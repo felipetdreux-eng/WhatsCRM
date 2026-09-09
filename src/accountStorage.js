@@ -4,6 +4,7 @@ export const SESSION_KEY = 'zapflow-session';
 const OWNER_KEY = 'zapflow-storage-owner';
 const LEGACY_BACKUP_PREFIX = 'zapflow-legacy-backup';
 const SCOPED_BASES = ['zapflow-leads', 'zapflow-messages'];
+const SUPABASE_SESSION_KEY = 'sb-myllrhcgbrwfvtqxgkcb-auth-token';
 
 export function readJSON(key, fallback) {
   try {
@@ -50,35 +51,23 @@ function archiveUnclaimedLegacy() {
 
 export function activateAccountStorage(accountId, { allowLegacy = true } = {}) {
   if (!accountId) return;
-
   const currentOwner = localStorage.getItem(OWNER_KEY);
-
   if (currentOwner === accountId) {
     saveGlobalToAccount(accountId);
     return;
   }
-
-  if (currentOwner && currentOwner !== accountId) {
-    saveGlobalToAccount(currentOwner);
-  }
-
+  if (currentOwner && currentOwner !== accountId) saveGlobalToAccount(currentOwner);
   if (!currentOwner) {
     const hasScopedData = SCOPED_BASES.some(base => localStorage.getItem(scopedKey(base, accountId)) !== null);
     const hasLegacyData = SCOPED_BASES.some(base => localStorage.getItem(base) !== null);
-
-    if (!hasScopedData && hasLegacyData && allowLegacy) {
-      saveGlobalToAccount(accountId);
-    } else if (hasLegacyData && !allowLegacy) {
-      archiveUnclaimedLegacy();
-    }
+    if (!hasScopedData && hasLegacyData && allowLegacy) saveGlobalToAccount(accountId);
+    else if (hasLegacyData && !allowLegacy) archiveUnclaimedLegacy();
   }
-
   for (const base of SCOPED_BASES) {
     const value = localStorage.getItem(scopedKey(base, accountId));
     if (value === null) localStorage.removeItem(base);
     else localStorage.setItem(base, value);
   }
-
   localStorage.setItem(OWNER_KEY, accountId);
 }
 
@@ -92,6 +81,8 @@ export function initializeAccountData(accountId, startMode) {
 export function logoutAccount(accountId) {
   const owner = localStorage.getItem(OWNER_KEY);
   if (owner === accountId) saveGlobalToAccount(accountId);
+  try { window.__zapflowSupabaseSignOut?.(); } catch {}
+  localStorage.removeItem(SUPABASE_SESSION_KEY);
   for (const base of SCOPED_BASES) localStorage.removeItem(base);
   localStorage.removeItem(OWNER_KEY);
   localStorage.removeItem(SESSION_KEY);
