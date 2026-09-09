@@ -28,6 +28,8 @@ async function hashPassword(password) {
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const EMAIL_REDIRECT_URL = `${window.location.origin}/`;
+
 const SELL_OPTIONS = [
   { id: 'services', title: 'Serviços', text: 'Freelas, agências, técnicos e profissionais.', icon: BriefcaseBusiness },
   { id: 'products', title: 'Produtos', text: 'Vendas de produtos e pedidos pelo WhatsApp.', icon: Package },
@@ -81,7 +83,10 @@ function AuthScreen({ onAuthenticated }) {
     const { data, error: signupError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: plainPassword,
-      options: { data: { name: legacy.name || normalizedEmail.split('@')[0] } },
+      options: {
+        data: { name: legacy.name || normalizedEmail.split('@')[0] },
+        emailRedirectTo: EMAIL_REDIRECT_URL,
+      },
     });
 
     if (signupError) {
@@ -114,7 +119,10 @@ function AuthScreen({ onAuthenticated }) {
         const { data, error: signupError } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
-          options: { data: { name: name.trim() } },
+          options: {
+            data: { name: name.trim() },
+            emailRedirectTo: EMAIL_REDIRECT_URL,
+          },
         });
         if (signupError) return setError(signupError.message);
         if (data.session && data.user) onAuthenticated(data.user);
