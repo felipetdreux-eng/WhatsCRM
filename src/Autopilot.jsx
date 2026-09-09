@@ -68,6 +68,13 @@ const OUTCOME_OPTIONS = [
   },
 ];
 
+const FOLLOWUP_PRESETS = [
+  { id: 'today', label: 'Hoje mais tarde', days: 0 },
+  { id: 'tomorrow', label: 'Amanhã', days: 1 },
+  { id: 'three-days', label: '+3 dias', days: 3 },
+  { id: 'next-week', label: 'Próxima semana', days: 7 },
+];
+
 const money = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
@@ -78,12 +85,23 @@ function dateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function dayDiff(value) {
+function offsetDateKey(days) {
+  const next = new Date();
+  next.setHours(12, 0, 0, 0);
+  next.setDate(next.getDate() + Number(days || 0));
+  return dateKey(next);
+}
+
+function daysUntilDate(value) {
   if (!value) return null;
   const target = new Date(`${value}T12:00:00`);
   const today = new Date(`${dateKey()}T12:00:00`);
   if (Number.isNaN(target.getTime())) return null;
   return Math.round((target - today) / 86400000);
+}
+
+function dayDiff(value) {
+  return daysUntilDate(value);
 }
 
 function daysWithoutInteraction(lead) {
@@ -206,11 +224,14 @@ function recommendation(item) {
   };
 }
 
-function followupSuggestion(days) {
+function followupSuggestion(value) {
+  const days = daysUntilDate(value);
+  if (days === 0) return 'hoje';
   if (days === 1) return 'amanhã';
   if (days === 2) return 'daqui a 2 dias';
   if (days === 3) return 'daqui a 3 dias';
-  return `daqui a ${days} dias`;
+  if (days === 7) return 'na próxima semana';
+  return prettyDate(value).toLowerCase();
 }
 
 export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp, onOutcome }) {
@@ -225,6 +246,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
   const [awaitingOutcome, setAwaitingOutcome] = useState(false);
   const [selectedOutcomeId, setSelectedOutcomeId] = useState('');
   const [saleValue, setSaleValue] = useState('');
+  const [followupDate, setFollowupDate] = useState('');
+  const [followupAction, setFollowupAction] = useState('');
   const [outcomeError, setOutcomeError] = useState('');
 
   const remaining = sessionQueue.filter(item => !handled.includes(item.lead.id));
@@ -236,6 +259,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
   const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 100;
   const suggestion = current ? recommendation(current) : null;
   const selectedOutcome = OUTCOME_OPTIONS.find(option => option.id === selectedOutcomeId) || null;
+  const needsFollowup = Boolean(selectedOutcome && !(selectedOutcome.status && CLOSED.includes(selectedOutcome.status)));
+  const suggestedDate = selectedOutcome?.nextDays != null ? offsetDateKey(selectedOutcome.nextDays) : '';
 
   useEffect(() => {
     if (!open) return undefined;
@@ -258,6 +283,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
       setAwaitingOutcome(false);
       setSelectedOutcomeId('');
       setSaleValue('');
+      setFollowupDate('');
+      setFollowupAction('');
       setOutcomeError('');
     }
   }, [open]);
@@ -267,6 +294,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setAwaitingOutcome(false);
     setSelectedOutcomeId('');
     setSaleValue(String(Number(current.lead.value || 0) > 0 ? Number(current.lead.value) : ''));
+    setFollowupDate('');
+    setFollowupAction('');
     setOutcomeError('');
   }, [current?.lead.id]);
 
@@ -285,11 +314,21 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setAwaitingOutcome(true);
     setSelectedOutcomeId('');
     setSaleValue(String(Number(current.lead.value || 0) > 0 ? Number(current.lead.value) : ''));
+    setFollowupDate('');
+    setFollowupAction('');
     setOutcomeError('');
   };
 
   const chooseOutcome = id => {
+    const option = OUTCOME_OPTIONS.find(item => item.id === id);
     setSelectedOutcomeId(id);
+    setFollowupDate(option?.nextDays != null ? offsetDateKey(option.nextDays) : '');
+    setFollowupAction(option?.nextAction || '');
+    setOutcomeError('');
+  };
+
+  const choosePreset = days => {
+    setFollowupDate(offsetDateKey(days));
     setOutcomeError('');
   };
 
@@ -307,13 +346,22 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
       }
     }
 
+    let nextDays = null;
+    if (needsFollowup) {
+      nextDays = daysUntilDate(followupDate);
+      if (nextDays == null || nextDays < 0) {
+        setOutcomeError('Escolha hoje ou uma data futura para o próximo contato.');
+        return;
+      }
+    }
+
     const applied = onOutcome?.({
       leadId: current.lead.id,
       outcome: selectedOutcome.id,
       label: selectedOutcome.label,
       status: selectedOutcome.status || null,
-      nextDays: selectedOutcome.nextDays ?? null,
-      nextAction: selectedOutcome.nextAction || '',
+      nextDays,
+      nextAction: needsFollowup ? (followupAction.trim() || selectedOutcome.nextAction || 'Retornar contato') : '',
       saleValue: selectedOutcome.id === 'won' ? Number(saleValue) : null,
     });
 
@@ -328,6 +376,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     markHandled(current.lead.id);
     setAwaitingOutcome(false);
     setSelectedOutcomeId('');
+    setFollowupDate('');
+    setFollowupAction('');
     setOutcomeError('');
   };
 
@@ -337,6 +387,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     markHandled(current.lead.id);
     setAwaitingOutcome(false);
     setSelectedOutcomeId('');
+    setFollowupDate('');
+    setFollowupAction('');
     setOutcomeError('');
   };
 
@@ -357,6 +409,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setAwaitingOutcome(false);
     setSelectedOutcomeId('');
     setSaleValue('');
+    setFollowupDate('');
+    setFollowupAction('');
     setOutcomeError('');
   };
 
@@ -432,7 +486,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                     <button type="button" className="autopilot-inspect" onClick={inspect}>Ver negociação</button>
                     <button type="button" className="autopilot-skip" onClick={skip}>Pular por agora</button>
                   </div>
-                  <div className="autopilot-after-contact"><CheckCircle2 size={14} /><span>Quando você voltar do WhatsApp, o Autopilot pergunta o que aconteceu e atualiza status, histórico e próximo passo.</span></div>
+                  <div className="autopilot-after-contact"><CheckCircle2 size={14} /><span>Quando você voltar do WhatsApp, o Autopilot pergunta o que aconteceu e já sugere quando falar com o cliente de novo.</span></div>
                 </>
               )}
 
@@ -465,7 +519,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                         <span>O Fuply vai registrar</span>
                         <strong>{selectedOutcome.label}</strong>
                         {selectedOutcome.status && <p>Status → <b>{selectedOutcome.status}</b></p>}
-                        {selectedOutcome.nextDays != null && <p>Próximo passo → <b>{selectedOutcome.nextAction}</b> {followupSuggestion(selectedOutcome.nextDays)}</p>}
+                        {needsFollowup && followupDate && <p>Próximo passo → <b>{followupAction || selectedOutcome.nextAction || 'Retornar contato'}</b> {followupSuggestion(followupDate)}</p>}
                         {selectedOutcome.status && CLOSED.includes(selectedOutcome.status) && <p>Esse lead sai da fila de follow-up.</p>}
                       </div>
                       {selectedOutcome.id === 'won' && (
@@ -474,6 +528,35 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                           <input type="number" min="0.01" step="0.01" value={saleValue} onChange={event => setSaleValue(event.target.value)} placeholder="0,00" />
                         </label>
                       )}
+                    </div>
+                  )}
+
+                  {selectedOutcome && needsFollowup && (
+                    <div className="autopilot-followup-picker">
+                      <div className="autopilot-followup-head">
+                        <div><span>Próximo contato</span><strong>Quando você quer voltar nesse cliente?</strong></div>
+                        {suggestedDate && followupDate === suggestedDate && <b><Sparkles size={12} /> Sugestão do Fuply</b>}
+                      </div>
+                      <div className="autopilot-followup-presets" aria-label="Atalhos para próximo contato">
+                        {FOLLOWUP_PRESETS.map(preset => {
+                          const presetDate = offsetDateKey(preset.days);
+                          return (
+                            <button type="button" key={preset.id} className={followupDate === presetDate ? 'active' : ''} onClick={() => choosePreset(preset.days)}>
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="autopilot-followup-fields">
+                        <label>
+                          <span>Escolher data</span>
+                          <input type="date" min={dateKey()} value={followupDate} onChange={event => { setFollowupDate(event.target.value); setOutcomeError(''); }} />
+                        </label>
+                        <label>
+                          <span>Próxima ação</span>
+                          <input value={followupAction} onChange={event => setFollowupAction(event.target.value)} placeholder="Ex.: Cobrar retorno" />
+                        </label>
+                      </div>
                     </div>
                   )}
 
