@@ -41,6 +41,12 @@ const STATUSES = [
   { id: 'Perdido', className: 'lost' },
 ];
 
+const OPEN_STATUSES = STATUSES.filter(status => !['Vendido', 'Perdido'].includes(status.id));
+const VALID_DDDS = new Set([
+  '11','12','13','14','15','16','17','18','19','21','22','24','27','28','31','32','33','34','35','37','38',
+  '41','42','43','44','45','46','47','48','49','51','53','54','55','61','62','63','64','65','66','67','68','69',
+  '71','73','74','75','77','79','81','82','83','84','85','86','87','88','89','91','92','93','94','95','96','97','98','99',
+]);
 const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
 
 const DEMO_LEADS = [
@@ -73,7 +79,7 @@ const emptyForm = {
 };
 
 const currency = value => new Intl.NumberFormat('pt-BR', {
-  style: 'currency', currency: 'BRL', maximumFractionDigits: 0,
+  style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2,
 }).format(Number(value || 0));
 
 function localDateKey() {
@@ -103,12 +109,17 @@ function canonicalPhone(phone) {
 
 function validBrazilPhone(phone) {
   const digits = canonicalPhone(phone);
-  return digits.length === 10 || digits.length === 11;
+  if (!/^\d{10,11}$/.test(digits)) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  if (!VALID_DDDS.has(digits.slice(0, 2))) return false;
+  const subscriber = digits.slice(2);
+  if (digits.length === 11) return subscriber.startsWith('9');
+  return ['2', '3', '4', '5'].includes(subscriber[0]);
 }
 
 function whatsappPhone(phone) {
   const digits = canonicalPhone(phone);
-  return digits ? `55${digits}` : '';
+  return validBrazilPhone(digits) ? `55${digits}` : '';
 }
 
 function statusTone(status) {
@@ -120,6 +131,48 @@ function statusTone(status) {
   return 'neutral';
 }
 
+function migrateLead(rawLead) {
+  const lead = rawLead && typeof rawLead === 'object' ? rawLead : {};
+  const status = STATUSES.some(item => item.id === lead.status) ? lead.status : 'Novo lead';
+  const value = Number.isFinite(Number(lead.value)) ? Number(lead.value) : 0;
+  const hadSaleValue = Number.isFinite(Number(lead.saleValue)) && Number(lead.saleValue) > 0;
+  const assumedSaleValue = status === 'Vendido' && !hadSaleValue && value > 0;
+  const migrated = {
+    ...lead,
+    id: lead.id || crypto.randomUUID(),
+    name: String(lead.name || 'Lead sem nome'),
+    company: String(lead.company || ''),
+    phone: canonicalPhone(lead.phone),
+    value,
+    status,
+    origin: lead.origin || 'Outro',
+    nextContact: lead.nextContact || '',
+    nextContactTime: lead.nextContactTime || '',
+    nextAction: lead.nextAction || '',
+    notes: lead.notes || '',
+    createdAt: lead.createdAt || null,
+    updatedAt: lead.updatedAt || lead.soldAt || lead.lostAt || lead.createdAt || null,
+    soldAt: status === 'Vendido' ? (lead.soldAt || null) : null,
+    lostAt: status === 'Perdido' ? (lead.lostAt || null) : null,
+    saleValue: status === 'Vendido' ? (hadSaleValue ? Number(lead.saleValue) : (value > 0 ? value : null)) : null,
+    saleValueSource: status === 'Vendido'
+      ? (hadSaleValue ? (lead.saleValueSource || 'confirmed') : (assumedSaleValue ? 'legacy-potential' : 'missing'))
+      : null,
+  };
+
+  if (['Vendido', 'Perdido'].includes(status)) {
+    migrated.nextContact = '';
+    migrated.nextContactTime = '';
+    migrated.nextAction = '';
+  }
+
+  return migrated;
+}
+
+function migrateLeads(items) {
+  return (Array.isArray(items) ? items : []).map(migrateLead);
+}
+
 function applyStatusTransition(previous, draft, nextStatus, saleValue) {
   const now = new Date().toISOString();
   const changed = previous.status !== nextStatus;
@@ -127,6 +180,7 @@ function applyStatusTransition(previous, draft, nextStatus, saleValue) {
 
   if (nextStatus === 'Vendido') {
     next.saleValue = Number(saleValue ?? draft.saleValue ?? previous.saleValue ?? 0);
+    next.saleValueSource = 'confirmed';
     next.soldAt = previous.status === 'Vendido' && previous.soldAt ? previous.soldAt : now;
     next.lostAt = null;
     next.nextContact = '';
@@ -134,6 +188,7 @@ function applyStatusTransition(previous, draft, nextStatus, saleValue) {
     next.nextAction = '';
   } else if (nextStatus === 'Perdido') {
     next.saleValue = null;
+    next.saleValueSource = null;
     next.soldAt = null;
     next.lostAt = previous.status === 'Perdido' && previous.lostAt ? previous.lostAt : now;
     next.nextContact = '';
@@ -141,6 +196,7 @@ function applyStatusTransition(previous, draft, nextStatus, saleValue) {
     next.nextAction = '';
   } else if (changed && ['Vendido', 'Perdido'].includes(previous.status)) {
     next.saleValue = null;
+    next.saleValueSource = null;
     next.soldAt = null;
     next.lostAt = null;
   }
@@ -152,9 +208,9 @@ function App() {
   const [leads, setLeads] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('zapflow-leads'));
-      return Array.isArray(saved) ? saved : DEMO_LEADS;
+      return migrateLeads(Array.isArray(saved) ? saved : DEMO_LEADS);
     } catch {
-      return DEMO_LEADS;
+      return migrateLeads(DEMO_LEADS);
     }
   });
   const [query, setQuery] = useState('');
@@ -230,6 +286,7 @@ function App() {
     if (!draggedId) return;
     const id = draggedId;
     setDraggedId(null);
+    if (statusFilter !== 'Todos' && statusFilter !== status) setStatusFilter('Todos');
     requestStatusChange(id, status);
   };
 
@@ -250,13 +307,15 @@ function App() {
     event.preventDefault();
     setFormError('');
     if (!form.name.trim()) return setFormError('Informe o nome do lead.');
-    if (!validBrazilPhone(form.phone)) return setFormError('Digite um WhatsApp válido com DDD.');
+    if (!validBrazilPhone(form.phone)) return setFormError('Digite um WhatsApp brasileiro válido com DDD.');
     if (isDuplicatePhone(form.phone)) return setFormError('Já existe um lead com esse WhatsApp.');
 
     const now = new Date().toISOString();
+    const safeStatus = ['Vendido', 'Perdido'].includes(form.status) ? 'Novo lead' : form.status;
     const next = {
       id: crypto.randomUUID(),
       ...form,
+      status: safeStatus,
       phone: canonicalPhone(form.phone),
       value: Number(form.value || 0),
       createdAt: now,
@@ -264,6 +323,7 @@ function App() {
       soldAt: null,
       lostAt: null,
       saleValue: null,
+      saleValueSource: null,
     };
     setLeads(current => [next, ...current]);
     setForm(emptyForm);
@@ -288,7 +348,7 @@ function App() {
     if (!editingLead) return;
     setFormError('');
     if (!editingLead.name?.trim()) return setFormError('Informe o nome do lead.');
-    if (!validBrazilPhone(editingLead.phone)) return setFormError('Digite um WhatsApp válido com DDD.');
+    if (!validBrazilPhone(editingLead.phone)) return setFormError('Digite um WhatsApp brasileiro válido com DDD.');
     if (isDuplicatePhone(editingLead.phone, editingLead.id)) return setFormError('Já existe outro lead com esse WhatsApp.');
     if (editingLead.status === 'Vendido' && Number(editingLead.saleValue) <= 0) return setFormError('Informe o valor final da venda.');
 
@@ -377,7 +437,7 @@ function App() {
               <label><span>Nome *</span><input required value={editingLead.name} onChange={e => setEditingLead({ ...editingLead, name: e.target.value })} /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={editingLead.phone} onChange={e => setEditingLead({ ...editingLead, phone: e.target.value })} /></label>
               <label><span>Empresa</span><input value={editingLead.company || ''} onChange={e => setEditingLead({ ...editingLead, company: e.target.value })} /></label>
-              <label><span>Valor potencial</span><input type="number" min="0" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></label>
+              <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></label>
               <label><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
               {editingLead.status === 'Vendido' && <label><span>Valor vendido *</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></label>}
               <label><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
@@ -486,7 +546,7 @@ function App() {
                 ))}
                 {columnLeads.length === 0 && <div className="empty-column">Arraste um lead para cá</div>}
               </div>
-              <button className="add-column-lead" onClick={() => { setForm({ ...emptyForm, status: status.id }); setFormError(''); setModalOpen(true); }}><Plus size={15} /> Adicionar lead</button>
+              {!['Vendido', 'Perdido'].includes(status.id) && <button className="add-column-lead" onClick={() => { setForm({ ...emptyForm, status: status.id }); setFormError(''); setModalOpen(true); }}><Plus size={15} /> Adicionar lead</button>}
             </section>;
           })}
         </div>
@@ -515,8 +575,8 @@ function App() {
               <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Studio Bella" /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
               <label><span>Empresa</span><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Ex.: Salão de beleza" /></label>
-              <label><span>Valor potencial</span><input type="number" min="0" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="350" /></label>
-              <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{STATUSES.filter(status => !['Vendido', 'Perdido'].includes(status.id)).map(status => <option key={status.id}>{status.id}</option>)}</select></label>
+              <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="350,00" /></label>
+              <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{OPEN_STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
               <label><span>Origem</span><select value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
               <label><span>Próximo contato</span><input type="date" value={form.nextContact} onChange={e => setForm({ ...form, nextContact: e.target.value })} /></label>
               <label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e => setForm({ ...form, nextContactTime: e.target.value })} /></label>
