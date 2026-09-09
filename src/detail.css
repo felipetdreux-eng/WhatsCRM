@@ -1,1 +1,103 @@
 .detail-content{padding-bottom:70px}.detail-topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.back-button{border:0;background:transparent;color:#475467;display:inline-flex;align-items:center;gap:7px;padding:7px 0;font-size:11px;font-weight:600}.back-button:hover{color:#111827}.detail-top-actions{display:flex;gap:8px}.detail-hero{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:17px 18px;margin-bottom:16px}.detail-avatar{width:48px;height:48px;border-radius:12px;background:#eaf8f1;color:#12875a;display:grid;place-items:center;font-size:14px;font-weight:800}.detail-title h1{margin:0;font-size:22px;letter-spacing:-.04em}.detail-title p{margin:4px 0 0;font-size:11px;color:#98a2b3}.detail-title-line{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.detail-status{font-size:9px;font-weight:700;padding:4px 7px;border-radius:999px;background:#f2f4f7;color:#667085}.detail-status.status-contatado{background:#edf5ff;color:#2f80ed}.detail-status.status-interessado{background:#f4ecff;color:#8055b8}.detail-status.status-proposta-enviada{background:#fff2e8;color:#c95e0b}.detail-status.status-vendido{background:#eaf8f1;color:#12875a}.detail-status.status-perdido{background:#fff0ef;color:#d92d20}.detail-value{text-align:right}.detail-value span{display:block;font-size:9px;color:#98a2b3}.detail-value strong{display:block;margin-top:3px;font-size:18px}.detail-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.8fr);gap:14px}.detail-main-column,.detail-side-column{display:flex;flex-direction:column;gap:14px}.detail-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:17px}.section-heading{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px}.section-heading h2{font-size:13px;margin:0}.section-heading p{font-size:10px;color:#98a2b3;margin:3px 0 0}.info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.info-item{border:1px solid #edf0f2;border-radius:10px;padding:11px;display:flex;gap:9px;align-items:flex-start}.info-item>svg{color:#16a36a;flex:0 0 auto;margin-top:1px}.info-item span,.info-item strong{display:block}.info-item span{font-size:9px;color:#98a2b3}.info-item strong{font-size:11px;margin-top:3px;font-weight:600;word-break:break-word}.notes-box{background:#f9fafb;border:1px solid #edf0f2;border-radius:10px;padding:13px;font-size:11px;line-height:1.55;color:#475467;min-height:74px}.action-schedule{display:flex;gap:10px;align-items:flex-start}.action-date-icon{width:38px;height:38px;border-radius:10px;background:#eaf8f1;color:#12875a;display:grid;place-items:center;flex:0 0 auto}.action-schedule strong,.action-schedule span{display:block}.action-schedule strong{font-size:11px}.action-schedule span{font-size:10px;color:#667085;margin-top:4px}.no-action{background:#f9fafb;border:1px dashed #d8dde3;border-radius:10px;padding:18px 12px;text-align:center;color:#98a2b3;font-size:10px}.detail-actions-stack{display:flex;flex-direction:column;gap:7px}.detail-actions-stack button{height:38px;border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;font-size:10px;font-weight:600;text-align:left}.detail-whatsapp{border:1px solid #cfe7db;background:#f5fbf8;color:#12875a}.detail-action{border:1px solid #e0e4e8;background:#fff;color:#475467}.detail-action.sold-action{border-color:#cfe7db;color:#12875a}.detail-action.lost-action{border-color:#f2cac6;color:#c72c23}.edit-card{max-width:820px}.detail-edit-form{margin-top:4px}@media(max-width:900px){.detail-grid{grid-template-columns:1fr}.detail-side-column{display:grid;grid-template-columns:1fr 1fr}.detail-hero{grid-template-columns:auto 1fr}.detail-value{grid-column:1/-1;text-align:left;padding-top:5px;border-top:1px solid #eef1f3}}@media(max-width:620px){.detail-topbar{align-items:flex-start}.detail-top-actions .secondary-button{display:none}.detail-hero{padding:14px}.detail-avatar{width:42px;height:42px}.detail-title h1{font-size:19px}.info-grid{grid-template-columns:1fr}.detail-side-column{display:flex}.detail-card{padding:14px}.detail-top-actions .primary-button{padding:0 10px}.detail-top-actions .primary-button svg{display:none}}
+
+/* Motion + mobile UX pass */
+@keyframes zf-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes zf-pop{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes zf-fade{from{opacity:0}to{opacity:1}}
+@keyframes zf-sheet{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes zf-pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,106,0)}50%{box-shadow:0 0 0 5px rgba(22,163,106,.08)}}
+
+html{scroll-behavior:smooth}
+body{overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button{transition:transform .16s ease,background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,filter .16s ease}
+button svg{transition:transform .18s ease,opacity .18s ease}
+
+.primary-button,.secondary-button,.whatsapp-button,.detail-whatsapp,.detail-action,.attention-button,.dashboard-panel-footer,.recent-whatsapp,.followup-toolbar button,.followup-buttons button,.quick-dates button,.add-column-lead,.back-button,.nav-item,.icon-button{will-change:transform}
+
+@media(hover:hover){
+  .primary-button:hover{transform:translateY(-2px);box-shadow:0 7px 16px rgba(15,122,80,.20)}
+  .primary-button:hover svg{transform:scale(1.08)}
+  .secondary-button:hover{transform:translateY(-1px);background:#fafbfc;border-color:#cfd5dc;box-shadow:0 4px 10px rgba(16,24,40,.06)}
+  .whatsapp-button:hover,.detail-whatsapp:hover,.followup-whatsapp:hover,.recent-whatsapp:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(22,163,106,.10)}
+  .detail-action:hover,.followup-reschedule:hover,.dashboard-panel-footer:hover,.quick-dates button:hover{transform:translateY(-1px)}
+  .detail-action.sold-action:hover,.followup-done:hover{background:#f1fbf6;box-shadow:0 4px 10px rgba(22,163,106,.08)}
+  .detail-action.lost-action:hover{background:#fff7f6;box-shadow:0 4px 10px rgba(217,45,32,.07)}
+  .nav-item:hover{transform:translateX(2px)}
+  .nav-item:hover svg{transform:scale(1.06)}
+  .icon-button:hover{transform:scale(1.06)}
+  .add-column-lead:hover svg,.dashboard-panel-footer:hover svg,.back-button:hover svg{transform:translateX(2px)}
+  .metric-card:hover,.dashboard-metric-card:hover,.followup-stat:hover,.detail-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,24,40,.055);border-color:#dce2e6}
+  .dashboard-list-item:hover .dashboard-avatar,.recent-table tbody tr:hover .dashboard-avatar{transform:scale(1.06)}
+}
+
+button:not(:disabled):active{transform:translateY(1px) scale(.975)!important;box-shadow:none!important}
+button:disabled{cursor:not-allowed;opacity:.55}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(22,163,106,.18);outline-offset:2px}
+
+.nav-item.active{animation:zf-pop .18s ease both}
+.nav-item.active svg{transform:scale(1.05)}
+.nav-badge{animation:zf-pop .22s ease both}
+.modal-backdrop{animation:zf-fade .18s ease both}
+.modal{animation:zf-pop .22s cubic-bezier(.2,.8,.2,1) both}
+.lead-card,.metric-card,.detail-card,.dashboard-metric-card,.dashboard-panel,.followup-section,.followup-stat{animation:zf-rise .24s ease both}
+.dashboard-attention{animation:zf-rise .28s ease both}
+.followup-toast{animation:zf-pop .2s ease both}
+.status-dot,.action-date-icon{animation:zf-pulse 2.8s ease-in-out infinite}
+.dashboard-avatar{transition:transform .16s ease}
+.pipeline-bar-fill{transition:width .35s cubic-bezier(.2,.8,.2,1)}
+
+@media(max-width:820px){
+  .main-content{padding-top:18px}
+  .page-header,.dashboard-header,.followups-header{gap:14px}
+  .header-actions,.dashboard-header-actions{gap:7px}
+  .primary-button,.secondary-button{min-height:42px}
+  .search-box,.followups-search{min-height:42px}
+}
+
+@media(max-width:560px){
+  :root{--mobile-nav-h:72px}
+  body{padding-bottom:env(safe-area-inset-bottom)}
+  .sidebar{height:calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));padding:5px 8px calc(5px + env(safe-area-inset-bottom));box-shadow:0 -8px 26px rgba(16,24,40,.06);background:rgba(255,255,255,.97);backdrop-filter:blur(14px)}
+  .nav-list{grid-template-columns:repeat(4,1fr)!important;gap:4px}
+  .nav-item:nth-child(5),.nav-item:nth-child(6){display:none!important}
+  .nav-item{position:relative;display:flex!important;flex-direction:column;justify-content:center;gap:3px;height:100%;min-height:56px;padding:4px 2px;border-radius:11px;font-size:9px}
+  .nav-item>span{display:block!important;font-size:9px;line-height:1;color:inherit;font-weight:600}
+  .nav-item>svg{width:19px;height:19px}
+  .nav-item.active{background:#eaf7f1}
+  .nav-badge{display:grid!important;position:absolute;top:3px;left:calc(50% + 8px);min-width:17px;width:auto;height:17px;padding:0 4px;background:#16a36a;color:#fff;font-size:8px;border:2px solid #fff}
+  .main-content{margin-bottom:calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));padding:15px 11px 18px}
+
+  .page-header{margin-bottom:14px}.page-header h1,.dashboard-header h1,.followups-header h1{font-size:24px}.page-header p,.dashboard-header p,.followups-header p{font-size:11px;line-height:1.45}
+  .header-actions{grid-template-columns:minmax(0,1fr) auto;width:100%}
+  .search-box{height:44px;border-radius:11px}.primary-button,.secondary-button{height:44px;border-radius:11px}
+  .header-actions .primary-button{white-space:nowrap}
+
+  .metrics-grid,.dashboard-metrics,.followup-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .metric-card,.dashboard-metric-card,.followup-stat{min-height:72px;border-radius:12px}
+
+  .pipeline-scroll{margin:0 -11px;padding:0 11px 18px;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scroll-padding-left:11px;-webkit-overflow-scrolling:touch}
+  .pipeline-board{grid-template-columns:repeat(6,min(86vw,340px));gap:10px}
+  .pipeline-column{scroll-snap-align:start;scroll-snap-stop:always;min-height:calc(100dvh - 290px);border-radius:14px}
+  .lead-card{padding:13px;border-radius:12px}.lead-heading strong{font-size:13px}.lead-heading span{font-size:10px}.lead-value{font-size:13px}
+  .whatsapp-button{height:38px;font-size:10.5px}.lead-actions>.icon-button{width:38px;height:38px}.add-column-lead{min-height:42px;font-size:11px}
+
+  .modal-backdrop{place-items:end center;padding:0;background:rgba(17,24,39,.48)}
+  .modal{width:100%;max-height:92dvh;border-radius:20px 20px 0 0;border-bottom:0;padding:18px 16px calc(22px + env(safe-area-inset-bottom));animation:zf-sheet .24s cubic-bezier(.2,.8,.2,1) both}
+  .modal-header{position:sticky;top:-18px;z-index:2;background:#fff;padding:18px 0 11px;margin-top:-18px}
+  .lead-form input,.lead-form select{min-height:44px}.lead-form textarea{min-height:96px}
+  .modal-actions{position:sticky;bottom:calc(-22px - env(safe-area-inset-bottom));background:#fff;padding:10px 0 calc(22px + env(safe-area-inset-bottom));margin-bottom:calc(-22px - env(safe-area-inset-bottom))}
+  .modal-actions .primary-button,.modal-actions .secondary-button{flex:1}
+
+  .detail-content{padding-bottom:18px}.detail-topbar{position:sticky;top:0;z-index:12;background:rgba(247,248,250,.94);backdrop-filter:blur(10px);margin:0 -11px 12px;padding:8px 11px}.back-button{min-height:40px;padding:0 4px}.detail-top-actions .primary-button{min-height:40px}
+  .detail-hero{border-radius:14px}.detail-card{border-radius:14px}.detail-actions-stack button{height:44px;font-size:11px}
+
+  .followups-page{padding-bottom:18px}.followups-search{height:44px}.followup-toolbar{margin-right:-11px;padding-right:11px;scrollbar-width:none}.followup-toolbar::-webkit-scrollbar{display:none}.followup-toolbar button{min-height:36px;padding:0 13px}
+  .followup-section{border-radius:14px}.followup-date-tile{width:46px;height:50px}.followup-buttons button{min-height:40px;border-radius:10px}.followup-main{min-height:54px}
+
+  .dashboard-page{padding-bottom:18px}.dashboard-header-actions button{min-height:44px}.dashboard-attention{border-radius:15px}.attention-button{min-height:44px}.dashboard-panel{border-radius:14px}.dashboard-panel-head{padding:14px}.dashboard-panel-footer{min-height:42px}.dashboard-list-item{min-height:54px}.recent-whatsapp,.dashboard-list-meta button{width:36px;height:36px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
