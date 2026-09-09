@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, MessageCircle, Pencil, Search, Send, X } from 'lucide-react';
-import { loadMessages, syncMessages } from './backendBridge';
+import { loadLeads, loadMessages, syncMessages } from './backendBridge';
 import './messages.css';
 
 const LEGACY_FIRST_CONTACT = 'Oi, {nome}! Tudo bem? Vi seu trabalho e queria te apresentar uma solução que pode ajudar a organizar seus contatos e oportunidades pelo WhatsApp. Posso te explicar rapidinho?';
@@ -69,8 +69,9 @@ function mergeRemoteTemplates(remote) {
   return [...defaults, ...extras];
 }
 
-export default function Messages({ leads, openWhatsApp, userId }) {
+export default function Messages({ leads = [], openWhatsApp, userId }) {
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
+  const [leadOptions, setLeadOptions] = useState(Array.isArray(leads) ? leads : []);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState('');
@@ -92,16 +93,22 @@ export default function Messages({ leads, openWhatsApp, userId }) {
       }
 
       try {
-        const remote = await loadMessages(userId);
-        const merged = mergeRemoteTemplates(remote);
-        const missingDefaults = DEFAULT_TEMPLATES.some(template => !remote.some(item => item.id === template.id));
-        const migratedLegacy = remote.some(template => template.id === 'first-contact' && template.text === LEGACY_FIRST_CONTACT);
+        const [remoteTemplates, remoteLeads] = await Promise.all([
+          loadMessages(userId),
+          loadLeads(userId),
+        ]);
+        const merged = mergeRemoteTemplates(remoteTemplates);
+        const missingDefaults = DEFAULT_TEMPLATES.some(template => !remoteTemplates.some(item => item.id === template.id));
+        const migratedLegacy = remoteTemplates.some(template => template.id === 'first-contact' && template.text === LEGACY_FIRST_CONTACT);
 
-        if (missingDefaults || migratedLegacy || remote.length === 0) {
+        if (missingDefaults || migratedLegacy || remoteTemplates.length === 0) {
           await syncMessages(merged, userId);
         }
 
-        if (active) setTemplates(merged);
+        if (active) {
+          setTemplates(merged);
+          if (remoteLeads.length || !leadOptions.length) setLeadOptions(remoteLeads);
+        }
       } catch (loadError) {
         console.error('ZapFlow message load failed:', loadError);
         if (active) setError('Não foi possível carregar suas mensagens agora.');
@@ -114,7 +121,7 @@ export default function Messages({ leads, openWhatsApp, userId }) {
     return () => { active = false; };
   }, [userId]);
 
-  const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
+  const selectedLead = leadOptions.find(lead => lead.id === selectedLeadId) || null;
   const filtered = useMemo(() => templates.filter(template => (
     `${template.title} ${template.category} ${template.text}`.toLowerCase().includes(query.trim().toLowerCase())
   )), [templates, query]);
@@ -204,7 +211,7 @@ export default function Messages({ leads, openWhatsApp, userId }) {
           <span>Personalizar para</span>
           <select value={selectedLeadId} onChange={event => { setSelectedLeadId(event.target.value); setError(''); }}>
             <option value="">Nenhum lead selecionado</option>
-            {leads.filter(lead => !['Vendido', 'Perdido'].includes(lead.status)).map(lead => (
+            {leadOptions.filter(lead => !['Vendido', 'Perdido'].includes(lead.status)).map(lead => (
               <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>
             ))}
           </select>
