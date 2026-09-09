@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import FollowUps from './FollowUps';
+import Leads from './Leads';
+import ComingSoon from './ComingSoon';
 import './styles.css';
 import './detail.css';
 
@@ -121,7 +123,7 @@ function App() {
   const [draggedId, setDraggedId] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
-  const [activePage, setActivePage] = useState('Pipeline');
+  const [activePage, setActivePage] = useState('Dashboard');
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -206,32 +208,18 @@ function App() {
   };
 
   const navigate = label => {
-    if (label === 'Dashboard') {
-      setActivePage('Dashboard');
-      setSelectedLeadId(null);
-      setEditingLead(null);
-      return;
-    }
-    if (label === 'Pipeline' || label === 'Leads') {
-      setActivePage('Pipeline');
-      setSelectedLeadId(null);
-      setEditingLead(null);
-      return;
-    }
-    if (label === 'Follow-ups') {
-      setActivePage('Follow-ups');
-      setSelectedLeadId(null);
-      setEditingLead(null);
-    }
+    setActivePage(label);
+    setSelectedLeadId(null);
+    setEditingLead(null);
   };
 
   const renderSidebar = () => (
     <aside className="sidebar">
-      <div className="logo-wrap">
+      <button className="logo-wrap logo-button" onClick={() => navigate('Dashboard')} aria-label="Ir para Dashboard">
         <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
         <span>ZapFlow</span>
-      </div>
-      <nav className="nav-list">
+      </button>
+      <nav className="nav-list" aria-label="Navegação principal">
         {navItems.map(([label, Icon]) => (
           <button key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)}>
             <Icon size={18} /><span>{label}</span>
@@ -395,23 +383,19 @@ function App() {
     </main>
   );
 
+  const renderActivePage = () => {
+    if (selectedLead) return renderLeadDetail();
+    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setModalOpen(true); }} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Follow-ups')} />;
+    if (activePage === 'Leads') return <Leads leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setModalOpen(true); }} />;
+    if (activePage === 'Follow-ups') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />;
+    if (activePage === 'Mensagens' || activePage === 'Configurações') return <ComingSoon type={activePage} goDashboard={() => setActivePage('Dashboard')} />;
+    return renderPipeline();
+  };
+
   return (
     <div className="app-shell">
       {renderSidebar()}
-      {selectedLead
-        ? renderLeadDetail()
-        : activePage === 'Dashboard'
-          ? <Dashboard
-              leads={leads}
-              openLead={openLead}
-              openWhatsApp={openWhatsApp}
-              onNewLead={() => { setForm(emptyForm); setModalOpen(true); }}
-              goPipeline={() => setActivePage('Pipeline')}
-              goFollowUps={() => setActivePage('Follow-ups')}
-            />
-          : activePage === 'Follow-ups'
-            ? <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />
-            : renderPipeline()}
+      {renderActivePage()}
 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
