@@ -10,16 +10,18 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Snowflake,
   Target,
   UsersRound,
   X,
 } from 'lucide-react';
 import LeadImporter from './LeadImporter';
+import { buildCoolingWatchlist, getLeadTemperature } from './leadTemperature';
 import './leads.css';
 
 const CLOSED = ['Vendido', 'Perdido'];
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
-const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato'];
+const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const noon = value => new Date(`${value}T12:00:00`);
@@ -36,9 +38,16 @@ const pretty = value => {
 const full = value => noon(value).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '');
 const statusClass = status => status.toLowerCase().replaceAll(' ', '-');
 
+function TemperatureBadge({ lead }) {
+  const temperature = getLeadTemperature(lead);
+  if (!temperature) return null;
+  return <span className={`lead-temperature-mini ${temperature.level}`} title={`${temperature.reason}. ${temperature.detail}`}>{temperature.label}</span>;
+}
+
 function inScope(lead, scope) {
   if (scope === 'Todos') return true;
   const closed = CLOSED.includes(lead.status);
+  if (scope === 'Esfriando') return Boolean(getLeadTemperature(lead)?.atRisk);
   const days = diff(lead.nextContact);
   if (scope === 'Sem próximo contato') return !lead.nextContact && !closed;
   if (closed || !lead.nextContact) return false;
@@ -65,6 +74,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       today: dated.filter(lead => diff(lead.nextContact) === 0),
       week: dated.filter(lead => diff(lead.nextContact) > 0 && diff(lead.nextContact) <= 7),
       without: active.filter(lead => !lead.nextContact),
+      cooling: buildCoolingWatchlist(active, { limit: Math.max(1, active.length) }),
     };
   }, [leads]);
 
@@ -76,9 +86,19 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       .filter(lead => !q || `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.nextAction} ${lead.notes || ''}`.toLowerCase().includes(q))
       .filter(lead => status === 'Todos' || lead.status === status)
       .filter(lead => inScope(lead, scope))
-      .sort((a, b) => a.nextContact && b.nextContact
-        ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
-        : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+      .sort((a, b) => {
+        if (scope === 'Esfriando') {
+          const aTemperature = getLeadTemperature(a);
+          const bTemperature = getLeadTemperature(b);
+          const aRank = aTemperature?.level === 'cooling' ? 0 : 1;
+          const bRank = bTemperature?.level === 'cooling' ? 0 : 1;
+          if (aRank !== bRank) return aRank - bRank;
+          if ((aTemperature?.days || 0) !== (bTemperature?.days || 0)) return (bTemperature?.days || 0) - (aTemperature?.days || 0);
+        }
+        return a.nextContact && b.nextContact
+          ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
+          : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      });
   }, [leads, query, status, scope]);
 
   const flash = text => {
@@ -172,6 +192,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
         <button type="button" className={`today ${scope === 'Hoje' ? 'active' : ''}`} onClick={() => setScope(scope === 'Hoje' ? 'Todos' : 'Hoje')}><CalendarClock size={18} /><span>Para hoje<strong>{summary.today.length}</strong></span></button>
         <button type="button" className={`upcoming ${scope === 'Próx. 7 dias' ? 'active' : ''}`} onClick={() => setScope(scope === 'Próx. 7 dias' ? 'Todos' : 'Próx. 7 dias')}><Clock3 size={18} /><span>Próx. 7 dias<strong>{summary.week.length}</strong></span></button>
         <button type="button" className={`missing ${scope === 'Sem próximo contato' ? 'active' : ''}`} onClick={() => setScope(scope === 'Sem próximo contato' ? 'Todos' : 'Sem próximo contato')}><Target size={18} /><span>Sem próximo contato<strong>{summary.without.length}</strong></span></button>
+        <button type="button" className={`cooling ${scope === 'Esfriando' ? 'active' : ''}`} onClick={() => setScope(scope === 'Esfriando' ? 'Todos' : 'Esfriando')}><Snowflake size={18} /><span>Esfriando<strong>{summary.cooling.length}</strong></span></button>
       </section>
 
       <section className="leads-directory">
@@ -187,7 +208,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
             <thead><tr><th>Lead</th><th>Status</th><th>Origem</th><th>Valor</th><th>Próximo contato</th><th>Próxima ação</th><th>Ações</th></tr></thead>
             <tbody>{filtered.map(lead => (
               <tr key={lead.id} tabIndex={0} onClick={() => openLead(lead)} onKeyDown={event => { if (event.key === 'Enter') openLead(lead); }}>
-                <td><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div></td>
+                <td><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span><TemperatureBadge lead={lead} /></div></div></td>
                 <td onClick={event => event.stopPropagation()}><select className="leads-status-select" value={lead.status} onChange={event => changeStatus(lead, event.target.value)} aria-label={`Status de ${lead.name}`}>{STATUSES.map(item => <option key={item}>{item}</option>)}</select></td>
                 <td><span className="lead-origin">{lead.origin || 'Outro'}</span></td>
                 <td><strong className="leads-value">{money(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong></td>
@@ -206,7 +227,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
 
         <div className="leads-mobile-list">{filtered.map(lead => (
           <article className="lead-directory-card" key={lead.id}>
-            <div className="lead-directory-card-top"><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div><span className={`leads-status status-${statusClass(lead.status)}`}>{lead.status}</span></div>
+            <div className="lead-directory-card-top"><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div><div className="lead-mobile-badges"><span className={`leads-status status-${statusClass(lead.status)}`}>{lead.status}</span><TemperatureBadge lead={lead} /></div></div>
             <div className="lead-directory-card-meta"><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
             <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
