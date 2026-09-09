@@ -27,6 +27,116 @@ function cleanMatrix(matrix) {
     .filter(row => row.some(cell => String(cell ?? '').trim()));
 }
 
+function hasMapped(mapping, key) {
+  return mapping?.[key] !== '' && mapping?.[key] != null;
+}
+
+function pdfHeaderScore(row) {
+  const headers = (Array.isArray(row) ? row : []).map(cell => String(cell ?? '').trim());
+  const mapping = detectMapping(headers);
+  const recognized = Object.values(mapping).filter(value => value !== '' && value != null).length;
+  const hasPhone = hasMapped(mapping, 'phone');
+  const hasIdentity = hasMapped(mapping, 'name') || hasMapped(mapping, 'company');
+  return {
+    score: (hasPhone ? 7 : 0) + (hasIdentity ? 6 : 0) + recognized,
+    mapping,
+  };
+}
+
+function looksLikePhone(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 13;
+}
+
+function alignPdfRow(row, headerCount, mapping) {
+  const cells = (Array.isArray(row) ? row : []).map(cell => String(cell ?? '').trim());
+  if (!cells.length || !headerCount) return cells;
+
+  const phoneColumn = hasMapped(mapping, 'phone') ? Number(mapping.phone) : -1;
+  const identityColumn = hasMapped(mapping, 'name')
+    ? Number(mapping.name)
+    : hasMapped(mapping, 'company')
+      ? Number(mapping.company)
+      : -1;
+  const phoneAt = cells.findIndex(looksLikePhone);
+
+  if (phoneColumn < 0 || phoneAt < 0 || cells.length === headerCount) {
+    if (cells.length >= headerCount) return cells;
+    return [...cells, ...Array(headerCount - cells.length).fill('')];
+  }
+
+  const aligned = Array(headerCount).fill('');
+  aligned[phoneColumn] = cells[phoneAt];
+
+  const beforePhone = cells.slice(0, phoneAt).filter(Boolean);
+  const afterPhone = cells.slice(phoneAt + 1).filter(Boolean);
+
+  if (identityColumn >= 0 && identityColumn !== phoneColumn && beforePhone.length) {
+    aligned[identityColumn] = beforePhone.join(' ');
+  }
+
+  const remainingColumns = Array.from({ length: headerCount }, (_, index) => index)
+    .filter(index => index !== phoneColumn && index !== identityColumn);
+  const afterColumns = remainingColumns.filter(index => index > phoneColumn);
+  const beforeColumns = remainingColumns.filter(index => index < phoneColumn);
+
+  afterPhone.forEach((value, index) => {
+    const target = afterColumns[index] ?? remainingColumns[index];
+    if (target != null && !aligned[target]) aligned[target] = value;
+  });
+
+  if (identityColumn < 0) {
+    beforePhone.forEach((value, index) => {
+      const target = beforeColumns[index];
+      if (target != null && !aligned[target]) aligned[target] = value;
+    });
+  }
+
+  return aligned;
+}
+
+function normalizePdfMatrix(matrix) {
+  const cleaned = cleanMatrix(matrix);
+  if (cleaned.length < 2) return cleaned;
+
+  let bestIndex = -1;
+  let bestScore = -1;
+  let bestMapping = null;
+
+  cleaned.forEach((row, index) => {
+    const candidate = pdfHeaderScore(row);
+    if (candidate.score > bestScore) {
+      bestIndex = index;
+      bestScore = candidate.score;
+      bestMapping = candidate.mapping;
+    }
+  });
+
+  const hasRequiredColumns = hasMapped(bestMapping, 'phone')
+    && (hasMapped(bestMapping, 'name') || hasMapped(bestMapping, 'company'));
+
+  // PDFs exported from Excel frequently contain titles, totals and instructions
+  // before the actual table. Only promote a row to header when we can identify
+  // both the phone and an identity column with confidence.
+  if (!hasRequiredColumns || bestScore < 15) return cleaned;
+
+  const headers = cleaned[bestIndex].map((header, index) => String(header || `Coluna ${index + 1}`).trim());
+  const headerCount = headers.length;
+  const rows = cleaned
+    .slice(bestIndex + 1)
+    .filter(row => {
+      const candidate = pdfHeaderScore(row);
+      const repeatedHeader = hasMapped(candidate.mapping, 'phone')
+        && (hasMapped(candidate.mapping, 'name') || hasMapped(candidate.mapping, 'company'))
+        && candidate.score >= 15;
+      return !repeatedHeader;
+    })
+    .map(row => alignPdfRow(row, headerCount, bestMapping))
+    .filter(row => row.some(cell => String(cell ?? '').trim()));
+
+  return [headers, ...rows];
+}
+
 function pdfItemsToRow(items) {
   const ordered = [...items].sort((a, b) => a.x - b.x);
   const cells = [];
@@ -92,7 +202,7 @@ async function readPdf(file) {
     throw new Error('Esse PDF parece ser escaneado ou só imagem. Exporte a tabela como PDF com texto selecionável, CSV ou Excel.');
   }
 
-  return cleanMatrix(matrix);
+  return normalizePdfMatrix(matrix);
 }
 
 async function readSpreadsheet(file) {
