@@ -9,12 +9,14 @@ import {
   ListFilter,
   MessageCircle,
   Plus,
+  Snowflake,
   Sparkles,
   Target,
   TrendingUp,
   UsersRound,
 } from 'lucide-react';
 import Autopilot, { buildAutopilotQueue } from './Autopilot';
+import { buildCoolingWatchlist } from './leadTemperature';
 import './dashboard.css';
 
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
@@ -59,14 +61,6 @@ function overdueLabel(value) {
   return `${days} dia${days === 1 ? '' : 's'} atrasado${days === 1 ? '' : 's'}`;
 }
 
-function daysWithoutInteraction(lead) {
-  const source = lead.lastFollowupAt || lead.updatedAt || lead.createdAt;
-  if (!source) return 0;
-  const date = new Date(source);
-  if (Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
-}
-
 export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps }) {
   const [autopilotOpen, setAutopilotOpen] = useState(false);
 
@@ -96,11 +90,8 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
         return Number(b.value || 0) - Number(a.value || 0);
       });
 
-    const cooling = active
-      .map(lead => ({ lead, days: daysWithoutInteraction(lead) }))
-      .filter(item => item.days >= 3)
-      .sort((a, b) => b.days - a.days || Number(b.lead.value || 0) - Number(a.lead.value || 0));
-    const cold = cooling.filter(item => item.days >= 7);
+    const cooling = buildCoolingWatchlist(active, { limit: Math.max(1, active.length) });
+    const cold = cooling.filter(item => item.temperature.level === 'cooling');
 
     const queue = [];
     const seen = new Set();
@@ -109,7 +100,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
         const lead = unwrap ? item.lead : item;
         if (seen.has(lead.id)) return;
         seen.add(lead.id);
-        queue.push({ lead, priority, days: unwrap ? item.days : null });
+        queue.push({ lead, priority, days: unwrap ? (item.temperature?.days ?? item.days ?? null) : null });
       });
     };
     pushQueue(overdue, 'overdue');
@@ -145,6 +136,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
       withoutNextContact,
       cooling,
       cold,
+      coolingWatchlist: cooling.slice(0, 4),
       statusCounts,
       maxStatusCount,
       queue: queue.slice(0, 7),
@@ -159,7 +151,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
     {
       label: 'Em negociação',
       value: data.active.length,
-      detail: `${data.cooling.length} sem interação há 3+ dias`,
+      detail: `${data.cooling.length} pedem atenção agora`,
       icon: UsersRound,
       tone: 'neutral',
     },
@@ -254,7 +246,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
             <div className={data.overdue.length ? 'danger' : ''}><strong>{data.overdue.length}</strong><span>Atrasados</span></div>
             <div className={data.todayFollowups.length ? 'warning' : ''}><strong>{data.todayFollowups.length}</strong><span>Hoje</span></div>
             <div><strong>{data.withoutNextContact.length}</strong><span>Sem próximo contato</span></div>
-            <div className={data.cooling.length ? 'cooling' : ''}><strong>{data.cooling.length}</strong><span>Esfriando</span></div>
+            <div className={data.cooling.length ? 'cooling' : ''}><strong>{data.cooling.length}</strong><span>Em risco</span></div>
           </div>
 
           <div className="focus-list">
@@ -294,10 +286,37 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
             <div><span>Em negociação</span><strong>{data.active.length}</strong></div>
             <div><span>Sem próximo passo</span><strong>{data.withoutNextContact.length}</strong></div>
             <div><span>Atrasados</span><strong>{data.overdue.length}</strong></div>
-            <div><span>7+ dias sem interação</span><strong>{data.cold.length}</strong></div>
+            <div><span>Esfriando</span><strong>{data.cold.length}</strong></div>
           </div>
           <button type="button" onClick={goFollowUps}>Organizar follow-ups <ArrowRight size={15} /></button>
         </aside>
+      </section>
+
+      <section className="cooling-watch" aria-label="Negociações esfriando">
+        <div className="cooling-watch-head">
+          <div className="cooling-watch-title"><span><Snowflake size={16} /></span><div><strong>Negociações esfriando</strong><p>O Fuply detecta quando uma oportunidade está ficando tempo demais sem contato.</p></div></div>
+          <button type="button" onClick={goFollowUps}>Ver todos os leads <ArrowRight size={15} /></button>
+        </div>
+        {data.coolingWatchlist.length ? (
+          <div className="cooling-watch-grid">
+            {data.coolingWatchlist.map(({ lead, temperature }) => (
+              <article className={`cooling-watch-card ${temperature.level}`} key={lead.id}>
+                <div className="cooling-watch-card-top">
+                  <button type="button" onClick={() => openLead(lead)}><div className="dashboard-avatar small">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.status} · {currency(lead.value)}</span></div></button>
+                  <span className={`cooling-badge ${temperature.level}`}>{temperature.label}</span>
+                </div>
+                <strong className="cooling-reason">{temperature.reason}</strong>
+                <p>{temperature.detail}</p>
+                <div className="cooling-watch-actions">
+                  <button type="button" className="cooling-open" onClick={() => openLead(lead)}>Ver negociação</button>
+                  <button type="button" className="cooling-recover" onClick={() => openWhatsApp(lead)}><MessageCircle size={15} /> Retomar agora</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="cooling-watch-empty"><CheckCircle2 size={20} /><div><strong>Nenhuma negociação esfriando</strong><span>Seu ritmo de follow-up está saudável agora.</span></div></div>
+        )}
       </section>
 
       <div className="dashboard-grid">
