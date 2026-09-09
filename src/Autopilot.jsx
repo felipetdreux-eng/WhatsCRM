@@ -13,6 +13,7 @@ import {
   Target,
   X,
 } from 'lucide-react';
+import { autopilotRecommendation, buildAutopilotQueue as buildSmartAutopilotQueue } from './autopilotEngine';
 import './autopilot.css';
 import './autopilot-outcome.css';
 
@@ -183,12 +184,7 @@ function scoreLead(lead) {
 }
 
 export function buildAutopilotQueue(leads) {
-  return leads
-    .filter(lead => !CLOSED.includes(lead.status))
-    .map(scoreLead)
-    .filter(item => item.actionable && item.score >= 24)
-    .sort((a, b) => b.score - a.score || Number(b.lead.value || 0) - Number(a.lead.value || 0))
-    .slice(0, 12);
+  return buildSmartAutopilotQueue(leads);
 }
 
 function priorityText(priority) {
@@ -198,30 +194,7 @@ function priorityText(priority) {
 }
 
 function recommendation(item) {
-  if (item.due != null && item.due < 0) return {
-    title: 'Retome esse contato agora',
-    detail: 'O follow-up já venceu. Abra a conversa, avance a negociação e registre o que aconteceu antes de seguir.',
-  };
-  if (item.due === 0) return {
-    title: 'Resolva o contato de hoje',
-    detail: 'Esse lead já estava na sua agenda. Faça o retorno agora para ele não virar atraso amanhã.',
-  };
-  if (item.lead.status === 'Proposta enviada') return {
-    title: 'Destrave a proposta',
-    detail: 'A proposta já saiu. O objetivo agora é conseguir uma resposta clara: avançar, ajustar ou encerrar.',
-  };
-  if (!item.lead.nextContact) return {
-    title: 'Defina o próximo passo',
-    detail: 'Essa negociação está aberta sem data de retorno. Fale com o lead e registre o resultado para o Fuply organizar a próxima ação.',
-  };
-  if (item.idleDays >= 7) return {
-    title: 'Reative antes que esfrie de vez',
-    detail: 'Já passou tempo demais sem interação. Uma retomada curta agora vale mais do que deixar esse lead morrer silenciosamente.',
-  };
-  return {
-    title: 'Avance a negociação',
-    detail: 'Revise a conversa e execute o próximo passo mais simples que aproxime esse lead de uma decisão.',
-  };
+  return autopilotRecommendation(item);
 }
 
 function followupSuggestion(value) {
@@ -448,7 +421,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                 ))}
               </div>
               {remaining.length > 7 && <div className="autopilot-queue-more">+{remaining.length - 7} depois</div>}
-              <div className="autopilot-queue-rule"><Sparkles size={14} /><span>A sessão mantém a ordem original. Cada resultado atualiza o CRM e a próxima fila automaticamente.</span></div>
+              <div className="autopilot-queue-rule"><Sparkles size={14} /><span>Urgência vem antes de valor. A fila considera prazo, etapa, tempo sem contato e potencial sem deixar um lead caro atropelar um follow-up vencido.</span></div>
             </aside>
 
             <div className="autopilot-workspace">
@@ -472,8 +445,8 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
               {!awaitingOutcome && (
                 <>
                   <div className="autopilot-reasons">
-                    <span>Por que esse lead veio primeiro</span>
-                    <div>{current.reasons.map(reason => <b key={reason}>{reason}</b>)}</div>
+                    <span>Por que esse lead está nesta posição</span>
+                    <div>{current.reasons.map((reason, index) => <b key={reason}>{index === 0 ? `Motivo principal · ${reason}` : reason}</b>)}</div>
                   </div>
 
                   <div className="autopilot-suggestion">
