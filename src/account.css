@@ -1,2 +1,19 @@
 .logo-button{border:0;background:transparent;color:inherit;text-align:left}
-.profile-logout{width:30px;height:30px;padding:0;border:1px solid #e4e7ec;background:#fff;color:#667085}.profile-logout:hover{color:#b42318;background:#fff6f5;border-color:#f3c8c4}.mobile-logout{display:none}@media(max-width:820px){.profile-card .profile-logout{display:grid;flex:0 0 auto}}@media(max-width:560px){.mobile-logout{position:fixed;top:10px;right:10px;z-index:45;width:34px;height:34px;border:1px solid #e4e7ec;border-radius:9px;background:rgba(255,255,255,.96);color:#667085;display:grid;place-items:center;box-shadow:0 4px 14px rgba(16,24,40,.08)}.mobile-logout:hover{color:#b42318;background:#fff6f5}}
+.profile-logout{width:30px;height:30px;padding:0;border:1px solid #e4e7ec;background:#fff;color:#667085}.profile-logout:hover{color:#b42318;background:#fff6f5;border-color:#f3c8c4}
+.mobile-logout{display:none}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+:where(button,input,select,textarea):focus-visible{outline:3px solid rgba(22,163,106,.3);outline-offset:2px}
+.mobile-status-control{display:none}
+@media(max-width:820px){
+  .profile-card .profile-logout{display:grid;flex:0 0 auto}
+  .mobile-status-control{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;padding:7px 8px;border:1px solid #e6e9ed;border-radius:8px;background:#f8faf9;color:#667085;font-size:9px}
+  .mobile-status-control span{font-weight:700}
+  .mobile-status-control select{min-width:0;max-width:145px;border:0;outline:0;background:transparent;color:#344054;font-size:9.5px;font-weight:600;text-align:right}
+  .lead-card[draggable="true"]{cursor:default}
+}
+@media(max-width:560px){
+  .mobile-logout{position:fixed;top:10px;right:10px;z-index:45;width:34px;height:34px;border:1px solid #e4e7ec;border-radius:9px;background:rgba(255,255,255,.96);color:#667085;display:grid;place-items:center;box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  .mobile-logout:hover{color:#b42318;background:#fff6f5}
+  .nav-list{grid-template-columns:repeat(5,1fr)}
+  .nav-item:nth-child(5){display:flex}
+}
