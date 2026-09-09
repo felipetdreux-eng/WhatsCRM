@@ -3,6 +3,7 @@ import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Moon, Play, Save, S
 import { updateProfileName, updateProfileTheme } from './backendBridge';
 import './settings.css';
 import './dark.css';
+import './dark-integrated.css';
 
 const GOAL_LABELS = {
   organize: 'Organizar leads',
