@@ -271,9 +271,9 @@ export default function App() {
     setModalOpen(true);
   };
 
-  const openWhatsApp = (lead, message = '') => {
+  const openWhatsApp = (lead, message = '', options = {}) => {
     const phone = whatsappPhone(lead?.phone);
-    if (!phone) return;
+    if (!phone) return false;
     const currentLead = leads.find(item => item.id === lead.id) || lead;
     const text = message ? `?text=${encodeURIComponent(message)}` : '';
     window.open(`https://wa.me/${phone}${text}`, '_blank', 'noopener,noreferrer');
@@ -287,10 +287,10 @@ export default function App() {
       'whatsapp_opened',
       'WhatsApp aberto',
       message ? 'Conversa aberta com uma mensagem preparada pelo sistema.' : 'Conversa aberta pelo sistema. O envio da mensagem não é confirmado pelo WhatsApp.',
-      { hasMessage: Boolean(message) },
+      { hasMessage: Boolean(message), source: options?.source || 'app' },
     );
 
-    if (!CLOSED.includes(currentLead.status)) {
+    if (!options?.skipFollowupPrompt && !CLOSED.includes(currentLead.status)) {
       setPendingFollowup({ id: currentLead.id, name: currentLead.name });
       setFollowupForm({
         date: currentLead.nextContact || dateKeyOffset(1),
@@ -299,6 +299,7 @@ export default function App() {
       });
       setFollowupError('');
     }
+    return true;
   };
 
   const scheduleOffset = days => {
@@ -335,6 +336,52 @@ export default function App() {
     );
     setPendingFollowup(null);
     setFollowupError('');
+  };
+
+  const applyAutopilotOutcome = ({ leadId, outcome, label, status, nextDays = null, nextAction = '', saleValue = null }) => {
+    const previous = leads.find(lead => lead.id === leadId);
+    if (!previous) return false;
+
+    let resolvedStatus = status || previous.status;
+    if ((outcome === 'talked' || outcome === 'later') && previous.status === 'Novo lead') resolvedStatus = 'Contatado';
+
+    const numericSaleValue = Number(saleValue ?? previous.value ?? 0);
+    if (resolvedStatus === 'Vendido' && (!Number.isFinite(numericSaleValue) || numericSaleValue <= 0)) return false;
+
+    let next = applyStatusTransition(previous, {}, resolvedStatus, resolvedStatus === 'Vendido' ? numericSaleValue : undefined);
+    const now = new Date().toISOString();
+    next = { ...next, lastFollowupAt: now, updatedAt: now };
+
+    if (!CLOSED.includes(next.status)) {
+      const hasSuggestedDate = Number.isFinite(Number(nextDays));
+      next.nextContact = hasSuggestedDate ? dateKeyOffset(Number(nextDays)) : (next.nextContact || '');
+      next.nextContactTime = '';
+      next.nextAction = nextAction || next.nextAction || 'Retornar contato';
+    }
+
+    setLeads(current => current.map(lead => lead.id === leadId ? next : lead));
+
+    const statusDetail = resolvedStatus !== previous.status ? `Status: ${previous.status} → ${resolvedStatus}.` : '';
+    const scheduleDetail = next.nextContact
+      ? `Próximo contato: ${formatDate(next.nextContact, true)} · ${next.nextAction}.`
+      : CLOSED.includes(next.status) ? 'Negociação encerrada e removida da fila de follow-up.' : '';
+    const detail = [statusDetail, scheduleDetail].filter(Boolean).join(' ');
+
+    logActivity(
+      previous,
+      'autopilot_outcome',
+      `Autopilot: ${label || 'resultado registrado'}`,
+      detail || 'Resultado do contato registrado pelo Autopilot.',
+      {
+        outcome,
+        from: previous.status,
+        to: resolvedStatus,
+        nextContact: next.nextContact || null,
+        nextAction: next.nextAction || null,
+        saleValue: resolvedStatus === 'Vendido' ? numericSaleValue : null,
+      },
+    );
+    return true;
   };
 
   const handleLogout = () => {
@@ -681,7 +728,7 @@ export default function App() {
 
   const renderActivePage = () => {
     if (selectedLead) return renderLeadDetail();
-    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} />;
