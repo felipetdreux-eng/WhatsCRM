@@ -29,6 +29,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import Dashboard from './Dashboard';
 import FollowUps from './FollowUps';
 import './styles.css';
 import './detail.css';
@@ -205,6 +206,12 @@ function App() {
   };
 
   const navigate = label => {
+    if (label === 'Dashboard') {
+      setActivePage('Dashboard');
+      setSelectedLeadId(null);
+      setEditingLead(null);
+      return;
+    }
     if (label === 'Pipeline' || label === 'Leads') {
       setActivePage('Pipeline');
       setSelectedLeadId(null);
@@ -393,9 +400,18 @@ function App() {
       {renderSidebar()}
       {selectedLead
         ? renderLeadDetail()
-        : activePage === 'Follow-ups'
-          ? <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />
-          : renderPipeline()}
+        : activePage === 'Dashboard'
+          ? <Dashboard
+              leads={leads}
+              openLead={openLead}
+              openWhatsApp={openWhatsApp}
+              onNewLead={() => { setForm(emptyForm); setModalOpen(true); }}
+              goPipeline={() => setActivePage('Pipeline')}
+              goFollowUps={() => setActivePage('Follow-ups')}
+            />
+          : activePage === 'Follow-ups'
+            ? <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />
+            : renderPipeline()}
 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
