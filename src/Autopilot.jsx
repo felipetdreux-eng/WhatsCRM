@@ -14,8 +14,59 @@ import {
   X,
 } from 'lucide-react';
 import './autopilot.css';
+import './autopilot-outcome.css';
 
 const CLOSED = ['Vendido', 'Perdido'];
+
+const OUTCOME_OPTIONS = [
+  {
+    id: 'talked',
+    label: 'Conversei com o cliente',
+    detail: 'A conversa aconteceu e a negociação continua aberta.',
+    nextDays: 1,
+    nextAction: 'Continuar negociação',
+    tone: 'positive',
+  },
+  {
+    id: 'no_answer',
+    label: 'Não respondeu',
+    detail: 'Você tentou contato, mas ainda não conseguiu uma resposta.',
+    nextDays: 3,
+    nextAction: 'Tentar novo contato',
+    tone: 'neutral',
+  },
+  {
+    id: 'later',
+    label: 'Pediu para falar depois',
+    detail: 'O cliente pediu tempo. O Fuply mantém a oportunidade viva e marca uma retomada.',
+    nextDays: 3,
+    nextAction: 'Retomar no combinado',
+    tone: 'neutral',
+  },
+  {
+    id: 'proposal',
+    label: 'Enviei proposta',
+    detail: 'A negociação avançou para proposta. O próximo objetivo é conseguir uma resposta clara.',
+    nextDays: 2,
+    nextAction: 'Cobrar retorno da proposta',
+    status: 'Proposta enviada',
+    tone: 'proposal',
+  },
+  {
+    id: 'won',
+    label: 'Fechou',
+    detail: 'Venda concluída. O lead sai da fila de follow-up e entra como vendido.',
+    status: 'Vendido',
+    tone: 'won',
+  },
+  {
+    id: 'lost',
+    label: 'Desistiu',
+    detail: 'A negociação terminou sem venda. O lead sai da fila de follow-up.',
+    status: 'Perdido',
+    tone: 'lost',
+  },
+];
 
 const money = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -131,7 +182,7 @@ function priorityText(priority) {
 function recommendation(item) {
   if (item.due != null && item.due < 0) return {
     title: 'Retome esse contato agora',
-    detail: 'O follow-up já venceu. Abra a conversa, avance a negociação e deixe o próximo passo marcado antes de seguir.',
+    detail: 'O follow-up já venceu. Abra a conversa, avance a negociação e registre o que aconteceu antes de seguir.',
   };
   if (item.due === 0) return {
     title: 'Resolva o contato de hoje',
@@ -143,7 +194,7 @@ function recommendation(item) {
   };
   if (!item.lead.nextContact) return {
     title: 'Defina o próximo passo',
-    detail: 'Essa negociação está aberta sem data de retorno. Fale com o lead e não saia sem deixar o próximo contato marcado.',
+    detail: 'Essa negociação está aberta sem data de retorno. Fale com o lead e registre o resultado para o Fuply organizar a próxima ação.',
   };
   if (item.idleDays >= 7) return {
     title: 'Reative antes que esfrie de vez',
@@ -155,18 +206,36 @@ function recommendation(item) {
   };
 }
 
-export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp }) {
-  const queue = useMemo(() => buildAutopilotQueue(leads), [leads]);
+function followupSuggestion(days) {
+  if (days === 1) return 'amanhã';
+  if (days === 2) return 'daqui a 2 dias';
+  if (days === 3) return 'daqui a 3 dias';
+  return `daqui a ${days} dias`;
+}
+
+export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp, onOutcome }) {
+  const liveQueue = useMemo(() => buildAutopilotQueue(leads), [leads]);
+  const [sessionQueue, setSessionQueue] = useState([]);
   const [handled, setHandled] = useState([]);
   const [whatsapps, setWhatsapps] = useState(0);
   const [skipped, setSkipped] = useState(0);
+  const [registered, setRegistered] = useState(0);
+  const [wonCount, setWonCount] = useState(0);
+  const [lostCount, setLostCount] = useState(0);
+  const [awaitingOutcome, setAwaitingOutcome] = useState(false);
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState('');
+  const [saleValue, setSaleValue] = useState('');
+  const [outcomeError, setOutcomeError] = useState('');
 
-  const remaining = queue.filter(item => !handled.includes(item.lead.id));
-  const current = remaining[0] || null;
-  const total = queue.length;
+  const remaining = sessionQueue.filter(item => !handled.includes(item.lead.id));
+  const currentBase = remaining[0] || null;
+  const currentLead = currentBase ? (leads.find(lead => lead.id === currentBase.lead.id) || currentBase.lead) : null;
+  const current = currentBase ? { ...currentBase, lead: currentLead } : null;
+  const total = sessionQueue.length;
   const done = Math.min(handled.length, total);
   const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 100;
   const suggestion = current ? recommendation(current) : null;
+  const selectedOutcome = OUTCOME_OPTIONS.find(option => option.id === selectedOutcomeId) || null;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -179,11 +248,27 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
 
   useEffect(() => {
     if (open) {
+      setSessionQueue(liveQueue);
       setHandled([]);
       setWhatsapps(0);
       setSkipped(0);
+      setRegistered(0);
+      setWonCount(0);
+      setLostCount(0);
+      setAwaitingOutcome(false);
+      setSelectedOutcomeId('');
+      setSaleValue('');
+      setOutcomeError('');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!current) return;
+    setAwaitingOutcome(false);
+    setSelectedOutcomeId('');
+    setSaleValue(String(Number(current.lead.value || 0) > 0 ? Number(current.lead.value) : ''));
+    setOutcomeError('');
+  }, [current?.lead.id]);
 
   if (!open) return null;
 
@@ -191,15 +276,68 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
 
   const contact = () => {
     if (!current) return;
-    openWhatsApp(current.lead);
+    const opened = openWhatsApp(current.lead, '', { skipFollowupPrompt: true, source: 'autopilot' });
+    if (opened === false) {
+      setOutcomeError('Esse lead não tem um WhatsApp válido para abrir.');
+      return;
+    }
     setWhatsapps(value => value + 1);
+    setAwaitingOutcome(true);
+    setSelectedOutcomeId('');
+    setSaleValue(String(Number(current.lead.value || 0) > 0 ? Number(current.lead.value) : ''));
+    setOutcomeError('');
+  };
+
+  const chooseOutcome = id => {
+    setSelectedOutcomeId(id);
+    setOutcomeError('');
+  };
+
+  const registerOutcome = () => {
+    if (!current || !selectedOutcome) {
+      setOutcomeError('Escolha o que aconteceu antes de continuar.');
+      return;
+    }
+
+    if (selectedOutcome.id === 'won') {
+      const value = Number(saleValue);
+      if (!Number.isFinite(value) || value <= 0) {
+        setOutcomeError('Informe o valor final da venda para fechar esse lead.');
+        return;
+      }
+    }
+
+    const applied = onOutcome?.({
+      leadId: current.lead.id,
+      outcome: selectedOutcome.id,
+      label: selectedOutcome.label,
+      status: selectedOutcome.status || null,
+      nextDays: selectedOutcome.nextDays ?? null,
+      nextAction: selectedOutcome.nextAction || '',
+      saleValue: selectedOutcome.id === 'won' ? Number(saleValue) : null,
+    });
+
+    if (applied === false) {
+      setOutcomeError('Não foi possível registrar esse resultado. Confira os dados e tente novamente.');
+      return;
+    }
+
+    setRegistered(value => value + 1);
+    if (selectedOutcome.id === 'won') setWonCount(value => value + 1);
+    if (selectedOutcome.id === 'lost') setLostCount(value => value + 1);
     markHandled(current.lead.id);
+    setAwaitingOutcome(false);
+    setSelectedOutcomeId('');
+    setOutcomeError('');
   };
 
   const skip = () => {
     if (!current) return;
     setSkipped(value => value + 1);
     markHandled(current.lead.id);
+    setAwaitingOutcome(false);
+    setSelectedOutcomeId('');
+    setOutcomeError('');
   };
 
   const inspect = () => {
@@ -209,9 +347,17 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
   };
 
   const restart = () => {
+    setSessionQueue(liveQueue);
     setHandled([]);
     setWhatsapps(0);
     setSkipped(0);
+    setRegistered(0);
+    setWonCount(0);
+    setLostCount(0);
+    setAwaitingOutcome(false);
+    setSelectedOutcomeId('');
+    setSaleValue('');
+    setOutcomeError('');
   };
 
   return (
@@ -228,7 +374,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
         <div className="autopilot-progress-row">
           <div className="autopilot-progress-copy">
             <strong>{current ? `${done + 1} de ${total}` : `${total} de ${total}`}</strong>
-            <span>{current ? 'ação atual' : 'fila concluída'}</span>
+            <span>{current ? (awaitingOutcome ? 'registrar resultado' : 'ação atual') : 'fila concluída'}</span>
           </div>
           <div className="autopilot-progress"><span style={{ width: `${progress}%` }} /></div>
           <span className="autopilot-progress-percent">{progress}%</span>
@@ -248,13 +394,13 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                 ))}
               </div>
               {remaining.length > 7 && <div className="autopilot-queue-more">+{remaining.length - 7} depois</div>}
-              <div className="autopilot-queue-rule"><Sparkles size={14} /><span>Ordem calculada por prazo, estágio, valor e tempo sem resposta.</span></div>
+              <div className="autopilot-queue-rule"><Sparkles size={14} /><span>A sessão mantém a ordem original. Cada resultado atualiza o CRM e a próxima fila automaticamente.</span></div>
             </aside>
 
             <div className="autopilot-workspace">
               <div className="autopilot-priority-line">
                 <span className={`autopilot-priority ${current.priority}`}><Flame size={14} /> {priorityText(current.priority)}</span>
-                <span className="autopilot-position">Próxima melhor ação</span>
+                <span className="autopilot-position">{awaitingOutcome ? 'Resultado do contato' : 'Próxima melhor ação'}</span>
               </div>
 
               <div className="autopilot-lead-head">
@@ -269,22 +415,77 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                 <div><CalendarClock size={16} /><span>Próximo contato</span><strong>{prettyDate(current.lead.nextContact)}{current.lead.nextContactTime ? ` · ${current.lead.nextContactTime}` : ''}</strong></div>
               </div>
 
-              <div className="autopilot-reasons">
-                <span>Por que esse lead veio primeiro</span>
-                <div>{current.reasons.map(reason => <b key={reason}>{reason}</b>)}</div>
-              </div>
+              {!awaitingOutcome && (
+                <>
+                  <div className="autopilot-reasons">
+                    <span>Por que esse lead veio primeiro</span>
+                    <div>{current.reasons.map(reason => <b key={reason}>{reason}</b>)}</div>
+                  </div>
 
-              <div className="autopilot-suggestion">
-                <div className="autopilot-suggestion-icon"><Sparkles size={19} /></div>
-                <div><span>Faça isso agora</span><strong>{suggestion.title}</strong><p>{suggestion.detail}</p></div>
-              </div>
+                  <div className="autopilot-suggestion">
+                    <div className="autopilot-suggestion-icon"><Sparkles size={19} /></div>
+                    <div><span>Faça isso agora</span><strong>{suggestion.title}</strong><p>{suggestion.detail}</p></div>
+                  </div>
 
-              <div className="autopilot-actions">
-                <button type="button" className="autopilot-whatsapp" onClick={contact}><MessageCircle size={18} /> Abrir WhatsApp <ArrowRight size={16} /></button>
-                <button type="button" className="autopilot-inspect" onClick={inspect}>Ver negociação</button>
-                <button type="button" className="autopilot-skip" onClick={skip}>Pular por agora</button>
-              </div>
-              <div className="autopilot-after-contact"><CheckCircle2 size={14} /><span>Ao abrir o WhatsApp, a janela de próximo contato aparece por cima. Salve a data e o Autopilot já deixa o próximo lead pronto.</span></div>
+                  <div className="autopilot-actions">
+                    <button type="button" className="autopilot-whatsapp" onClick={contact}><MessageCircle size={18} /> Abrir WhatsApp <ArrowRight size={16} /></button>
+                    <button type="button" className="autopilot-inspect" onClick={inspect}>Ver negociação</button>
+                    <button type="button" className="autopilot-skip" onClick={skip}>Pular por agora</button>
+                  </div>
+                  <div className="autopilot-after-contact"><CheckCircle2 size={14} /><span>Quando você voltar do WhatsApp, o Autopilot pergunta o que aconteceu e atualiza status, histórico e próximo passo.</span></div>
+                </>
+              )}
+
+              {awaitingOutcome && (
+                <section className="autopilot-outcome-shell" aria-label="Resultado do contato">
+                  <div className="autopilot-outcome-heading">
+                    <div className="autopilot-outcome-icon"><MessageCircle size={18} /></div>
+                    <div><span>WhatsApp aberto</span><h3>O que aconteceu com {current.lead.name}?</h3><p>Escolha o resultado real da conversa. O Fuply atualiza a negociação antes de liberar o próximo lead.</p></div>
+                  </div>
+
+                  <div className="autopilot-outcome-grid">
+                    {OUTCOME_OPTIONS.map(option => (
+                      <button
+                        type="button"
+                        key={option.id}
+                        className={`autopilot-outcome-option ${option.tone} ${selectedOutcomeId === option.id ? 'selected' : ''}`}
+                        onClick={() => chooseOutcome(option.id)}
+                        aria-pressed={selectedOutcomeId === option.id}
+                      >
+                        <span className="autopilot-outcome-check">{selectedOutcomeId === option.id ? <CheckCircle2 size={15} /> : null}</span>
+                        <strong>{option.label}</strong>
+                        <small>{option.detail}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedOutcome && (
+                    <div className={`autopilot-outcome-plan ${selectedOutcome.tone}`}>
+                      <div>
+                        <span>O Fuply vai registrar</span>
+                        <strong>{selectedOutcome.label}</strong>
+                        {selectedOutcome.status && <p>Status → <b>{selectedOutcome.status}</b></p>}
+                        {selectedOutcome.nextDays != null && <p>Próximo passo → <b>{selectedOutcome.nextAction}</b> {followupSuggestion(selectedOutcome.nextDays)}</p>}
+                        {selectedOutcome.status && CLOSED.includes(selectedOutcome.status) && <p>Esse lead sai da fila de follow-up.</p>}
+                      </div>
+                      {selectedOutcome.id === 'won' && (
+                        <label className="autopilot-sale-value">
+                          <span>Valor final da venda</span>
+                          <input type="number" min="0.01" step="0.01" value={saleValue} onChange={event => setSaleValue(event.target.value)} placeholder="0,00" />
+                        </label>
+                      )}
+                    </div>
+                  )}
+
+                  {outcomeError && <div className="autopilot-outcome-error" role="alert">{outcomeError}</div>}
+
+                  <div className="autopilot-outcome-actions">
+                    <button type="button" className="autopilot-whatsapp" disabled={!selectedOutcome} onClick={registerOutcome}><CheckCircle2 size={17} /> Registrar e continuar <ArrowRight size={15} /></button>
+                    <button type="button" className="autopilot-inspect" onClick={contact}><MessageCircle size={16} /> Abrir WhatsApp de novo</button>
+                    <button type="button" className="autopilot-skip" onClick={skip}>Não registrar agora</button>
+                  </div>
+                </section>
+              )}
             </div>
           </div>
         ) : (
@@ -292,15 +493,16 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
             <div className="autopilot-finish-icon"><CheckCircle2 size={35} /></div>
             <span>Fila zerada</span>
             <h2 id="autopilot-title">Você terminou as prioridades de agora.</h2>
-            <p>Em vez de caçar lead por lead no CRM, você percorreu a fila que tinha maior chance de exigir atenção primeiro.</p>
-            <div className="autopilot-finish-stats">
+            <p>{registered ? `O Fuply registrou ${registered} resultado${registered === 1 ? '' : 's'} e já reorganizou o que precisa acontecer depois.${wonCount ? ` ${wonCount} venda${wonCount === 1 ? '' : 's'} fechada${wonCount === 1 ? '' : 's'}.` : ''}${lostCount ? ` ${lostCount} negociação${lostCount === 1 ? '' : 'ões'} encerrada${lostCount === 1 ? '' : 's'}.` : ''}` : 'Você percorreu a fila prioritária. Os leads pulados continuam disponíveis para uma próxima sessão.'}</p>
+            <div className="autopilot-finish-stats autopilot-finish-stats-four">
               <div><strong>{total}</strong><span>ações revisadas</span></div>
               <div><strong>{whatsapps}</strong><span>WhatsApps abertos</span></div>
+              <div><strong>{registered}</strong><span>resultados registrados</span></div>
               <div><strong>{skipped}</strong><span>puladas</span></div>
             </div>
             <div className="autopilot-finish-actions">
               <button type="button" className="autopilot-whatsapp" onClick={onClose}>Voltar ao Dashboard</button>
-              {total > 0 && <button type="button" className="autopilot-inspect" onClick={restart}><RotateCcw size={15} /> Rever fila</button>}
+              {total > 0 && <button type="button" className="autopilot-inspect" onClick={restart}><RotateCcw size={15} /> Recalcular fila</button>}
             </div>
           </div>
         )}
