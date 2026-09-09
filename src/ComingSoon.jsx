@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings, Sparkles } from 'lucide-react';
 import Messages from './Messages';
+import { getActiveAccount } from './accountStorage';
 import './comingsoon.css';
 
 function loadLeads() {
@@ -21,13 +22,15 @@ function normalizePhone(phone) {
 
 export default function ComingSoon({ type, goDashboard }) {
   if (type === 'Mensagens') {
+    const account = getActiveAccount();
     const leads = loadLeads();
     const openWhatsApp = (lead, message = '') => {
       const phone = normalizePhone(lead.phone);
+      if (!phone) return;
       const text = message ? `?text=${encodeURIComponent(message)}` : '';
       window.open(`https://wa.me/${phone}${text}`, '_blank', 'noopener,noreferrer');
     };
-    return <Messages leads={leads} openWhatsApp={openWhatsApp} />;
+    return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id || ''} />;
   }
 
   return (
