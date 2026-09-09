@@ -29,6 +29,7 @@ async function hashPassword(password) {
 }
 
 const EMAIL_REDIRECT_URL = `${window.location.origin}/`;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 const SELL_OPTIONS = [
   { id: 'services', title: 'Serviços', text: 'Freelas, agências, técnicos e profissionais.', icon: BriefcaseBusiness },
@@ -65,12 +66,58 @@ function AuthScreen({ onAuthenticated }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+    const timer = window.setTimeout(() => {
+      setResendSeconds(value => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
+
+  const armResend = (address, startCooldown = true) => {
+    setConfirmationEmail(address);
+    setResendSeconds(startCooldown ? RESEND_COOLDOWN_SECONDS : 0);
+  };
 
   const switchMode = next => {
     setMode(next);
     setError('');
     setNotice('');
     setPassword('');
+    setConfirmationEmail('');
+    setResendSeconds(0);
+  };
+
+  const resendConfirmation = async () => {
+    if (!confirmationEmail || resendSeconds > 0 || resendLoading) return;
+    setError('');
+    setNotice('');
+    setResendLoading(true);
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: confirmationEmail,
+        options: { emailRedirectTo: EMAIL_REDIRECT_URL },
+      });
+      if (resendError) {
+        const message = resendError.message?.toLowerCase() || '';
+        if (message.includes('rate') || message.includes('seconds')) {
+          setError('Você pediu outro email cedo demais. Aguarde o contador e tente novamente.');
+          setResendSeconds(RESEND_COOLDOWN_SECONDS);
+        } else {
+          setError(resendError.message || 'Não foi possível reenviar o email agora.');
+        }
+        return;
+      }
+      setNotice(`Novo email de confirmação enviado para ${confirmationEmail}.`);
+      setResendSeconds(RESEND_COOLDOWN_SECONDS);
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   const tryLegacyMigration = async (normalizedEmail, plainPassword) => {
@@ -90,15 +137,19 @@ function AuthScreen({ onAuthenticated }) {
     });
 
     if (signupError) {
-      setError(signupError.message.includes('registered')
-        ? 'Essa conta já existe no backend. Se a senha não entrar, use a recuperação de senha.'
-        : signupError.message);
+      if (signupError.message.includes('registered')) {
+        armResend(normalizedEmail, false);
+        setError('Essa conta já existe no backend. Se ainda não confirmou o email, você pode reenviar a confirmação abaixo.');
+      } else {
+        setError(signupError.message);
+      }
       return true;
     }
 
     if (data.session && data.user) {
       onAuthenticated(data.user);
     } else {
+      armResend(normalizedEmail);
       setNotice('Sua conta antiga foi migrada. Confirme o email enviado pelo Supabase e depois entre normalmente.');
     }
     return true;
@@ -108,6 +159,8 @@ function AuthScreen({ onAuthenticated }) {
     event.preventDefault();
     setError('');
     setNotice('');
+    setConfirmationEmail('');
+    setResendSeconds(0);
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !normalizedEmail.includes('@')) return setError('Digite um email válido.');
     if (password.length < 6) return setError('A senha precisa ter pelo menos 6 caracteres.');
@@ -126,7 +179,10 @@ function AuthScreen({ onAuthenticated }) {
         });
         if (signupError) return setError(signupError.message);
         if (data.session && data.user) onAuthenticated(data.user);
-        else setNotice('Conta criada. Confirme o email que o Supabase enviou antes de entrar.');
+        else {
+          armResend(normalizedEmail);
+          setNotice('Conta criada. Confirme o email que o Supabase enviou antes de entrar.');
+        }
         return;
       }
 
@@ -137,7 +193,8 @@ function AuthScreen({ onAuthenticated }) {
       }
 
       if (loginError?.message?.toLowerCase().includes('email not confirmed')) {
-        setError('Seu email ainda não foi confirmado. Abra a mensagem do Supabase e confirme a conta.');
+        armResend(normalizedEmail, false);
+        setError('Seu email ainda não foi confirmado. Abra a mensagem recebida ou reenvie a confirmação abaixo.');
         return;
       }
 
@@ -166,6 +223,29 @@ function AuthScreen({ onAuthenticated }) {
               <label><span>Senha</span><div className="auth-input"><LockKeyhole size={17} /><input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" className="auth-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
               {error && <div className="auth-error" role="alert">{error}</div>}
               {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
+              {confirmationEmail && (
+                <button
+                  type="button"
+                  onClick={resendConfirmation}
+                  disabled={resendLoading || resendSeconds > 0}
+                  style={{
+                    height: 40,
+                    border: '1px solid #cfe5da',
+                    borderRadius: 9,
+                    background: resendSeconds > 0 ? '#f3f6f5' : '#f5fbf8',
+                    color: resendSeconds > 0 ? '#8a9490' : '#0f7a50',
+                    fontWeight: 800,
+                    fontSize: 11,
+                    cursor: resendLoading || resendSeconds > 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {resendLoading
+                    ? 'Reenviando...'
+                    : resendSeconds > 0
+                      ? `Reenviar email em ${resendSeconds}s`
+                      : 'Reenviar email de confirmação'}
+                </button>
+              )}
               <button className="auth-submit" disabled={loading}>{loading ? 'Processando...' : mode === 'login' ? 'Entrar no ZapFlow' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
             </form>
             <p className="auth-local-note">Acesso protegido pelo Supabase Auth. Seus leads ficam vinculados à sua conta.</p>
