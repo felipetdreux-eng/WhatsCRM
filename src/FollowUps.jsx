@@ -15,6 +15,7 @@ import {
 import './followups.css';
 
 const CLOSED = ['Vendido', 'Perdido'];
+const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
 
 const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -60,7 +61,7 @@ function statusClass(status) {
   return status.toLowerCase().replaceAll(' ', '-');
 }
 
-function FollowUpCard({ lead, openLead, openWhatsApp, complete, reschedule }) {
+function FollowUpCard({ lead, openLead, openWhatsApp, complete, reschedule, updateStatus }) {
   const diff = dayDiff(lead.nextContact);
   const overdue = diff < 0;
   const today = diff === 0;
@@ -91,6 +92,16 @@ function FollowUpCard({ lead, openLead, openWhatsApp, complete, reschedule }) {
       </div>
 
       <div className="followup-buttons">
+        <select
+          className="followup-status-select"
+          value={lead.status}
+          onChange={event => updateStatus(lead.id, event.target.value)}
+          onClick={event => event.stopPropagation()}
+          aria-label={`Atualizar status de ${lead.name}`}
+          title="Atualizar status"
+        >
+          {STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+        </select>
         <button className="followup-whatsapp" onClick={() => openWhatsApp(lead)} title="Abrir WhatsApp">
           <MessageCircle size={16} /><span>WhatsApp</span>
         </button>
@@ -153,6 +164,12 @@ export default function FollowUps({ leads, setLeads, openLead, openWhatsApp }) {
   const showToast = text => {
     setToast(text);
     window.setTimeout(() => setToast(''), 2300);
+  };
+
+  const updateStatus = (id, status) => {
+    const lead = leads.find(item => item.id === id);
+    setLeads(current => current.map(item => item.id === id ? { ...item, status } : item));
+    showToast(`${lead?.name || 'Lead'} atualizado para ${status}.`);
   };
 
   const complete = id => {
@@ -223,10 +240,10 @@ export default function FollowUps({ leads, setLeads, openLead, openWhatsApp }) {
       </div>
 
       <div className="followup-content">
-        <FollowUpSection title="Atrasados" subtitle="Esses contatos já passaram da data. Resolva primeiro." icon={AlertTriangle} tone="red" leads={visible.overdue} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} />
-        <FollowUpSection title="Hoje" subtitle="Sua lista de contatos para resolver hoje." icon={CalendarClock} tone="green" leads={visible.today} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} />
-        <FollowUpSection title="Próximos 7 dias" subtitle="O que vem logo depois, sem surpresa na agenda." icon={Clock3} tone="blue" leads={visible.week} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} />
-        <FollowUpSection title="Mais adiante" subtitle="Follow-ups já programados para depois desta semana." icon={CalendarClock} tone="gray" leads={visible.later} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} />
+        <FollowUpSection title="Atrasados" subtitle="Esses contatos já passaram da data. Resolva primeiro." icon={AlertTriangle} tone="red" leads={visible.overdue} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} updateStatus={updateStatus} />
+        <FollowUpSection title="Hoje" subtitle="Sua lista de contatos para resolver hoje." icon={CalendarClock} tone="green" leads={visible.today} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} updateStatus={updateStatus} />
+        <FollowUpSection title="Próximos 7 dias" subtitle="O que vem logo depois, sem surpresa na agenda." icon={Clock3} tone="blue" leads={visible.week} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} updateStatus={updateStatus} />
+        <FollowUpSection title="Mais adiante" subtitle="Follow-ups já programados para depois desta semana." icon={CalendarClock} tone="gray" leads={visible.later} openLead={openLead} openWhatsApp={openWhatsApp} complete={complete} reschedule={openReschedule} updateStatus={updateStatus} />
 
         {empty && (
           <section className="followup-empty">
