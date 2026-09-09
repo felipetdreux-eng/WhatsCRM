@@ -84,6 +84,9 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
           <h1>Configurações</h1>
           <p>Gerencie as informações básicas da sua conta ZapFlow.</p>
         </div>
+        <button type="button" className="settings-tutorial-shortcut" onClick={restartTutorial}>
+          <Play size={16} /> Rever tutorial
+        </button>
       </header>
 
       <div className="settings-grid">
