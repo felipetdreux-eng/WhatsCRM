@@ -67,7 +67,7 @@ function daysWithoutInteraction(lead) {
   return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
 }
 
-export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps }) {
+export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps }) {
   const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   const data = useMemo(() => {
@@ -337,6 +337,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
         leads={leads}
         openLead={openLead}
         openWhatsApp={openWhatsApp}
+        onOutcome={onAutopilotOutcome}
       />
     </main>
   );
