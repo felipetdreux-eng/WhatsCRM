@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Play, Save, ShieldCheck, Target, UserRound } from 'lucide-react';
-import { updateProfileName } from './backendBridge';
+import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Moon, Play, Save, ShieldCheck, Sun, Target, UserRound } from 'lucide-react';
+import { updateProfileName, updateProfileTheme } from './backendBridge';
 import './settings.css';
 
 const GOAL_LABELS = {
@@ -17,7 +17,9 @@ const SELLING_LABELS = {
 
 export default function SettingsPage({ account, onAccountChange, onLogout }) {
   const [name, setName] = useState(account?.name || '');
+  const [theme, setTheme] = useState(account?.theme === 'dark' ? 'dark' : 'light');
   const [saving, setSaving] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -35,7 +37,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
     setNotice('');
     try {
       await updateProfileName(account?.id, cleanName);
-      onAccountChange?.({ ...account, name: cleanName });
+      onAccountChange?.({ ...account, name: cleanName, theme });
       setName(cleanName);
       setNotice('Nome atualizado com sucesso.');
     } catch (saveError) {
@@ -43,6 +45,28 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
       setError('Não foi possível salvar seu nome agora.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const changeTheme = async nextTheme => {
+    if (savingTheme || nextTheme === theme) return;
+    const previousTheme = theme;
+    setTheme(nextTheme);
+    setSavingTheme(true);
+    setError('');
+    setNotice('');
+    document.documentElement.dataset.theme = nextTheme;
+    try {
+      await updateProfileTheme(account?.id, nextTheme);
+      onAccountChange?.({ ...account, theme: nextTheme });
+      setNotice(nextTheme === 'dark' ? 'Modo escuro ativado.' : 'Modo claro ativado.');
+    } catch (themeError) {
+      console.error('ZapFlow theme update failed:', themeError);
+      setTheme(previousTheme);
+      document.documentElement.dataset.theme = previousTheme;
+      setError('Não foi possível salvar a aparência agora.');
+    } finally {
+      setSavingTheme(false);
     }
   };
 
@@ -97,6 +121,25 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
             <div><dt><Target size={16} /> Objetivo</dt><dd>{GOAL_LABELS[account?.onboarding?.goal] || 'Não informado'}</dd></div>
             <div><dt><ShieldCheck size={16} /> Dados</dt><dd>Supabase com isolamento por conta</dd></div>
           </dl>
+        </section>
+
+        <section className="settings-card" aria-labelledby="appearance-settings-title">
+          <div className="settings-card-heading">
+            <div className="settings-icon"><Moon size={19} /></div>
+            <div><h2 id="appearance-settings-title">Aparência</h2><p>Escolha como o sistema fica neste e nos outros dispositivos.</p></div>
+          </div>
+          <div className="theme-picker" role="radiogroup" aria-label="Tema do sistema">
+            <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'active' : ''} onClick={() => changeTheme('light')} disabled={savingTheme}>
+              <Sun size={18} />
+              <span><strong>Claro</strong><small>Visual padrão</small></span>
+              {theme === 'light' && <Check size={16} className="theme-check" />}
+            </button>
+            <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'active' : ''} onClick={() => changeTheme('dark')} disabled={savingTheme}>
+              <Moon size={18} />
+              <span><strong>Escuro</strong><small>Mais confortável à noite</small></span>
+              {theme === 'dark' && <Check size={16} className="theme-check" />}
+            </button>
+          </div>
         </section>
 
         <section className="settings-card" aria-labelledby="help-settings-title">
