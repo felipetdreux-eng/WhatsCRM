@@ -107,6 +107,27 @@ export async function getProfile(userId) {
   return data;
 }
 
+export async function updateProfileName(userId, name) {
+  const cleanName = String(name || '').trim();
+  if (!userId || cleanName.length < 2) throw new Error('Nome inválido.');
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ name: cleanName })
+    .eq('id', userId)
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed')
+    .single();
+  if (error) throw error;
+
+  const accounts = readJSON(ACCOUNTS_KEY, []);
+  if (Array.isArray(accounts)) {
+    const next = accounts.map(account => account.id === userId ? { ...account, name: cleanName } : account);
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(next));
+  }
+
+  return data;
+}
+
 export function mirrorAccount(user, profile) {
   const accounts = readJSON(ACCOUNTS_KEY, []);
   const legacy = legacyAccountFor(user.email, user.id);
