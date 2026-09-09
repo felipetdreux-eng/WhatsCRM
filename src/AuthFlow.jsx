@@ -28,7 +28,6 @@ async function hashPassword(password) {
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-const EMAIL_REDIRECT_URL = `${window.location.origin}/`;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 const SELL_OPTIONS = [
@@ -67,19 +66,22 @@ function AuthScreen({ onAuthenticated }) {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendSeconds, setResendSeconds] = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
     if (resendSeconds <= 0) return undefined;
-    const timer = window.setTimeout(() => {
-      setResendSeconds(value => Math.max(0, value - 1));
-    }, 1000);
+    const timer = window.setTimeout(() => setResendSeconds(value => Math.max(0, value - 1)), 1000);
     return () => window.clearTimeout(timer);
   }, [resendSeconds]);
 
-  const armResend = (address, startCooldown = true) => {
+  const beginConfirmation = (address, startCooldown = true, message = 'Enviamos um código de 6 dígitos para seu email.') => {
     setConfirmationEmail(address);
+    setOtp('');
+    setError('');
+    setNotice(message);
     setResendSeconds(startCooldown ? RESEND_COOLDOWN_SECONDS : 0);
   };
 
@@ -89,6 +91,7 @@ function AuthScreen({ onAuthenticated }) {
     setNotice('');
     setPassword('');
     setConfirmationEmail('');
+    setOtp('');
     setResendSeconds(0);
   };
 
@@ -101,22 +104,59 @@ function AuthScreen({ onAuthenticated }) {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email: confirmationEmail,
-        options: { emailRedirectTo: EMAIL_REDIRECT_URL },
       });
       if (resendError) {
         const message = resendError.message?.toLowerCase() || '';
         if (message.includes('rate') || message.includes('seconds')) {
-          setError('Você pediu outro email cedo demais. Aguarde o contador e tente novamente.');
+          setError('Você pediu outro código cedo demais. Aguarde o contador e tente novamente.');
           setResendSeconds(RESEND_COOLDOWN_SECONDS);
         } else {
-          setError(resendError.message || 'Não foi possível reenviar o email agora.');
+          setError(resendError.message || 'Não foi possível reenviar o código agora.');
         }
         return;
       }
-      setNotice(`Novo email de confirmação enviado para ${confirmationEmail}.`);
+      setNotice(`Novo código enviado para ${confirmationEmail}.`);
       setResendSeconds(RESEND_COOLDOWN_SECONDS);
     } finally {
       setResendLoading(false);
+    }
+  };
+
+  const verifyCode = async event => {
+    event.preventDefault();
+    const cleanOtp = otp.replace(/\D/g, '');
+    if (cleanOtp.length !== 6) {
+      setError('Digite os 6 números enviados para seu email.');
+      return;
+    }
+
+    setError('');
+    setNotice('');
+    setVerifyingOtp(true);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: confirmationEmail,
+        token: cleanOtp,
+        type: 'email',
+      });
+
+      if (verifyError) {
+        const message = verifyError.message?.toLowerCase() || '';
+        if (message.includes('expired')) setError('Esse código expirou. Reenvie um novo código e tente novamente.');
+        else setError('Código inválido. Confira os 6 números e tente novamente.');
+        return;
+      }
+
+      if (data?.user) {
+        onAuthenticated(data.user);
+        return;
+      }
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) onAuthenticated(userData.user);
+      else setError('O código foi aceito, mas não conseguimos abrir sua sessão. Tente entrar novamente.');
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -130,28 +170,20 @@ function AuthScreen({ onAuthenticated }) {
     const { data, error: signupError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: plainPassword,
-      options: {
-        data: { name: legacy.name || normalizedEmail.split('@')[0] },
-        emailRedirectTo: EMAIL_REDIRECT_URL,
-      },
+      options: { data: { name: legacy.name || normalizedEmail.split('@')[0] } },
     });
 
     if (signupError) {
-      if (signupError.message.includes('registered')) {
-        armResend(normalizedEmail, false);
-        setError('Essa conta já existe no backend. Se ainda não confirmou o email, você pode reenviar a confirmação abaixo.');
+      if (signupError.message.toLowerCase().includes('registered')) {
+        beginConfirmation(normalizedEmail, false, 'Essa conta já existe no backend. Se ainda não confirmou o email, solicite um novo código abaixo.');
       } else {
         setError(signupError.message);
       }
       return true;
     }
 
-    if (data.session && data.user) {
-      onAuthenticated(data.user);
-    } else {
-      armResend(normalizedEmail);
-      setNotice('Sua conta antiga foi migrada. Confirme o email enviado pelo Supabase e depois entre normalmente.');
-    }
+    if (data.session && data.user) onAuthenticated(data.user);
+    else beginConfirmation(normalizedEmail, true, 'Sua conta antiga foi migrada. Digite o código enviado para confirmar o email.');
     return true;
   };
 
@@ -159,8 +191,6 @@ function AuthScreen({ onAuthenticated }) {
     event.preventDefault();
     setError('');
     setNotice('');
-    setConfirmationEmail('');
-    setResendSeconds(0);
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !normalizedEmail.includes('@')) return setError('Digite um email válido.');
     if (password.length < 6) return setError('A senha precisa ter pelo menos 6 caracteres.');
@@ -172,17 +202,11 @@ function AuthScreen({ onAuthenticated }) {
         const { data, error: signupError } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
-          options: {
-            data: { name: name.trim() },
-            emailRedirectTo: EMAIL_REDIRECT_URL,
-          },
+          options: { data: { name: name.trim() } },
         });
         if (signupError) return setError(signupError.message);
         if (data.session && data.user) onAuthenticated(data.user);
-        else {
-          armResend(normalizedEmail);
-          setNotice('Conta criada. Confirme o email que o Supabase enviou antes de entrar.');
-        }
+        else beginConfirmation(normalizedEmail);
         return;
       }
 
@@ -193,8 +217,7 @@ function AuthScreen({ onAuthenticated }) {
       }
 
       if (loginError?.message?.toLowerCase().includes('email not confirmed')) {
-        armResend(normalizedEmail, false);
-        setError('Seu email ainda não foi confirmado. Abra a mensagem recebida ou reenvie a confirmação abaixo.');
+        beginConfirmation(normalizedEmail, false, 'Seu email ainda não foi confirmado. Digite o código recebido ou solicite outro abaixo.');
         return;
       }
 
@@ -204,6 +227,75 @@ function AuthScreen({ onAuthenticated }) {
       setLoading(false);
     }
   };
+
+  if (confirmationEmail) {
+    return (
+      <div className="auth-overlay">
+        <div className="auth-layout">
+          <BrandPanel />
+          <main className="auth-form-panel">
+            <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div>
+            <section className="auth-card">
+              <button
+                type="button"
+                onClick={() => { setConfirmationEmail(''); setOtp(''); setError(''); setNotice(''); setResendSeconds(0); }}
+                style={{ border: 0, background: 'transparent', padding: 0, color: '#667085', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 22 }}
+              >
+                <ArrowLeft size={16} /> Voltar
+              </button>
+
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: '#eaf8f1', color: '#16a36a', display: 'grid', placeItems: 'center', marginBottom: 18 }}>
+                <Mail size={23} />
+              </div>
+
+              <div className="auth-card-heading">
+                <h2>Confirme seu email</h2>
+                <p>Enviamos um código de 6 dígitos para <strong style={{ color: '#344054' }}>{confirmationEmail}</strong>.</p>
+              </div>
+
+              <form className="auth-form" onSubmit={verifyCode}>
+                <label>
+                  <span>Código de confirmação</span>
+                  <div className="auth-input" style={{ height: 58, padding: '0 16px' }}>
+                    <input
+                      value={otp}
+                      onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      autoFocus
+                      aria-label="Código de 6 dígitos"
+                      placeholder="000000"
+                      style={{ textAlign: 'center', fontSize: 25, fontWeight: 800, letterSpacing: 10, color: '#111827', fontVariantNumeric: 'tabular-nums' }}
+                    />
+                  </div>
+                </label>
+
+                {error && <div className="auth-error" role="alert">{error}</div>}
+                {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
+
+                <button className="auth-submit" disabled={verifyingOtp || otp.length !== 6}>
+                  {verifyingOtp ? 'Confirmando...' : 'Confirmar email'}
+                  {!verifyingOtp && <ArrowRight size={17} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resendConfirmation}
+                  disabled={resendLoading || resendSeconds > 0}
+                  style={{ height: 40, border: '1px solid #cfe5da', borderRadius: 9, background: resendSeconds > 0 ? '#f3f6f5' : '#f5fbf8', color: resendSeconds > 0 ? '#8a9490' : '#0f7a50', fontWeight: 800, fontSize: 11, cursor: resendLoading || resendSeconds > 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  {resendLoading ? 'Reenviando...' : resendSeconds > 0 ? `Reenviar código em ${resendSeconds}s` : 'Reenviar código'}
+                </button>
+              </form>
+
+              <p className="auth-local-note">Não precisa clicar em nenhum link no email. Copie o código e confirme aqui mesmo.</p>
+            </section>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-overlay">
@@ -223,29 +315,6 @@ function AuthScreen({ onAuthenticated }) {
               <label><span>Senha</span><div className="auth-input"><LockKeyhole size={17} /><input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" className="auth-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
               {error && <div className="auth-error" role="alert">{error}</div>}
               {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
-              {confirmationEmail && (
-                <button
-                  type="button"
-                  onClick={resendConfirmation}
-                  disabled={resendLoading || resendSeconds > 0}
-                  style={{
-                    height: 40,
-                    border: '1px solid #cfe5da',
-                    borderRadius: 9,
-                    background: resendSeconds > 0 ? '#f3f6f5' : '#f5fbf8',
-                    color: resendSeconds > 0 ? '#8a9490' : '#0f7a50',
-                    fontWeight: 800,
-                    fontSize: 11,
-                    cursor: resendLoading || resendSeconds > 0 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {resendLoading
-                    ? 'Reenviando...'
-                    : resendSeconds > 0
-                      ? `Reenviar email em ${resendSeconds}s`
-                      : 'Reenviar email de confirmação'}
-                </button>
-              )}
               <button className="auth-submit" disabled={loading}>{loading ? 'Processando...' : mode === 'login' ? 'Entrar no ZapFlow' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
             </form>
             <p className="auth-local-note">Acesso protegido pelo Supabase Auth. Seus leads ficam vinculados à sua conta.</p>
