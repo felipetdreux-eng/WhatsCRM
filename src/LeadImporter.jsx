@@ -20,6 +20,7 @@ const ACCEPT = '.csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf';
 const SHEET_FORMATS = new Set(['xlsx', 'xls', 'xlsm', 'ods']);
 const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs';
 const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs';
+const FUPLY_STATUSES = new Set(['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido']);
 
 function cleanMatrix(matrix) {
   return (Array.isArray(matrix) ? matrix : [])
@@ -27,13 +28,62 @@ function cleanMatrix(matrix) {
     .filter(row => row.some(cell => String(cell ?? '').trim()));
 }
 
+function plainText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeNegotiationStatus(value) {
+  const text = plainText(value);
+  if (!text || /^(vazio|sem status|sem etapa|n\/a|-)$/.test(text)) return '';
+  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Vendido';
+  if (/(descartado|perdido|cancelado|recusado|desistiu|sem interesse|nao interessado|sem retorno)/.test(text)) return 'Perdido';
+  if (/(trabalhando|proposta|orcamento|cotacao|enviado)/.test(text)) return 'Proposta enviada';
+  if (/(em andamento|interessado|negociacao|negociando|quente)/.test(text)) return 'Interessado';
+  if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
+  if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo lead';
+  return String(value ?? '').trim();
+}
+
 function hasMapped(mapping, key) {
   return mapping?.[key] !== '' && mapping?.[key] != null;
 }
 
+function enhanceMapping(headers, baseMapping) {
+  const mapping = { ...baseMapping };
+  if (!hasMapped(mapping, 'status')) {
+    const index = headers.findIndex(header => {
+      const text = plainText(header);
+      return text === 'estado da negociacao'
+        || text === 'estado negociacao'
+        || text === 'status da negociacao'
+        || text === 'situacao da negociacao'
+        || text === 'situacao negociacao'
+        || text === 'estado da venda';
+    });
+    if (index >= 0) mapping.status = index;
+  }
+  return mapping;
+}
+
+function normalizeStatusColumn(rows, mapping) {
+  if (!hasMapped(mapping, 'status')) return rows;
+  const statusIndex = Number(mapping.status);
+  return rows.map(row => {
+    const next = [...row];
+    next[statusIndex] = normalizeNegotiationStatus(next[statusIndex]);
+    return next;
+  });
+}
+
 function pdfHeaderScore(row) {
   const headers = (Array.isArray(row) ? row : []).map(cell => String(cell ?? '').trim());
-  const mapping = detectMapping(headers);
+  const mapping = enhanceMapping(headers, detectMapping(headers));
   const recognized = Object.values(mapping).filter(value => value !== '' && value != null).length;
   const hasPhone = hasMapped(mapping, 'phone');
   const hasIdentity = hasMapped(mapping, 'name') || hasMapped(mapping, 'company');
@@ -46,6 +96,39 @@ function pdfHeaderScore(row) {
 function looksLikePhone(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   return digits.length >= 10 && digits.length <= 13;
+}
+
+function extractPdfNegotiationStates(matrix, expectedCount) {
+  const states = [];
+  let collecting = false;
+
+  for (const row of cleanMatrix(matrix)) {
+    const cells = row.map(cell => String(cell ?? '').trim()).filter(Boolean);
+    if (!cells.length) continue;
+
+    const mapping = enhanceMapping(cells, detectMapping(cells));
+    if (hasMapped(mapping, 'status')) {
+      collecting = true;
+      continue;
+    }
+    if (!collecting) continue;
+
+    // Stop before a later horizontal block such as Valor/Observações.
+    if ((hasMapped(mapping, 'value') || hasMapped(mapping, 'notes')) && !hasMapped(mapping, 'status')) break;
+
+    const statusCell = cells.find(cell => FUPLY_STATUSES.has(normalizeNegotiationStatus(cell)));
+    if (statusCell) {
+      states.push(normalizeNegotiationStatus(statusCell));
+    } else if (cells.some(cell => /^(vazio|sem status|sem etapa|-)$/.test(plainText(cell)))) {
+      // Some exported sheets print the word "Vazio" for blank status rows.
+      // Keep the placeholder so following rows stay aligned with the contacts.
+      states.push('');
+    }
+
+    if (states.length >= expectedCount) break;
+  }
+
+  return states;
 }
 
 function extractPdfContactMatrix(matrix) {
@@ -65,11 +148,18 @@ function extractPdfContactMatrix(matrix) {
 
   // Excel/Sheets PDFs often print one logical spreadsheet in horizontal page
   // blocks: contact columns on pages 1-2, status columns later, notes later still.
-  // In that layout a single PDF row never contains every field. When we can
-  // confidently find several name + phone rows, treat that contact table as
-  // the import source instead of feeding the unrelated later page blocks into
-  // the normal row analyzer.
+  // Rebuild the status block by row order so the state of each negotiation is
+  // not lost just because the PDF printer threw the columns onto other pages.
   if (contacts.length < 3) return null;
+
+  const states = extractPdfNegotiationStates(matrix, contacts.length);
+  if (states.length) {
+    return [
+      ['Estabelecimento', 'WhatsApp', 'Status'],
+      ...contacts.map((contact, index) => [...contact, states[index] || '']),
+    ];
+  }
+
   return [['Estabelecimento', 'WhatsApp'], ...contacts];
 }
 
@@ -273,10 +363,12 @@ export default function LeadImporter({ leads = [], setLeads, onClose, onActivity
       const matrix = await readSpreadsheet(file);
       if (matrix.length < 2) throw new Error('Não encontrei linhas de dados. A primeira linha deve conter os títulos das colunas.');
       const nextHeaders = matrix[0].map((header, index) => String(header || `Coluna ${index + 1}`).trim());
+      const nextMapping = enhanceMapping(nextHeaders, detectMapping(nextHeaders));
+      const nextRows = normalizeStatusColumn(matrix.slice(1), nextMapping);
       setFileName(file.name);
       setHeaders(nextHeaders);
-      setRows(matrix.slice(1));
-      setMapping(detectMapping(nextHeaders));
+      setRows(nextRows);
+      setMapping(nextMapping);
     } catch (loadError) {
       console.error('Spreadsheet import failed:', loadError);
       setFileName('');
