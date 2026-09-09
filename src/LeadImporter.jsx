@@ -48,6 +48,31 @@ function looksLikePhone(value) {
   return digits.length >= 10 && digits.length <= 13;
 }
 
+function extractPdfContactMatrix(matrix) {
+  const contacts = [];
+
+  cleanMatrix(matrix).forEach(row => {
+    const cells = row.map(cell => String(cell ?? '').trim()).filter(Boolean);
+    const phoneAt = cells.findIndex(looksLikePhone);
+    if (phoneAt <= 0) return;
+
+    const identity = cells.slice(0, phoneAt).join(' ').trim();
+    const phone = cells[phoneAt];
+    if (!identity || !phone) return;
+
+    contacts.push([identity, phone]);
+  });
+
+  // Excel/Sheets PDFs often print one logical spreadsheet in horizontal page
+  // blocks: contact columns on pages 1-2, status columns later, notes later still.
+  // In that layout a single PDF row never contains every field. When we can
+  // confidently find several name + phone rows, treat that contact table as
+  // the import source instead of feeding the unrelated later page blocks into
+  // the normal row analyzer.
+  if (contacts.length < 3) return null;
+  return [['Estabelecimento', 'WhatsApp'], ...contacts];
+}
+
 function alignPdfRow(row, headerCount, mapping) {
   const cells = (Array.isArray(row) ? row : []).map(cell => String(cell ?? '').trim());
   if (!cells.length || !headerCount) return cells;
@@ -202,6 +227,8 @@ async function readPdf(file) {
     throw new Error('Esse PDF parece ser escaneado ou só imagem. Exporte a tabela como PDF com texto selecionável, CSV ou Excel.');
   }
 
+  const contactMatrix = extractPdfContactMatrix(matrix);
+  if (contactMatrix) return contactMatrix;
   return normalizePdfMatrix(matrix);
 }
 
