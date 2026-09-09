@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -9,10 +9,12 @@ import {
   ListFilter,
   MessageCircle,
   Plus,
+  Sparkles,
   Target,
   TrendingUp,
   UsersRound,
 } from 'lucide-react';
+import Autopilot, { buildAutopilotQueue } from './Autopilot';
 import './dashboard.css';
 
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
@@ -66,6 +68,8 @@ function daysWithoutInteraction(lead) {
 }
 
 export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps }) {
+  const [autopilotOpen, setAutopilotOpen] = useState(false);
+
   const data = useMemo(() => {
     const active = leads.filter(lead => !['Vendido', 'Perdido'].includes(lead.status));
     const sold = leads.filter(lead => lead.status === 'Vendido');
@@ -125,6 +129,10 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
       .slice(0, 5);
 
+    const autopilotQueue = buildAutopilotQueue(leads);
+    const autopilotHigh = autopilotQueue.filter(item => item.priority === 'high').length;
+    const autopilotValue = autopilotQueue.reduce((sum, item) => sum + Number(item.lead.value || 0), 0);
+
     return {
       active,
       sold,
@@ -141,6 +149,9 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       maxStatusCount,
       queue: queue.slice(0, 7),
       recent,
+      autopilotQueue,
+      autopilotHigh,
+      autopilotValue,
     };
   }, [leads]);
 
@@ -196,6 +207,25 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
           <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
         </div>
       </header>
+
+      <section className="autopilot-dashboard" aria-label="Autopilot de vendas">
+        <div className="autopilot-dashboard-main">
+          <div className="autopilot-dashboard-icon"><Sparkles size={21} /></div>
+          <div className="autopilot-dashboard-copy">
+            <span>Seu dia no Autopilot</span>
+            <h2>{data.autopilotQueue.length ? `${data.autopilotQueue.length} oportunidades merecem sua atenção` : 'Sua fila prioritária está limpa'}</h2>
+            <p>{data.autopilotQueue.length ? 'O sistema ordenou quem você deveria revisar primeiro com base em atraso, estágio, valor e tempo sem interação.' : 'Nada urgente agora. Você pode focar em gerar novas oportunidades.'}</p>
+            <div className="autopilot-dashboard-meta">
+              <b>{data.autopilotHigh} prioridade{data.autopilotHigh === 1 ? '' : 's'} alta{data.autopilotHigh === 1 ? '' : 's'}</b>
+              <b>{data.overdue.length} atrasada{data.overdue.length === 1 ? '' : 's'}</b>
+              <b>{currency(data.autopilotValue)} em jogo</b>
+            </div>
+          </div>
+        </div>
+        <button type="button" className="autopilot-dashboard-button" onClick={() => setAutopilotOpen(true)}>
+          <Sparkles size={16} /> {data.autopilotQueue.length ? `Começar ${data.autopilotQueue.length} ações` : 'Abrir Autopilot'} <ArrowRight size={15} />
+        </button>
+      </section>
 
       <section className="dashboard-metrics" aria-label="Resumo comercial">
         {cards.map(card => {
@@ -300,6 +330,14 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
           </div>
         </section>
       </div>
+
+      <Autopilot
+        open={autopilotOpen}
+        onClose={() => setAutopilotOpen(false)}
+        leads={leads}
+        openLead={openLead}
+        openWhatsApp={openWhatsApp}
+      />
     </main>
   );
 }
