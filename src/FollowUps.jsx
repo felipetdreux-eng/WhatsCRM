@@ -61,6 +61,15 @@ function statusClass(status) {
   return status.toLowerCase().replaceAll(' ', '-');
 }
 
+function groupByDate(items) {
+  return {
+    overdue: items.filter(lead => dayDiff(lead.nextContact) < 0),
+    today: items.filter(lead => dayDiff(lead.nextContact) === 0),
+    week: items.filter(lead => dayDiff(lead.nextContact) > 0 && dayDiff(lead.nextContact) <= 7),
+    later: items.filter(lead => dayDiff(lead.nextContact) > 7),
+  };
+}
+
 function FollowUpCard({ lead, openLead, openWhatsApp, complete, reschedule, updateStatus }) {
   const diff = dayDiff(lead.nextContact);
   const overdue = diff < 0;
@@ -132,31 +141,32 @@ function FollowUpSection({ title, subtitle, icon: Icon, tone, leads, ...actions 
   );
 }
 
-export default function FollowUps({ leads, setLeads, openLead, openWhatsApp }) {
+export default function FollowUps({ leads, setLeads, openLead, openWhatsApp, updateLeadStatus }) {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState('Todos');
   const [rescheduling, setRescheduling] = useState(null);
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
 
-  const active = useMemo(() => leads
+  const allActive = useMemo(() => leads
     .filter(lead => lead.nextContact && !CLOSED.includes(lead.status))
-    .filter(lead => `${lead.name} ${lead.company} ${lead.nextAction} ${lead.status}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)), [leads, query]);
+    .sort((a, b) => `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)), [leads]);
 
-  const groups = useMemo(() => ({
-    overdue: active.filter(lead => dayDiff(lead.nextContact) < 0),
-    today: active.filter(lead => dayDiff(lead.nextContact) === 0),
-    week: active.filter(lead => dayDiff(lead.nextContact) > 0 && dayDiff(lead.nextContact) <= 7),
-    later: active.filter(lead => dayDiff(lead.nextContact) > 7),
-  }), [active]);
+  const searchedActive = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return allActive;
+    return allActive.filter(lead => `${lead.name} ${lead.company} ${lead.nextAction} ${lead.status}`.toLowerCase().includes(needle));
+  }, [allActive, query]);
+
+  const groups = useMemo(() => groupByDate(allActive), [allActive]);
+  const searchedGroups = useMemo(() => groupByDate(searchedActive), [searchedActive]);
 
   const visible = useMemo(() => {
-    if (scope === 'Hoje') return { overdue: [], today: groups.today, week: [], later: [] };
-    if (scope === 'Atrasados') return { overdue: groups.overdue, today: [], week: [], later: [] };
-    if (scope === 'Próximos 7 dias') return { overdue: [], today: [], week: groups.week, later: [] };
-    return groups;
-  }, [groups, scope]);
+    if (scope === 'Hoje') return { overdue: [], today: searchedGroups.today, week: [], later: [] };
+    if (scope === 'Atrasados') return { overdue: searchedGroups.overdue, today: [], week: [], later: [] };
+    if (scope === 'Próximos 7 dias') return { overdue: [], today: [], week: searchedGroups.week, later: [] };
+    return searchedGroups;
+  }, [searchedGroups, scope]);
 
   const totalPotential = [...groups.overdue, ...groups.today]
     .reduce((sum, lead) => sum + Number(lead.value || 0), 0);
@@ -168,18 +178,26 @@ export default function FollowUps({ leads, setLeads, openLead, openWhatsApp }) {
 
   const updateStatus = (id, status) => {
     const lead = leads.find(item => item.id === id);
-    setLeads(current => current.map(item => item.id === id ? { ...item, status } : item));
+    if (updateLeadStatus) {
+      updateLeadStatus(id, status);
+      if (status === 'Vendido') showToast(`Confirme o valor final da venda de ${lead?.name || 'cliente'}.`);
+      else showToast(`${lead?.name || 'Lead'} atualizado para ${status}.`);
+      return;
+    }
+    setLeads(current => current.map(item => item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item));
     showToast(`${lead?.name || 'Lead'} atualizado para ${status}.`);
   };
 
   const complete = id => {
     const lead = leads.find(item => item.id === id);
+    const now = new Date().toISOString();
     setLeads(current => current.map(item => item.id === id ? {
       ...item,
       nextContact: '',
       nextContactTime: '',
       nextAction: '',
-      lastFollowupAt: new Date().toISOString(),
+      lastFollowupAt: now,
+      updatedAt: now,
     } : item));
     showToast(`Follow-up de ${lead?.name || 'cliente'} concluído.`);
   };
@@ -208,6 +226,7 @@ export default function FollowUps({ leads, setLeads, openLead, openWhatsApp }) {
       nextContact: schedule.date,
       nextContactTime: schedule.time,
       nextAction: schedule.action,
+      updatedAt: new Date().toISOString(),
     } : item));
     showToast(`${rescheduling.name} reagendado para ${fullDate(schedule.date)}.`);
     setRescheduling(null);
