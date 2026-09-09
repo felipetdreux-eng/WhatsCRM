@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Moon, Play, Save, ShieldCheck, Sun, Target, UserRound } from 'lucide-react';
 import { updateProfileName, updateProfileTheme } from './backendBridge';
 import './settings.css';
+import './dark.css';
 
 const GOAL_LABELS = {
   organize: 'Organizar leads',
