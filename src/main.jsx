@@ -28,8 +28,17 @@ import {
 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import FollowUps from './FollowUps';
-import ComingSoon from './ComingSoon';
+import Messages from './Messages';
+import SettingsPage from './SettingsPage';
 import { getActiveAccount, logoutAccount } from './accountStorage';
+import {
+  buildDemoLeads,
+  canonicalPhone,
+  currency,
+  localDateKey,
+  validBrazilPhone,
+  whatsappPhone,
+} from './domain';
 import './styles.css';
 import './detail.css';
 import './account.css';
@@ -51,29 +60,7 @@ const STATUSES = [
 ];
 
 const OPEN_STATUSES = STATUSES.filter(status => !['Vendido', 'Perdido'].includes(status.id));
-const VALID_DDDS = new Set([
-  '11','12','13','14','15','16','17','18','19','21','22','24','27','28','31','32','33','34','35','37','38',
-  '41','42','43','44','45','46','47','48','49','51','53','54','55','61','62','63','64','65','66','67','68','69',
-  '71','73','74','75','77','79','81','82','83','84','85','86','87','88','89','91','92','93','94','95','96','97','98','99',
-]);
 const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
-
-const DEMO_LEADS = [
-  { id: '1', name: 'Studio Bella', company: 'Salão de beleza', phone: '21999999991', value: 350, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-08', nextContactTime: '15:00', nextAction: 'Fazer primeiro contato', notes: 'Primeiro contato pendente.', createdAt: '2026-09-07T12:00:00.000Z' },
-  { id: '2', name: 'Mercado Silva', company: 'Mercado', phone: '21999999992', value: 250, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-09', nextContactTime: '', nextAction: 'Apresentar serviço', notes: '', createdAt: '2026-09-07T11:00:00.000Z' },
-  { id: '3', name: 'Pet Care Feliz', company: 'Pet shop', phone: '21999999993', value: 400, status: 'Novo lead', origin: 'Instagram', nextContact: '2026-09-07', nextContactTime: '16:30', nextAction: 'Enviar mensagem', notes: '', createdAt: '2026-09-06T18:00:00.000Z' },
-  { id: '4', name: 'Barbearia Prime', company: 'Barbearia', phone: '21999999994', value: 300, status: 'Contatado', origin: 'Google Maps', nextContact: '2026-09-08', nextContactTime: '11:00', nextAction: 'Perguntar se recebeu', notes: 'Mensagem enviada.', createdAt: '2026-09-06T15:00:00.000Z' },
-  { id: '5', name: 'Padaria do João', company: 'Padaria', phone: '21999999995', value: 500, status: 'Contatado', origin: 'Indicação', nextContact: '2026-09-10', nextContactTime: '14:00', nextAction: 'Retornar contato', notes: '', createdAt: '2026-09-05T17:00:00.000Z' },
-  { id: '6', name: 'João Fotografia', company: 'Estúdio de fotografia', phone: '21999999996', value: 600, status: 'Interessado', origin: 'Instagram', nextContact: '2026-09-08', nextContactTime: '10:00', nextAction: 'Mandar proposta', notes: 'Gostou da proposta inicial.', createdAt: '2026-09-05T14:00:00.000Z' },
-  { id: '7', name: 'Ana Design', company: 'Design gráfico', phone: '21999999997', value: 450, status: 'Interessado', origin: 'Instagram', nextContact: '2026-09-10', nextContactTime: '', nextAction: 'Alinhar escopo', notes: '', createdAt: '2026-09-04T13:00:00.000Z' },
-  { id: '8', name: 'Alpha Elétrica', company: 'Serviços elétricos', phone: '21999999998', value: 750, status: 'Proposta enviada', origin: 'Google Maps', nextContact: '2026-09-11', nextContactTime: '15:30', nextAction: 'Cobrar retorno da proposta', notes: 'Proposta enviada por WhatsApp.', createdAt: '2026-09-04T10:00:00.000Z' },
-  { id: '9', name: 'Oficina JM', company: 'Oficina mecânica', phone: '21999999999', value: 850, status: 'Proposta enviada', origin: 'Google Maps', nextContact: '2026-09-12', nextContactTime: '09:30', nextAction: 'Fazer follow-up', notes: '', createdAt: '2026-09-03T18:00:00.000Z' },
-  { id: '10', name: 'Personal Lucas', company: 'Personal trainer', phone: '21999999980', value: 650, saleValue: 600, status: 'Vendido', origin: 'Indicação', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Cliente ativo.', createdAt: '2026-09-02T14:00:00.000Z', soldAt: '2026-09-06T16:00:00.000Z' },
-  { id: '11', name: 'Restaurante Sabor', company: 'Restaurante', phone: '21999999981', value: 700, saleValue: 700, status: 'Vendido', origin: 'Site', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Cliente ativo.', createdAt: '2026-09-01T15:00:00.000Z', soldAt: '2026-09-05T16:00:00.000Z' },
-  { id: '12', name: 'Tech Solutions', company: 'TI e informática', phone: '21999999982', value: 400, status: 'Perdido', origin: 'Google Maps', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Sem retorno.', createdAt: '2026-08-31T14:00:00.000Z', lostAt: '2026-09-05T11:00:00.000Z' },
-  { id: '13', name: 'Academia Move', company: 'Academia', phone: '21999999983', value: 550, status: 'Perdido', origin: 'Instagram', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Escolheu concorrente.', createdAt: '2026-08-30T12:00:00.000Z', lostAt: '2026-09-04T12:00:00.000Z' },
-];
-
 const navItems = [
   ['Dashboard', LayoutDashboard],
   ['Pipeline', ListFilter],
@@ -87,18 +74,9 @@ const emptyForm = {
   nextContact: '', nextContactTime: '', nextAction: '', notes: '',
 };
 
-const currency = value => new Intl.NumberFormat('pt-BR', {
-  style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2,
-}).format(Number(value || 0));
-
 function initials(name) {
   const parts = String(name || 'Usuário').trim().split(/\s+/).filter(Boolean);
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'US').toUpperCase();
-}
-
-function localDateKey() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function formatDate(value, long = false) {
@@ -113,27 +91,6 @@ function formatDate(value, long = false) {
   return date.toLocaleDateString('pt-BR', long
     ? { day: '2-digit', month: 'long', year: 'numeric' }
     : { day: '2-digit', month: '2-digit' });
-}
-
-function canonicalPhone(phone) {
-  let digits = String(phone || '').replace(/\D/g, '');
-  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) digits = digits.slice(2);
-  return digits;
-}
-
-function validBrazilPhone(phone) {
-  const digits = canonicalPhone(phone);
-  if (!/^\d{10,11}$/.test(digits)) return false;
-  if (/^(\d)\1+$/.test(digits)) return false;
-  if (!VALID_DDDS.has(digits.slice(0, 2))) return false;
-  const subscriber = digits.slice(2);
-  if (digits.length === 11) return subscriber.startsWith('9');
-  return ['2', '3', '4', '5'].includes(subscriber[0]);
-}
-
-function whatsappPhone(phone) {
-  const digits = canonicalPhone(phone);
-  return validBrazilPhone(digits) ? `55${digits}` : '';
 }
 
 function statusTone(status) {
@@ -219,12 +176,13 @@ function applyStatusTransition(previous, draft, nextStatus, saleValue) {
 }
 
 function App() {
+  const [account, setAccount] = useState(ACTIVE_ACCOUNT);
   const [leads, setLeads] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('zapflow-leads'));
-      return migrateLeads(Array.isArray(saved) ? saved : DEMO_LEADS);
+      return migrateLeads(Array.isArray(saved) ? saved : buildDemoLeads());
     } catch {
-      return migrateLeads(DEMO_LEADS);
+      return migrateLeads(buildDemoLeads());
     }
   });
   const [query, setQuery] = useState('');
@@ -245,8 +203,8 @@ function App() {
   }, [leads]);
 
   const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
-  const accountName = ACTIVE_ACCOUNT?.name || 'Usuário';
-  const accountGoal = GOAL_LABELS[ACTIVE_ACCOUNT?.onboarding?.goal] || 'Plano gratuito';
+  const accountName = account?.name || 'Usuário';
+  const accountGoal = GOAL_LABELS[account?.onboarding?.goal] || 'Plano gratuito';
 
   const filteredLeads = useMemo(() => leads.filter(lead => {
     const haystack = `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status}`.toLowerCase();
@@ -282,8 +240,8 @@ function App() {
   };
 
   const handleLogout = () => {
-    if (!ACTIVE_ACCOUNT?.id) return;
-    logoutAccount(ACTIVE_ACCOUNT.id);
+    if (!account?.id) return;
+    logoutAccount(account.id);
     window.location.reload();
   };
 
@@ -402,22 +360,22 @@ function App() {
 
   const renderSidebar = () => (
     <aside className="sidebar">
-      <button className="logo-wrap logo-button" onClick={() => navigate('Dashboard')} aria-label="Ir para Dashboard">
+      <button type="button" className="logo-wrap logo-button" onClick={() => navigate('Dashboard')} aria-label="Ir para Dashboard">
         <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
         <span>ZapFlow</span>
       </button>
       <nav className="nav-list" aria-label="Navegação principal">
         {navItems.map(([label, Icon]) => (
-          <button key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)}>
+          <button type="button" key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)} aria-current={!selectedLead && activePage === label ? 'page' : undefined}>
             <Icon size={18} /><span>{label}</span>
-            {label === 'Leads' && dueFollowups > 0 && <b className="nav-badge">{dueFollowups}</b>}
+            {label === 'Leads' && dueFollowups > 0 && <b className="nav-badge" aria-label={`${dueFollowups} follow-ups pendentes`}>{dueFollowups}</b>}
           </button>
         ))}
       </nav>
       <div className="profile-card">
-        <div className="avatar">{initials(accountName)}</div>
+        <div className="avatar" aria-hidden="true">{initials(accountName)}</div>
         <div><strong>{accountName}</strong><span>Grátis · {accountGoal}</span></div>
-        <button className="profile-logout icon-button" onClick={handleLogout} title="Sair da conta" aria-label="Sair da conta"><LogOut size={16} /></button>
+        <button type="button" className="profile-logout icon-button" onClick={handleLogout} title="Sair da conta" aria-label="Sair da conta"><LogOut size={16} /></button>
       </div>
     </aside>
   );
@@ -428,17 +386,17 @@ function App() {
     return (
       <main className="main-content detail-content">
         <div className="detail-topbar">
-          <button className="back-button" onClick={() => { setSelectedLeadId(null); setEditingLead(null); setFormError(''); }}>
+          <button type="button" className="back-button" onClick={() => { setSelectedLeadId(null); setEditingLead(null); setFormError(''); }}>
             <ArrowLeft size={18} /> Voltar
           </button>
           <div className="detail-top-actions">
-            {!editingLead && <button className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>}
-            <button className="primary-button" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
+            {!editingLead && <button type="button" className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>}
+            <button type="button" className="primary-button" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
           </div>
         </div>
 
         <section className="detail-hero">
-          <div className="detail-avatar">{selectedLead.name.slice(0, 2).toUpperCase()}</div>
+          <div className="detail-avatar" aria-hidden="true">{selectedLead.name.slice(0, 2).toUpperCase()}</div>
           <div className="detail-title">
             <div className="detail-title-line">
               <h1>{selectedLead.name}</h1>
@@ -513,10 +471,10 @@ function App() {
               <section className="detail-card">
                 <div className="section-heading"><div><h2>Ações</h2><p>Atalhos para avançar a negociação.</p></div></div>
                 <div className="detail-actions-stack">
-                  <button className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
-                  {selectedLead.status !== 'Vendido' && <button className="detail-action sold-action" onClick={() => setLeadStatus('Vendido')}><CheckCircle2 size={17} /> Marcar como vendido</button>}
-                  {selectedLead.status !== 'Perdido' && <button className="detail-action lost-action" onClick={() => setLeadStatus('Perdido')}><XCircle size={17} /> Marcar como perdido</button>}
-                  <button className="detail-action" onClick={startEditing}><Pencil size={17} /> Editar cliente</button>
+                  <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
+                  {selectedLead.status !== 'Vendido' && <button type="button" className="detail-action sold-action" onClick={() => setLeadStatus('Vendido')}><CheckCircle2 size={17} /> Marcar como vendido</button>}
+                  {selectedLead.status !== 'Perdido' && <button type="button" className="detail-action lost-action" onClick={() => setLeadStatus('Perdido')}><XCircle size={17} /> Marcar como perdido</button>}
+                  <button type="button" className="detail-action" onClick={startEditing}><Pencil size={17} /> Editar cliente</button>
                 </div>
               </section>
             </aside>
@@ -531,14 +489,14 @@ function App() {
       <header className="page-header">
         <div><h1>Pipeline</h1><p>Organize seus clientes e não perca follow-ups.</p></div>
         <div className="header-actions">
-          <label className="search-box"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" /></label>
-          <label className="filter-control"><Filter size={16} /><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option>Todos</option>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
-          <label className="filter-control hide-tablet"><select value={originFilter} onChange={e => setOriginFilter(e.target.value)}><option>Todas</option>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
-          <button className="primary-button" onClick={() => { setForm(emptyForm); setFormError(''); setModalOpen(true); }}><Plus size={18} /> Novo lead</button>
+          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar clientes</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar clientes" /></label>
+          <label className="filter-control"><Filter size={16} /><span className="sr-only">Filtrar por status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrar por status"><option>Todos</option>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
+          <label className="filter-control hide-tablet"><span className="sr-only">Filtrar por origem</span><select value={originFilter} onChange={e => setOriginFilter(e.target.value)} aria-label="Filtrar por origem"><option>Todas</option>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
+          <button type="button" className="primary-button" onClick={() => { setForm(emptyForm); setFormError(''); setModalOpen(true); }}><Plus size={18} /> Novo lead</button>
         </div>
       </header>
 
-      <section className="metrics-grid">
+      <section className="metrics-grid" aria-label="Resumo do pipeline">
         {metrics.map(metric => {
           const Icon = metric.icon;
           return <article className="metric-card" key={metric.label}>
@@ -548,7 +506,7 @@ function App() {
         })}
       </section>
 
-      <section className="pipeline-scroll">
+      <section className="pipeline-scroll" aria-label="Etapas do pipeline">
         <div className="pipeline-board">
           {STATUSES.map(status => {
             const columnLeads = filteredLeads.filter(lead => lead.status === status.id);
@@ -557,18 +515,24 @@ function App() {
               <div className="column-body">
                 {columnLeads.map(lead => (
                   <article className="lead-card" key={lead.id} draggable onDragStart={() => setDraggedId(lead.id)} onDragEnd={() => setDraggedId(null)} onClick={() => openLead(lead)}>
-                    <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div><button className="icon-button" aria-label="Abrir cliente" onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button></div>
+                    <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div><button type="button" className="icon-button" aria-label={`Abrir ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button></div>
                     <b className="lead-value">{currency(status.id === 'Vendido' ? lead.saleValue : lead.value)}</b>
+                    <label className="mobile-status-control" onClick={e => e.stopPropagation()}>
+                      <span>Status</span>
+                      <select value={lead.status} onChange={e => requestStatusChange(lead.id, e.target.value)} aria-label={`Alterar status de ${lead.name}`}>
+                        {STATUSES.map(option => <option key={option.id}>{option.id}</option>)}
+                      </select>
+                    </label>
                     {lead.nextContact ? <div className="next-contact"><CalendarClock size={14} /> Próximo contato: {formatDate(lead.nextContact)}</div> : <div className={`lead-tag ${status.id === 'Vendido' ? 'success' : status.id === 'Perdido' ? 'danger' : ''}`}>{status.id === 'Vendido' ? 'Venda fechada' : status.id === 'Perdido' ? (lead.notes || 'Negociação encerrada') : 'Sem próximo contato'}</div>}
                     <div className="lead-actions">
-                      <button className="whatsapp-button" onClick={e => { e.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /> Abrir WhatsApp</button>
-                      <button className="icon-button" onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button>
+                      <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /> Abrir WhatsApp</button>
+                      <button type="button" className="icon-button" aria-label={`Ver detalhes de ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button>
                     </div>
                   </article>
                 ))}
-                {columnLeads.length === 0 && <div className="empty-column">Arraste um lead para cá</div>}
+                {columnLeads.length === 0 && <div className="empty-column">Nenhum lead nesta etapa</div>}
               </div>
-              {!['Vendido', 'Perdido'].includes(status.id) && <button className="add-column-lead" onClick={() => { setForm({ ...emptyForm, status: status.id }); setFormError(''); setModalOpen(true); }}><Plus size={15} /> Adicionar lead</button>}
+              {!['Vendido', 'Perdido'].includes(status.id) && <button type="button" className="add-column-lead" onClick={() => { setForm({ ...emptyForm, status: status.id }); setFormError(''); setModalOpen(true); }}><Plus size={15} /> Adicionar lead</button>}
             </section>;
           })}
         </div>
@@ -580,20 +544,21 @@ function App() {
     if (selectedLead) return renderLeadDetail();
     if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setFormError(''); setModalOpen(true); }} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} />;
-    if (activePage === 'Mensagens' || activePage === 'Configurações') return <ComingSoon type={activePage} goDashboard={() => setActivePage('Dashboard')} />;
+    if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
+    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} />;
     return renderPipeline();
   };
 
   return (
     <div className="app-shell">
       {renderSidebar()}
-      <button className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
+      <button type="button" className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
       {renderActivePage()}
 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
-          <section className="modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2>Novo lead</h2><p>Adicione um novo contato ao pipeline.</p></div><button className="icon-button" onClick={() => setModalOpen(false)}><X size={20} /></button></div>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-lead-title" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header"><div><h2 id="new-lead-title">Novo lead</h2><p>Adicione um novo contato ao pipeline.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
             <form onSubmit={addLead} className="lead-form">
               <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Studio Bella" /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
@@ -614,8 +579,8 @@ function App() {
 
       {pendingSale && (
         <div className="modal-backdrop" onMouseDown={() => { setPendingSale(null); setSaleError(''); }}>
-          <section className="modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2>Fechar venda</h2><p>{pendingSale.name} · registre o valor que realmente foi fechado.</p></div><button className="icon-button" onClick={() => { setPendingSale(null); setSaleError(''); }}><X size={20} /></button></div>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="sale-modal-title" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header"><div><h2 id="sale-modal-title">Fechar venda</h2><p>{pendingSale.name} · registre o valor que realmente foi fechado.</p></div><button type="button" className="icon-button" onClick={() => { setPendingSale(null); setSaleError(''); }} aria-label="Fechar"><X size={20} /></button></div>
             <form className="lead-form" onSubmit={confirmSale}>
               <label className="full"><span>Valor vendido *</span><input autoFocus type="number" min="0.01" step="0.01" value={pendingSale.value} onChange={e => setPendingSale({ ...pendingSale, value: e.target.value })} /></label>
               {saleError && <div className="auth-error full" role="alert">{saleError}</div>}
