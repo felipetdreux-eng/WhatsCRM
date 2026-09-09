@@ -1,19 +1,45 @@
 import { supabase } from './supabaseClient';
 import { getProfile, hydrateBackend, installSyncBridge } from './backendBridge';
 
-async function boot() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return;
+let bootPromise = null;
+let bootedUserId = null;
 
-  try {
-    const profile = await getProfile(data.user.id);
-    if (!profile?.onboarding_completed) return;
-    await hydrateBackend(data.user, profile);
-    installSyncBridge(data.user.id);
-    await import('./main.jsx');
-  } catch (bootError) {
-    console.error('ZapFlow backend boot failed:', bootError);
-  }
+async function boot(sessionUser = null) {
+  const user = sessionUser || (await supabase.auth.getUser()).data?.user || null;
+  if (!user) return;
+  if (bootedUserId === user.id) return;
+  if (bootPromise) return bootPromise;
+
+  bootPromise = (async () => {
+    try {
+      const profile = await getProfile(user.id);
+      if (!profile?.onboarding_completed) return;
+
+      await hydrateBackend(user, profile);
+      installSyncBridge(user.id);
+      await import('./main.jsx');
+      bootedUserId = user.id;
+    } catch (bootError) {
+      console.error('ZapFlow backend boot failed:', bootError);
+    } finally {
+      bootPromise = null;
+    }
+  })();
+
+  return bootPromise;
 }
 
-boot();
+boot().catch(bootError => console.error('ZapFlow initial boot failed:', bootError));
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    bootedUserId = null;
+    return;
+  }
+
+  if (session?.user && ['SIGNED_IN', 'INITIAL_SESSION', 'USER_UPDATED'].includes(event)) {
+    window.setTimeout(() => {
+      boot(session.user).catch(bootError => console.error('ZapFlow auth boot failed:', bootError));
+    }, 0);
+  }
+});
