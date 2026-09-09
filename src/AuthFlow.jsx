@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowLeft,
@@ -17,23 +17,16 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
+import {
+  ACCOUNTS_KEY,
+  SESSION_KEY,
+  activateAccountStorage,
+  getActiveAccount,
+  initializeAccountData,
+  readJSON,
+  saveAccounts,
+} from './accountStorage';
 import './authflow.css';
-
-const ACCOUNTS_KEY = 'zapflow-accounts';
-const SESSION_KEY = 'zapflow-session';
-
-function readJSON(key, fallback) {
-  try {
-    const value = JSON.parse(localStorage.getItem(key));
-    return value ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveAccounts(accounts) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-}
 
 async function hashPassword(password) {
   const bytes = new TextEncoder().encode(password);
@@ -54,6 +47,11 @@ const GOAL_OPTIONS = [
   { id: 'followups', title: 'Lembrar follow-ups', text: 'Não esquecer quem precisa de retorno.', icon: Target },
   { id: 'sales', title: 'Aumentar vendas', text: 'Acompanhar melhor cada oportunidade.', icon: LayoutDashboard },
 ];
+
+const BOOT_ACCOUNT = getActiveAccount();
+if (BOOT_ACCOUNT?.onboardingCompleted) {
+  activateAccountStorage(BOOT_ACCOUNT.id, { allowLegacy: true });
+}
 
 function BrandPanel() {
   return (
@@ -96,18 +94,9 @@ function AuthScreen({ onAuthenticated }) {
     setError('');
 
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes('@')) {
-      setError('Digite um email válido.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('A senha precisa ter pelo menos 6 caracteres.');
-      return;
-    }
-    if (mode === 'register' && name.trim().length < 2) {
-      setError('Digite seu nome.');
-      return;
-    }
+    if (!normalizedEmail || !normalizedEmail.includes('@')) return setError('Digite um email válido.');
+    if (password.length < 6) return setError('A senha precisa ter pelo menos 6 caracteres.');
+    if (mode === 'register' && name.trim().length < 2) return setError('Digite seu nome.');
 
     setLoading(true);
     try {
@@ -119,6 +108,7 @@ function AuthScreen({ onAuthenticated }) {
           setError('Já existe uma conta com esse email neste navegador.');
           return;
         }
+
         const account = {
           id: crypto.randomUUID(),
           name: name.trim(),
@@ -128,8 +118,8 @@ function AuthScreen({ onAuthenticated }) {
           onboardingCompleted: false,
           onboarding: null,
         };
-        const nextAccounts = [...accounts, account];
-        saveAccounts(nextAccounts);
+
+        saveAccounts([...accounts, account]);
         localStorage.setItem(SESSION_KEY, JSON.stringify({ accountId: account.id, email: account.email }));
         onAuthenticated(account);
         return;
@@ -193,7 +183,7 @@ function AuthScreen({ onAuthenticated }) {
               </button>
             </form>
 
-            <p className="auth-local-note">Versão de teste: o acesso fica salvo apenas neste navegador até conectarmos o banco de dados real.</p>
+            <p className="auth-local-note">Versão de teste: contas e dados ficam neste navegador até conectarmos o banco de dados real.</p>
           </section>
         </main>
       </div>
@@ -212,18 +202,12 @@ function Onboarding({ account, onComplete }) {
   const finish = () => {
     const accounts = readJSON(ACCOUNTS_KEY, []);
     const onboarding = { selling, goal, startMode, completedAt: new Date().toISOString() };
-    const nextAccounts = accounts.map(item => item.id === account.id
-      ? { ...item, onboardingCompleted: true, onboarding }
-      : item);
-    saveAccounts(nextAccounts);
+    const updatedAccount = { ...account, onboardingCompleted: true, onboarding };
+    saveAccounts(accounts.map(item => item.id === account.id ? updatedAccount : item));
 
-    if (startMode === 'empty') {
-      localStorage.setItem('zapflow-leads', JSON.stringify([]));
-    } else {
-      localStorage.removeItem('zapflow-leads');
-    }
-
-    onComplete({ ...account, onboardingCompleted: true, onboarding });
+    initializeAccountData(account.id, startMode);
+    activateAccountStorage(account.id, { allowLegacy: false });
+    onComplete(updatedAccount);
   };
 
   return (
@@ -244,7 +228,7 @@ function Onboarding({ account, onComplete }) {
             <>
               <span className="onboarding-kicker">Pra começar</span>
               <h1>Como você vende?</h1>
-              <p>Isso ajuda o ZapFlow a organizar sua experiência sem jogar 47 configurações inúteis na sua cara.</p>
+              <p>Isso ajuda o ZapFlow a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p>
               <div className="onboarding-options">
                 {SELL_OPTIONS.map(option => {
                   const Icon = option.icon;
@@ -303,30 +287,24 @@ function Onboarding({ account, onComplete }) {
 }
 
 function AuthFlow() {
-  const accounts = useMemo(() => readJSON(ACCOUNTS_KEY, []), []);
-  const session = useMemo(() => readJSON(SESSION_KEY, null), []);
-  const initialAccount = session ? accounts.find(account => account.id === session.accountId) || null : null;
-
+  const initialAccount = BOOT_ACCOUNT;
   const [account, setAccount] = useState(initialAccount);
   const [phase, setPhase] = useState(() => {
     if (!initialAccount) return 'auth';
     return initialAccount.onboardingCompleted ? 'done' : 'onboarding';
   });
 
-  useEffect(() => {
-    if (phase !== 'done') document.body.classList.add('auth-locked');
-    else document.body.classList.remove('auth-locked');
-    return () => document.body.classList.remove('auth-locked');
-  }, [phase]);
-
   const authenticated = nextAccount => {
+    if (nextAccount.onboardingCompleted) {
+      activateAccountStorage(nextAccount.id, { allowLegacy: true });
+      window.location.reload();
+      return;
+    }
     setAccount(nextAccount);
-    setPhase(nextAccount.onboardingCompleted ? 'done' : 'onboarding');
+    setPhase('onboarding');
   };
 
-  const completed = nextAccount => {
-    setAccount(nextAccount);
-    setPhase('done');
+  const completed = () => {
     window.location.reload();
   };
 

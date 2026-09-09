@@ -5,11 +5,11 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
-  ChevronDown,
   CircleDollarSign,
   Filter,
   LayoutDashboard,
   ListFilter,
+  LogOut,
   MapPin,
   MessageCircle,
   MessagesSquare,
@@ -29,8 +29,17 @@ import {
 import Dashboard from './Dashboard';
 import FollowUps from './FollowUps';
 import ComingSoon from './ComingSoon';
+import { getActiveAccount, logoutAccount } from './accountStorage';
 import './styles.css';
 import './detail.css';
+import './account.css';
+
+const ACTIVE_ACCOUNT = getActiveAccount();
+const GOAL_LABELS = {
+  organize: 'Organizar leads',
+  followups: 'Follow-ups',
+  sales: 'Aumentar vendas',
+};
 
 const STATUSES = [
   { id: 'Novo lead', className: 'new' },
@@ -81,6 +90,11 @@ const emptyForm = {
 const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2,
 }).format(Number(value || 0));
+
+function initials(name) {
+  const parts = String(name || 'Usuário').trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'US').toUpperCase();
+}
 
 function localDateKey() {
   const date = new Date();
@@ -231,6 +245,8 @@ function App() {
   }, [leads]);
 
   const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
+  const accountName = ACTIVE_ACCOUNT?.name || 'Usuário';
+  const accountGoal = GOAL_LABELS[ACTIVE_ACCOUNT?.onboarding?.goal] || 'Plano gratuito';
 
   const filteredLeads = useMemo(() => leads.filter(lead => {
     const haystack = `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status}`.toLowerCase();
@@ -263,6 +279,12 @@ function App() {
     if (!phone) return;
     const text = message ? `?text=${encodeURIComponent(message)}` : '';
     window.open(`https://wa.me/${phone}${text}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleLogout = () => {
+    if (!ACTIVE_ACCOUNT?.id) return;
+    logoutAccount(ACTIVE_ACCOUNT.id);
+    window.location.reload();
   };
 
   const commitStatusChange = (id, status, saleValue) => {
@@ -393,9 +415,9 @@ function App() {
         ))}
       </nav>
       <div className="profile-card">
-        <div className="avatar">FA</div>
-        <div><strong>Felipe</strong><span>Plano gratuito</span></div>
-        <ChevronDown size={16} />
+        <div className="avatar">{initials(accountName)}</div>
+        <div><strong>{accountName}</strong><span>Grátis · {accountGoal}</span></div>
+        <button className="profile-logout icon-button" onClick={handleLogout} title="Sair da conta" aria-label="Sair da conta"><LogOut size={16} /></button>
       </div>
     </aside>
   );
@@ -565,6 +587,7 @@ function App() {
   return (
     <div className="app-shell">
       {renderSidebar()}
+      <button className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
       {renderActivePage()}
 
       {modalOpen && (
@@ -605,4 +628,7 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>);
+const rootHost = document.getElementById('root');
+if (rootHost && ACTIVE_ACCOUNT?.onboardingCompleted) {
+  createRoot(rootHost).render(<React.StrictMode><App /></React.StrictMode>);
+}
