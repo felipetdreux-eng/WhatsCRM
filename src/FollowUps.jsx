@@ -1,17 +1,7 @@
-import React,{useState}from'react';
-import{Plus,X}from'lucide-react';
-import LeadsPage from'./LeadsPage';
-import'./leads-integrated.css';
+import React from 'react';
+import LeadsPage from './LeadsPage';
+import './leads-integrated.css';
 
-const STATUSES=['Novo lead','Contatado','Interessado','Proposta enviada'];
-const ORIGINS=['Google Maps','Instagram','Indicação','Site','WhatsApp','Outro'];
-const VALID_DDDS=new Set(['11','12','13','14','15','16','17','18','19','21','22','24','27','28','31','32','33','34','35','37','38','41','42','43','44','45','46','47','48','49','51','53','54','55','61','62','63','64','65','66','67','68','69','71','73','74','75','77','79','81','82','83','84','85','86','87','88','89','91','92','93','94','95','96','97','98','99']);
-const EMPTY={name:'',company:'',phone:'',value:'',status:'Novo lead',origin:'Google Maps',nextContact:'',nextContactTime:'',nextAction:'',notes:''};
-function phoneDigits(phone){let d=String(phone||'').replace(/\D/g,'');if(d.startsWith('55')&&(d.length===12||d.length===13))d=d.slice(2);return d}
-function validPhone(phone){const d=phoneDigits(phone);if(!/^\d{10,11}$/.test(d)||/^(\d)\1+$/.test(d)||!VALID_DDDS.has(d.slice(0,2)))return false;const n=d.slice(2);return d.length===11?n.startsWith('9'):['2','3','4','5'].includes(n[0])}
-export default function FollowUps(props){
- const{leads,setLeads}=props,[adding,setAdding]=useState(false),[form,setForm]=useState(EMPTY),[error,setError]=useState('');
- const close=()=>{setAdding(false);setForm(EMPTY);setError('')};
- const save=e=>{e.preventDefault();setError('');if(!form.name.trim())return setError('Informe o nome do lead.');if(!validPhone(form.phone))return setError('Digite um WhatsApp brasileiro válido com DDD.');const phone=phoneDigits(form.phone);if(leads.some(l=>phoneDigits(l.phone)===phone))return setError('Já existe um lead com esse WhatsApp.');const now=new Date().toISOString();setLeads(cur=>[{id:crypto.randomUUID(),...form,name:form.name.trim(),phone,value:Number(form.value||0),createdAt:now,updatedAt:now,soldAt:null,lostAt:null,saleValue:null,saleValueSource:null},...cur]);close()};
- return <><LeadsPage {...props} onNewLead={()=>setAdding(true)}/>{adding&&<div className="modal-backdrop" onMouseDown={close}><section className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modal-header"><div><h2>Novo lead</h2><p>Adicione o contato sem sair da sua base de leads.</p></div><button className="icon-button" onClick={close}><X size={20}/></button></div><form className="lead-form" onSubmit={save}><label><span>Nome *</span><input autoFocus required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="21999999999"/></label><label><span>Empresa</span><input value={form.company} onChange={e=>setForm({...form,company:e.target.value})}/></label><label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e=>setForm({...form,value:e.target.value})}/></label><label><span>Status</span><select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></label><label><span>Origem</span><select value={form.origin} onChange={e=>setForm({...form,origin:e.target.value})}>{ORIGINS.map(o=><option key={o}>{o}</option>)}</select></label><label><span>Próximo contato</span><input type="date" value={form.nextContact} onChange={e=>setForm({...form,nextContact:e.target.value})}/></label><label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e=>setForm({...form,nextContactTime:e.target.value})}/></label><label className="full"><span>Próxima ação</span><input value={form.nextAction} onChange={e=>setForm({...form,nextAction:e.target.value})}/></label><label className="full"><span>Observações</span><textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></label>{error&&<div className="auth-error full" role="alert">{error}</div>}<div className="modal-actions full"><button type="button" className="secondary-button" onClick={close}>Cancelar</button><button className="primary-button"><Plus size={16}/> Adicionar lead</button></div></form></section></div>}</>;
+export default function FollowUps(props) {
+  return <LeadsPage {...props} />;
 }
