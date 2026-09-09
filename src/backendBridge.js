@@ -92,6 +92,15 @@ function fromDbLead(row) {
   };
 }
 
+function fromDbMessage(row) {
+  return {
+    id: row.template_key || row.id,
+    title: row.title || 'Mensagem',
+    category: row.category || '',
+    text: row.text || '',
+  };
+}
+
 export async function getProfile(userId) {
   const { data, error } = await supabase.from('profiles').select('id,name,selling_type,goal,start_mode,onboarding_completed').eq('id', userId).single();
   if (error) throw error;
@@ -134,8 +143,15 @@ export async function syncLeads(leads, userId) {
   return (data || []).map(fromDbLead);
 }
 
+export async function loadMessages(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase.from('message_templates').select('*').eq('user_id', userId).order('created_at');
+  if (error) throw error;
+  return (data || []).map(fromDbMessage);
+}
+
 export async function syncMessages(templates, userId) {
-  if (!Array.isArray(templates) || !userId) return;
+  if (!Array.isArray(templates) || !userId) return [];
   const rows = templates.map(template => ({
     user_id: userId,
     template_key: String(template.id || template.title),
@@ -143,9 +159,10 @@ export async function syncMessages(templates, userId) {
     category: template.category || '',
     text: template.text || '',
   })).filter(row => row.text.trim());
-  if (!rows.length) return;
-  const { error } = await supabase.from('message_templates').upsert(rows, { onConflict: 'user_id,template_key' });
+  if (!rows.length) return [];
+  const { data, error } = await supabase.from('message_templates').upsert(rows, { onConflict: 'user_id,template_key' }).select();
   if (error) throw error;
+  return (data || []).map(fromDbMessage);
 }
 
 export async function hydrateBackend(user, profile) {
@@ -169,17 +186,10 @@ export async function hydrateBackend(user, profile) {
     }
   }
 
-  const { data: dbMessages, error: messageError } = await supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at');
-  if (messageError) throw messageError;
-
-  if (dbMessages?.length) {
-    localStorage.setItem('zapflow-messages', JSON.stringify(dbMessages.map(row => ({ id: row.template_key || row.id, title: row.title, category: row.category, text: row.text }))));
-  } else {
+  const dbMessages = await loadMessages(user.id);
+  if (!dbMessages.length) {
     const oldMessages = legacyData('zapflow-messages', legacyId);
-    if (Array.isArray(oldMessages) && oldMessages.length) {
-      await syncMessages(oldMessages, user.id);
-      localStorage.setItem('zapflow-messages', JSON.stringify(oldMessages));
-    }
+    if (Array.isArray(oldMessages) && oldMessages.length) await syncMessages(oldMessages, user.id);
   }
 }
 
@@ -188,7 +198,6 @@ export function installSyncBridge(userId) {
   window.__zapflowSyncBridgeInstalled = true;
   const originalSetItem = Storage.prototype.setItem;
   let leadTimer;
-  let messageTimer;
 
   Storage.prototype.setItem = function(key, value) {
     originalSetItem.call(this, key, value);
@@ -197,12 +206,6 @@ export function installSyncBridge(userId) {
       clearTimeout(leadTimer);
       leadTimer = setTimeout(() => {
         try { syncLeads(JSON.parse(value), userId).catch(console.error); } catch {}
-      }, 180);
-    }
-    if (key === 'zapflow-messages') {
-      clearTimeout(messageTimer);
-      messageTimer = setTimeout(() => {
-        try { syncMessages(JSON.parse(value), userId).catch(console.error); } catch {}
       }, 180);
     }
   };
