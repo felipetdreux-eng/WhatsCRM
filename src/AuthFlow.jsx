@@ -35,6 +35,7 @@ const OTP_MAX_LENGTH = 8;
 function authErrorMessage(error, fallback) {
   const raw = String(error?.message || '').trim();
   const message = raw.toLowerCase();
+  if (!raw || raw === '{}' || raw === '[object object]') return fallback;
   if (message.includes('rate') || message.includes('seconds') || message.includes('too many')) {
     return 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.';
   }
@@ -43,6 +44,9 @@ function authErrorMessage(error, fallback) {
   }
   if (message.includes('password') && (message.includes('weak') || message.includes('characters'))) {
     return 'Escolha uma senha mais forte, com pelo menos 6 caracteres.';
+  }
+  if (message.includes('email') && (message.includes('send') || message.includes('smtp') || message.includes('authorized'))) {
+    return 'Não foi possível enviar o email de confirmação agora. Tente novamente em alguns minutos.';
   }
   return raw || fallback;
 }
@@ -234,13 +238,30 @@ function AuthScreen({ onAuthenticated }) {
         }
 
         if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-          setError('Já existe uma conta com esse email. Use “Entrar”. Se o email ainda não foi confirmado, tente entrar para solicitar um novo código.');
+          setError('Já existe uma conta com esse email. Use “Entrar”.');
           return;
         }
 
         if (data?.session && data?.user) {
           onAuthenticated(data.user);
           return;
+        }
+
+        if (data?.user) {
+          const { data: immediateLogin, error: immediateLoginError } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
+          });
+          if (!immediateLoginError && immediateLogin?.user) {
+            onAuthenticated(immediateLogin.user);
+            return;
+          }
+
+          const loginMessage = String(immediateLoginError?.message || '').toLowerCase();
+          if (!loginMessage.includes('email not confirmed')) {
+            setError(authErrorMessage(immediateLoginError, 'Sua conta foi criada, mas não conseguimos iniciar a sessão. Tente entrar novamente.'));
+            return;
+          }
         }
 
         beginConfirmation(normalizedEmail);
