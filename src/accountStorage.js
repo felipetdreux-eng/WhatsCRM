@@ -82,14 +82,16 @@ export async function logoutAccount(accountId) {
   const owner = localStorage.getItem(OWNER_KEY);
   if (owner === accountId) saveGlobalToAccount(accountId);
 
+  // Clear the local session first so a reload cannot resurrect an authenticated UI
+  // while the remote sign-out request is still in flight.
+  localStorage.removeItem(SUPABASE_SESSION_KEY);
+  for (const base of SCOPED_BASES) localStorage.removeItem(base);
+  localStorage.removeItem(OWNER_KEY);
+  localStorage.removeItem(SESSION_KEY);
+
   try {
     await window.__zapflowSupabaseSignOut?.();
   } catch (error) {
     console.error('Supabase sign out failed:', error);
   }
-
-  localStorage.removeItem(SUPABASE_SESSION_KEY);
-  for (const base of SCOPED_BASES) localStorage.removeItem(base);
-  localStorage.removeItem(OWNER_KEY);
-  localStorage.removeItem(SESSION_KEY);
 }
