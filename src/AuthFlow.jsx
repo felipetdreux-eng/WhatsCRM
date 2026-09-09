@@ -32,6 +32,21 @@ const RESEND_COOLDOWN_SECONDS = 60;
 const OTP_MIN_LENGTH = 6;
 const OTP_MAX_LENGTH = 8;
 
+function authErrorMessage(error, fallback) {
+  const raw = String(error?.message || '').trim();
+  const message = raw.toLowerCase();
+  if (message.includes('rate') || message.includes('seconds') || message.includes('too many')) {
+    return 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.';
+  }
+  if (message.includes('network') || message.includes('fetch') || message.includes('failed to fetch')) {
+    return 'Não foi possível conectar ao serviço de login. Confira sua internet e tente novamente.';
+  }
+  if (message.includes('password') && (message.includes('weak') || message.includes('characters'))) {
+    return 'Escolha uma senha mais forte, com pelo menos 6 caracteres.';
+  }
+  return raw || fallback;
+}
+
 const SELL_OPTIONS = [
   { id: 'services', title: 'Serviços', text: 'Freelas, agências, técnicos e profissionais.', icon: BriefcaseBusiness },
   { id: 'products', title: 'Produtos', text: 'Vendas de produtos e pedidos pelo WhatsApp.', icon: Package },
@@ -88,6 +103,7 @@ function AuthScreen({ onAuthenticated }) {
   };
 
   const switchMode = next => {
+    if (loading || verifyingOtp || resendLoading) return;
     setMode(next);
     setError('');
     setNotice('');
@@ -108,17 +124,15 @@ function AuthScreen({ onAuthenticated }) {
         email: confirmationEmail,
       });
       if (resendError) {
-        const message = resendError.message?.toLowerCase() || '';
-        if (message.includes('rate') || message.includes('seconds')) {
-          setError('Você pediu outro código cedo demais. Aguarde o contador e tente novamente.');
-          setResendSeconds(RESEND_COOLDOWN_SECONDS);
-        } else {
-          setError(resendError.message || 'Não foi possível reenviar o código agora.');
-        }
+        setError(authErrorMessage(resendError, 'Não foi possível reenviar o código agora.'));
+        if ((resendError.message?.toLowerCase() || '').includes('rate')) setResendSeconds(RESEND_COOLDOWN_SECONDS);
         return;
       }
       setNotice(`Novo código enviado para ${confirmationEmail}.`);
       setResendSeconds(RESEND_COOLDOWN_SECONDS);
+    } catch (resendError) {
+      console.error('Auth confirmation resend failed:', resendError);
+      setError(authErrorMessage(resendError, 'Não foi possível reenviar o código agora.'));
     } finally {
       setResendLoading(false);
     }
@@ -126,6 +140,7 @@ function AuthScreen({ onAuthenticated }) {
 
   const verifyCode = async event => {
     event.preventDefault();
+    if (verifyingOtp) return;
     const cleanOtp = otp.replace(/\D/g, '');
     if (cleanOtp.length < OTP_MIN_LENGTH || cleanOtp.length > OTP_MAX_LENGTH) {
       setError('Digite o código completo enviado para seu email.');
@@ -147,7 +162,7 @@ function AuthScreen({ onAuthenticated }) {
         if (message.includes('expired') || message.includes('invalid')) {
           setError('Não foi possível validar esse código. Ele pode estar inválido, expirado ou já ter sido usado. Solicite um novo código e tente novamente.');
         } else {
-          setError(verifyError.message || 'Não foi possível confirmar esse código agora.');
+          setError(authErrorMessage(verifyError, 'Não foi possível confirmar esse código agora.'));
         }
         return;
       }
@@ -157,9 +172,12 @@ function AuthScreen({ onAuthenticated }) {
         return;
       }
 
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userData?.user) onAuthenticated(userData.user);
-      else setError('O código foi aceito, mas não conseguimos abrir sua sessão. Tente entrar novamente.');
+      else setError(authErrorMessage(userError, 'O código foi aceito, mas não conseguimos abrir sua sessão. Tente entrar novamente.'));
+    } catch (verifyError) {
+      console.error('Auth OTP verification failed:', verifyError);
+      setError(authErrorMessage(verifyError, 'Não foi possível confirmar esse código agora.'));
     } finally {
       setVerifyingOtp(false);
     }
@@ -182,7 +200,7 @@ function AuthScreen({ onAuthenticated }) {
       if (signupError.message.toLowerCase().includes('registered')) {
         beginConfirmation(normalizedEmail, false, 'Essa conta já existe no backend. Se ainda não confirmou o email, solicite um novo código abaixo.');
       } else {
-        setError(signupError.message);
+        setError(authErrorMessage(signupError, 'Não foi possível migrar sua conta agora.'));
       }
       return true;
     }
@@ -194,10 +212,11 @@ function AuthScreen({ onAuthenticated }) {
 
   const submit = async event => {
     event.preventDefault();
+    if (loading) return;
     setError('');
     setNotice('');
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes('@')) return setError('Digite um email válido.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return setError('Digite um email válido.');
     if (password.length < 6) return setError('A senha precisa ter pelo menos 6 caracteres.');
     if (mode === 'register' && name.trim().length < 2) return setError('Digite seu nome.');
 
@@ -209,9 +228,22 @@ function AuthScreen({ onAuthenticated }) {
           password,
           options: { data: { name: name.trim() } },
         });
-        if (signupError) return setError(signupError.message);
-        if (data.session && data.user) onAuthenticated(data.user);
-        else beginConfirmation(normalizedEmail);
+        if (signupError) {
+          setError(authErrorMessage(signupError, 'Não foi possível criar sua conta agora.'));
+          return;
+        }
+
+        if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setError('Já existe uma conta com esse email. Use “Entrar”. Se o email ainda não foi confirmado, tente entrar para solicitar um novo código.');
+          return;
+        }
+
+        if (data?.session && data?.user) {
+          onAuthenticated(data.user);
+          return;
+        }
+
+        beginConfirmation(normalizedEmail);
         return;
       }
 
@@ -228,6 +260,9 @@ function AuthScreen({ onAuthenticated }) {
 
       const handledLegacy = await tryLegacyMigration(normalizedEmail, password);
       if (!handledLegacy) setError('Email ou senha incorretos.');
+    } catch (submitError) {
+      console.error('Auth submit failed:', submitError);
+      setError(authErrorMessage(submitError, mode === 'register' ? 'Não foi possível criar sua conta agora.' : 'Não foi possível entrar agora.'));
     } finally {
       setLoading(false);
     }
@@ -279,7 +314,7 @@ function AuthScreen({ onAuthenticated }) {
                 {error && <div className="auth-error" role="alert">{error}</div>}
                 {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
 
-                <button className="auth-submit" disabled={verifyingOtp || otp.length < OTP_MIN_LENGTH || otp.length > OTP_MAX_LENGTH}>
+                <button type="submit" className="auth-submit" disabled={verifyingOtp || otp.length < OTP_MIN_LENGTH || otp.length > OTP_MAX_LENGTH}>
                   {verifyingOtp ? 'Confirmando...' : 'Confirmar email'}
                   {!verifyingOtp && <ArrowRight size={17} />}
                 </button>
@@ -310,17 +345,17 @@ function AuthScreen({ onAuthenticated }) {
           <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div>
           <section className="auth-card">
             <div className="auth-tabs" role="tablist" aria-label="Acesso">
-              <button className={mode === 'login' ? 'active' : ''} onClick={() => switchMode('login')} type="button">Entrar</button>
-              <button className={mode === 'register' ? 'active' : ''} onClick={() => switchMode('register')} type="button">Criar conta</button>
+              <button className={mode === 'login' ? 'active' : ''} aria-selected={mode === 'login'} role="tab" onClick={() => switchMode('login')} type="button" disabled={loading}>Entrar</button>
+              <button className={mode === 'register' ? 'active' : ''} aria-selected={mode === 'register'} role="tab" onClick={() => switchMode('register')} type="button" disabled={loading}>Criar conta</button>
             </div>
             <div className="auth-card-heading"><h2>{mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2><p>{mode === 'login' ? 'Entre para continuar suas negociações.' : 'Comece a organizar suas vendas em poucos passos.'}</p></div>
-            <form className="auth-form" onSubmit={submit}>
-              {mode === 'register' && <label><span>Nome</span><div className="auth-input"><UserRound size={17} /><input value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" autoComplete="name" /></div></label>}
-              <label><span>Email</span><div className="auth-input"><Mail size={17} /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="voce@email.com" autoComplete="email" /></div></label>
-              <label><span>Senha</span><div className="auth-input"><LockKeyhole size={17} /><input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" className="auth-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+            <form className="auth-form" onSubmit={submit} noValidate>
+              {mode === 'register' && <label><span>Nome</span><div className="auth-input"><UserRound size={17} /><input required value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" autoComplete="name" /></div></label>}
+              <label><span>Email</span><div className="auth-input"><Mail size={17} /><input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="voce@email.com" autoComplete="email" /></div></label>
+              <label><span>Senha</span><div className="auth-input"><LockKeyhole size={17} /><input required minLength={6} type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" className="auth-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
               {error && <div className="auth-error" role="alert">{error}</div>}
               {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
-              <button className="auth-submit" disabled={loading}>{loading ? 'Processando...' : mode === 'login' ? 'Entrar no ZapFlow' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
+              <button type="submit" className="auth-submit" disabled={loading}>{loading ? (mode === 'register' ? 'Criando conta...' : 'Entrando...') : mode === 'login' ? 'Entrar no ZapFlow' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
             </form>
             <p className="auth-local-note">Acesso protegido pelo Supabase Auth. Seus leads ficam vinculados à sua conta.</p>
           </section>
@@ -340,17 +375,27 @@ function Onboarding({ user, profile, onComplete }) {
   const canContinue = step === 1 ? Boolean(selling) : step === 2 ? Boolean(goal) : Boolean(startMode);
 
   const finish = async () => {
+    if (saving) return;
     setSaving(true);
     setError('');
-    const { error: updateError } = await supabase.from('profiles').update({
-      selling_type: selling,
-      goal,
-      start_mode: startMode,
-      onboarding_completed: true,
-    }).eq('id', user.id);
-    setSaving(false);
-    if (updateError) return setError(updateError.message);
-    onComplete();
+    try {
+      const { error: updateError } = await supabase.from('profiles').update({
+        selling_type: selling,
+        goal,
+        start_mode: startMode,
+        onboarding_completed: true,
+      }).eq('id', user.id);
+      if (updateError) {
+        setError(authErrorMessage(updateError, 'Não foi possível concluir o onboarding agora.'));
+        return;
+      }
+      onComplete();
+    } catch (updateError) {
+      console.error('Onboarding save failed:', updateError);
+      setError(authErrorMessage(updateError, 'Não foi possível concluir o onboarding agora.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -359,11 +404,11 @@ function Onboarding({ user, profile, onComplete }) {
         <header className="onboarding-topbar"><div className="auth-brand compact"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div><div className="onboarding-progress-copy">Passo {step} de 3</div></header>
         <div className="onboarding-progress"><span style={{ width: `${(step / 3) * 100}%` }} /></div>
         <section className="onboarding-card">
-          {step === 1 && <><span className="onboarding-kicker">Pra começar</span><h1>Como você vende?</h1><p>Isso ajuda o ZapFlow a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p><div className="onboarding-options">{SELL_OPTIONS.map(option => { const Icon = option.icon; return <button key={option.id} className={selling === option.id ? 'selected' : ''} onClick={() => setSelling(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{selling === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
-          {step === 2 && <><span className="onboarding-kicker">Seu foco</span><h1>Qual é seu principal objetivo?</h1><p>Escolha o problema que você mais quer parar de carregar na cabeça.</p><div className="onboarding-options">{GOAL_OPTIONS.map(option => { const Icon = option.icon; return <button key={option.id} className={goal === option.id ? 'selected' : ''} onClick={() => setGoal(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{goal === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
-          {step === 3 && <><span className="onboarding-kicker">Último passo</span><h1>Como quer começar?</h1><p>Você pode explorar o ZapFlow com exemplos ou entrar com o sistema limpo.</p><div className="onboarding-start-grid"><button className={startMode === 'demo' ? 'selected' : ''} onClick={() => setStartMode('demo')}><div className="onboarding-option-icon"><Sparkles size={21} /></div><strong>Usar dados de exemplo</strong><span>Veja o pipeline, leads e follow-ups já preenchidos.</span>{startMode === 'demo' && <Check className="onboarding-check" size={17} />}</button><button className={startMode === 'empty' ? 'selected' : ''} onClick={() => setStartMode('empty')}><div className="onboarding-option-icon"><UsersRound size={21} /></div><strong>Começar vazio</strong><span>Entre sem contatos e adicione seu primeiro lead.</span>{startMode === 'empty' && <Check className="onboarding-check" size={17} />}</button></div></>}
+          {step === 1 && <><span className="onboarding-kicker">Pra começar</span><h1>Como você vende?</h1><p>Isso ajuda o ZapFlow a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p><div className="onboarding-options">{SELL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={selling === option.id ? 'selected' : ''} onClick={() => setSelling(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{selling === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
+          {step === 2 && <><span className="onboarding-kicker">Seu foco</span><h1>Qual é seu principal objetivo?</h1><p>Escolha o problema que você mais quer parar de carregar na cabeça.</p><div className="onboarding-options">{GOAL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={goal === option.id ? 'selected' : ''} onClick={() => setGoal(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{goal === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
+          {step === 3 && <><span className="onboarding-kicker">Último passo</span><h1>Como quer começar?</h1><p>Você pode explorar o ZapFlow com exemplos ou entrar com o sistema limpo.</p><div className="onboarding-start-grid"><button type="button" className={startMode === 'demo' ? 'selected' : ''} onClick={() => setStartMode('demo')}><div className="onboarding-option-icon"><Sparkles size={21} /></div><strong>Usar dados de exemplo</strong><span>Veja o pipeline, leads e follow-ups já preenchidos.</span>{startMode === 'demo' && <Check className="onboarding-check" size={17} />}</button><button type="button" className={startMode === 'empty' ? 'selected' : ''} onClick={() => setStartMode('empty')}><div className="onboarding-option-icon"><UsersRound size={21} /></div><strong>Começar vazio</strong><span>Entre sem contatos e adicione seu primeiro lead.</span>{startMode === 'empty' && <Check className="onboarding-check" size={17} />}</button></div></>}
           {error && <div className="auth-error" role="alert">{error}</div>}
-          <footer className="onboarding-actions"><button type="button" className="onboarding-back" disabled={step === 1 || saving} onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft size={17} /> Voltar</button>{step < 3 ? <button className="onboarding-next" disabled={!canContinue || saving} onClick={() => setStep(value => Math.min(3, value + 1))}>Continuar <ArrowRight size={17} /></button> : <button className="onboarding-next" disabled={!canContinue || saving} onClick={finish}>{saving ? 'Salvando...' : 'Entrar no ZapFlow'} {!saving && <ArrowRight size={17} />}</button>}</footer>
+          <footer className="onboarding-actions"><button type="button" className="onboarding-back" disabled={step === 1 || saving} onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft size={17} /> Voltar</button>{step < 3 ? <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={() => setStep(value => Math.min(3, value + 1))}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={finish}>{saving ? 'Salvando...' : 'Entrar no ZapFlow'} {!saving && <ArrowRight size={17} />}</button>}</footer>
         </section>
       </main>
     </div>
@@ -387,7 +432,8 @@ function AuthFlow() {
       setUser(nextUser);
       setProfile(nextProfile);
       setPhase(nextProfile?.onboarding_completed ? 'done' : 'onboarding');
-    } catch {
+    } catch (profileError) {
+      console.error('Auth profile resolution failed:', profileError);
       setUser(nextUser);
       setProfile(null);
       setPhase('onboarding');
@@ -396,11 +442,36 @@ function AuthFlow() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(({ data }) => { if (active) resolveUser(data.user || null); });
+    let authTimer = null;
+
+    supabase.auth.getUser()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error('Initial auth lookup failed:', error);
+          setPhase('auth');
+          return;
+        }
+        resolveUser(data.user || null);
+      })
+      .catch(initialError => {
+        console.error('Initial auth lookup failed:', initialError);
+        if (active) setPhase('auth');
+      });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active) resolveUser(session?.user || null);
+      const nextUser = session?.user || null;
+      window.clearTimeout(authTimer);
+      authTimer = window.setTimeout(() => {
+        if (active) resolveUser(nextUser);
+      }, 0);
     });
-    return () => { active = false; subscription.unsubscribe(); };
+
+    return () => {
+      active = false;
+      window.clearTimeout(authTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
