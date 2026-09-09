@@ -4,6 +4,7 @@ const ACCOUNTS_KEY = 'zapflow-accounts';
 const SESSION_KEY = 'zapflow-session';
 const OWNER_KEY = 'zapflow-storage-owner';
 const ID_MAP_KEY_PREFIX = 'zapflow-lead-id-map';
+const THEME_KEY = 'zapflow-theme';
 
 const readJSON = (key, fallback) => {
   try {
@@ -15,6 +16,15 @@ const readJSON = (key, fallback) => {
 };
 
 const isUuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+
+export function applyAppTheme(theme) {
+  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = nextTheme;
+  localStorage.setItem(THEME_KEY, nextTheme);
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', nextTheme === 'dark' ? '#0f1412' : '#16A36A');
+  return nextTheme;
+}
 
 function legacyAccountFor(email, userId) {
   const accounts = readJSON(ACCOUNTS_KEY, []);
@@ -102,7 +112,7 @@ function fromDbMessage(row) {
 }
 
 export async function getProfile(userId) {
-  const { data, error } = await supabase.from('profiles').select('id,name,selling_type,goal,start_mode,onboarding_completed').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles').select('id,name,selling_type,goal,start_mode,onboarding_completed,theme').eq('id', userId).single();
   if (error) throw error;
   return data;
 }
@@ -115,7 +125,7 @@ export async function updateProfileName(userId, name) {
     .from('profiles')
     .update({ name: cleanName })
     .eq('id', userId)
-    .select('id,name,selling_type,goal,start_mode,onboarding_completed')
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed,theme')
     .single();
   if (error) throw error;
 
@@ -128,6 +138,27 @@ export async function updateProfileName(userId, name) {
   return data;
 }
 
+export async function updateProfileTheme(userId, theme) {
+  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  if (!userId) throw new Error('Conta inválida.');
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ theme: nextTheme })
+    .eq('id', userId)
+    .select('id,theme')
+    .single();
+  if (error) throw error;
+
+  applyAppTheme(nextTheme);
+  const accounts = readJSON(ACCOUNTS_KEY, []);
+  if (Array.isArray(accounts)) {
+    const next = accounts.map(account => account.id === userId ? { ...account, theme: nextTheme } : account);
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(next));
+  }
+  return data;
+}
+
 export function mirrorAccount(user, profile) {
   const accounts = readJSON(ACCOUNTS_KEY, []);
   const legacy = legacyAccountFor(user.email, user.id);
@@ -136,6 +167,7 @@ export function mirrorAccount(user, profile) {
     goal: profile.goal || '',
     startMode: profile.start_mode || 'demo',
   } : null;
+  const theme = applyAppTheme(profile?.theme || localStorage.getItem(THEME_KEY) || 'light');
   const account = {
     id: user.id,
     name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuário',
@@ -143,6 +175,7 @@ export function mirrorAccount(user, profile) {
     createdAt: user.created_at || new Date().toISOString(),
     onboardingCompleted: Boolean(profile?.onboarding_completed),
     onboarding,
+    theme,
     backend: 'supabase',
   };
   const next = Array.isArray(accounts) ? accounts.filter(item => item.id !== user.id) : [];
