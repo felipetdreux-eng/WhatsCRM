@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   Clock3,
+  FileSpreadsheet,
   MessageCircle,
   Plus,
   RefreshCw,
@@ -13,6 +14,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
+import LeadImporter from './LeadImporter';
 import './leads.css';
 
 const CLOSED = ['Vendido', 'Perdido'];
@@ -53,6 +55,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const [rescheduling, setRescheduling] = useState(null);
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   const summary = useMemo(() => {
     const active = leads.filter(lead => !CLOSED.includes(lead.status));
@@ -80,7 +83,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
 
   const flash = text => {
     setToast(text);
-    window.setTimeout(() => setToast(''), 2200);
+    window.setTimeout(() => setToast(''), 3200);
   };
 
   const changeStatus = (lead, next) => {
@@ -146,11 +149,22 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     setRescheduling(null);
   };
 
+  const importDone = stats => {
+    const pieces = [];
+    if (stats.create) pieces.push(`${stats.create} novo${stats.create === 1 ? '' : 's'}`);
+    if (stats.update) pieces.push(`${stats.update} atualizado${stats.update === 1 ? '' : 's'}`);
+    if (stats.errors) pieces.push(`${stats.errors} linha${stats.errors === 1 ? '' : 's'} ignorada${stats.errors === 1 ? '' : 's'}`);
+    flash(`Importação concluída: ${pieces.join(', ') || 'nenhuma alteração'}.`);
+  };
+
   return (
     <main className="main-content leads-page">
       <header className="leads-header">
         <div><span className="leads-kicker"><UsersRound size={14} /> Base de clientes</span><h1>Leads</h1><p>Todos os contatos em um só lugar, com follow-ups integrados.</p></div>
-        <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
+        <div className="leads-header-actions">
+          <button type="button" className="secondary-button leads-import-button" onClick={() => setImportOpen(true)}><FileSpreadsheet size={17} /> Importar planilha</button>
+          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
+        </div>
       </header>
 
       <section className="leads-summary">
@@ -221,6 +235,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
         </div>
       )}
 
+      {importOpen && <LeadImporter leads={leads} setLeads={setLeads} onClose={() => setImportOpen(false)} onActivity={onActivity} onDone={importDone} />}
       {toast && <div className="leads-toast" role="status"><Check size={16} />{toast}</div>}
     </main>
   );
