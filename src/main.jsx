@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import FollowUps from './FollowUps';
-import Leads from './Leads';
 import ComingSoon from './ComingSoon';
 import './styles.css';
 import './detail.css';
@@ -67,7 +66,6 @@ const navItems = [
   ['Dashboard', LayoutDashboard],
   ['Pipeline', ListFilter],
   ['Leads', UsersRound],
-  ['Follow-ups', CalendarClock],
   ['Mensagens', MessagesSquare],
   ['Configurações', Settings],
 ];
@@ -223,7 +221,7 @@ function App() {
         {navItems.map(([label, Icon]) => (
           <button key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)}>
             <Icon size={18} /><span>{label}</span>
-            {label === 'Follow-ups' && dueFollowups > 0 && <b className="nav-badge">{dueFollowups}</b>}
+            {label === 'Leads' && dueFollowups > 0 && <b className="nav-badge">{dueFollowups}</b>}
           </button>
         ))}
       </nav>
@@ -385,9 +383,8 @@ function App() {
 
   const renderActivePage = () => {
     if (selectedLead) return renderLeadDetail();
-    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setModalOpen(true); }} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Follow-ups')} />;
-    if (activePage === 'Leads') return <Leads leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setModalOpen(true); }} />;
-    if (activePage === 'Follow-ups') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />;
+    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => { setForm(emptyForm); setModalOpen(true); }} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />;
     if (activePage === 'Mensagens' || activePage === 'Configurações') return <ComingSoon type={activePage} goDashboard={() => setActivePage('Dashboard')} />;
     return renderPipeline();
   };
