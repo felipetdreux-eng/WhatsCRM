@@ -19,7 +19,8 @@ const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', '
 const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 }).format(Number(value || 0));
 
 function dateKey(date = new Date()) {
@@ -45,6 +46,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
     const proposals = leads.filter(lead => lead.status === 'Proposta enviada');
     const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || 0), 0);
     const salesWithoutValue = sold.filter(lead => !Number(lead.saleValue)).length;
+    const assumedSales = sold.filter(lead => lead.saleValueSource === 'legacy-potential').length;
     const potentialValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
     const conversion = leads.length ? Math.round((sold.length / leads.length) * 100) : 0;
     const today = dateKey();
@@ -82,6 +84,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       proposals,
       soldValue,
       salesWithoutValue,
+      assumedSales,
       potentialValue,
       conversion,
       overdue,
@@ -95,12 +98,18 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
     };
   }, [leads]);
 
+  const soldValueDetail = data.salesWithoutValue
+    ? `${data.salesWithoutValue} venda${data.salesWithoutValue > 1 ? 's' : ''} sem valor fechado`
+    : data.assumedSales
+      ? `${data.assumedSales} venda${data.assumedSales > 1 ? 's' : ''} antiga${data.assumedSales > 1 ? 's' : ''} estimada${data.assumedSales > 1 ? 's' : ''}`
+      : 'valor efetivamente fechado';
+
   const cards = [
     { label: 'Leads', value: leads.length, detail: `${data.active.length} em negociação`, icon: UsersRound, tone: 'neutral' },
     { label: 'Interessados', value: data.interested.length, detail: 'leads aquecidos', icon: Target, tone: 'purple' },
     { label: 'Propostas', value: data.proposals.length, detail: 'aguardando decisão', icon: CircleDollarSign, tone: 'orange' },
     { label: 'Vendas', value: data.sold.length, detail: `${data.conversion}% de conversão`, icon: CheckCircle2, tone: 'green' },
-    { label: 'Valor vendido', value: currency(data.soldValue), detail: data.salesWithoutValue ? `${data.salesWithoutValue} venda${data.salesWithoutValue > 1 ? 's' : ''} sem valor fechado` : 'valor efetivamente fechado', icon: TrendingUp, tone: 'green' },
+    { label: 'Valor vendido', value: currency(data.soldValue), detail: soldValueDetail, icon: TrendingUp, tone: 'green' },
     { label: 'Pipeline potencial', value: currency(data.potentialValue), detail: 'valor das oportunidades abertas', icon: CircleDollarSign, tone: 'blue' },
   ];
 
