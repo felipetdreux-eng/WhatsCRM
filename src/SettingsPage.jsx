@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BriefcaseBusiness, Check, LogOut, Mail, Save, ShieldCheck, Target, UserRound } from 'lucide-react';
+import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Play, Save, ShieldCheck, Target, UserRound } from 'lucide-react';
 import { updateProfileName } from './backendBridge';
 import './settings.css';
 
@@ -44,6 +44,10 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const restartTutorial = () => {
+    window.dispatchEvent(new Event('zapflow:start-tutorial'));
   };
 
   return (
@@ -93,6 +97,14 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
             <div><dt><Target size={16} /> Objetivo</dt><dd>{GOAL_LABELS[account?.onboarding?.goal] || 'Não informado'}</dd></div>
             <div><dt><ShieldCheck size={16} /> Dados</dt><dd>Supabase com isolamento por conta</dd></div>
           </dl>
+        </section>
+
+        <section className="settings-card" aria-labelledby="help-settings-title">
+          <div className="settings-card-heading">
+            <div className="settings-icon"><CircleHelp size={19} /></div>
+            <div><h2 id="help-settings-title">Ajuda</h2><p>Revise o fluxo principal do sistema quando quiser.</p></div>
+          </div>
+          <button type="button" className="settings-logout" onClick={restartTutorial}><Play size={16} /> Ver tutorial novamente</button>
         </section>
 
         <section className="settings-card settings-session" aria-labelledby="session-settings-title">
