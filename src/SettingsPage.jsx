@@ -104,7 +104,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
             <div className="settings-icon"><CircleHelp size={19} /></div>
             <div><h2 id="help-settings-title">Ajuda</h2><p>Revise o fluxo principal do sistema quando quiser.</p></div>
           </div>
-          <button type="button" className="settings-logout" onClick={restartTutorial}><Play size={16} /> Ver tutorial novamente</button>
+          <button type="button" className="settings-help-button" onClick={restartTutorial}><Play size={16} /> Ver tutorial novamente</button>
         </section>
 
         <section className="settings-card settings-session" aria-labelledby="session-settings-title">
