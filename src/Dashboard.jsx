@@ -10,7 +10,6 @@ import {
   Plus,
   Target,
   TrendingUp,
-  UserRound,
   UsersRound,
 } from 'lucide-react';
 import './dashboard.css';
@@ -21,7 +20,7 @@ const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
   maximumFractionDigits: 0,
-}).format(value || 0);
+}).format(Number(value || 0));
 
 function dateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -44,13 +43,14 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
     const sold = leads.filter(lead => lead.status === 'Vendido');
     const interested = leads.filter(lead => lead.status === 'Interessado');
     const proposals = leads.filter(lead => lead.status === 'Proposta enviada');
-    const soldValue = sold.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
+    const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || 0), 0);
+    const salesWithoutValue = sold.filter(lead => !Number(lead.saleValue)).length;
     const potentialValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
     const conversion = leads.length ? Math.round((sold.length / leads.length) * 100) : 0;
     const today = dateKey();
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 7);
-    const nextWeek = dateKey(tomorrowDate);
+    const nextWeekDate = new Date();
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    const nextWeek = dateKey(nextWeekDate);
 
     const followups = active
       .filter(lead => lead.nextContact)
@@ -65,6 +65,15 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       count: leads.filter(lead => lead.status === status).length,
     }));
     const maxStatusCount = Math.max(1, ...statusCounts.map(item => item.count));
+    const urgentTotal = overdue.length + todayFollowups.length;
+    const recent = [...leads]
+      .sort((a, b) => {
+        if (a.createdAt && b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+        if (a.createdAt) return -1;
+        if (b.createdAt) return 1;
+        return 0;
+      })
+      .slice(0, 5);
 
     return {
       active,
@@ -72,6 +81,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       interested,
       proposals,
       soldValue,
+      salesWithoutValue,
       potentialValue,
       conversion,
       overdue,
@@ -79,8 +89,9 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
       weekFollowups,
       statusCounts,
       maxStatusCount,
+      urgentTotal,
       urgent: [...overdue, ...todayFollowups].slice(0, 5),
-      recent: [...leads].slice(0, 5),
+      recent,
     };
   }, [leads]);
 
@@ -89,8 +100,8 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
     { label: 'Interessados', value: data.interested.length, detail: 'leads aquecidos', icon: Target, tone: 'purple' },
     { label: 'Propostas', value: data.proposals.length, detail: 'aguardando decisão', icon: CircleDollarSign, tone: 'orange' },
     { label: 'Vendas', value: data.sold.length, detail: `${data.conversion}% de conversão`, icon: CheckCircle2, tone: 'green' },
-    { label: 'Valor vendido', value: currency(data.soldValue), detail: 'negócios fechados', icon: TrendingUp, tone: 'green' },
-    { label: 'Pipeline potencial', value: currency(data.potentialValue), detail: 'valor em aberto', icon: CircleDollarSign, tone: 'blue' },
+    { label: 'Valor vendido', value: currency(data.soldValue), detail: data.salesWithoutValue ? `${data.salesWithoutValue} venda${data.salesWithoutValue > 1 ? 's' : ''} sem valor fechado` : 'valor efetivamente fechado', icon: TrendingUp, tone: 'green' },
+    { label: 'Pipeline potencial', value: currency(data.potentialValue), detail: 'valor das oportunidades abertas', icon: CircleDollarSign, tone: 'blue' },
   ];
 
   return (
@@ -170,7 +181,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
         <section className="dashboard-panel urgent-panel">
           <div className="dashboard-panel-head">
             <div><h2>Precisa de atenção</h2><p>Follow-ups vencidos ou marcados para hoje.</p></div>
-            <span className="urgent-count">{data.urgent.length}</span>
+            <span className="urgent-count">{data.urgentTotal}</span>
           </div>
           <div className="dashboard-list">
             {data.urgent.length ? data.urgent.map(lead => (
@@ -194,7 +205,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
 
       <section className="dashboard-panel recent-panel">
         <div className="dashboard-panel-head">
-          <div><h2>Leads recentes</h2><p>Acesso rápido às negociações que você adicionou por último.</p></div>
+          <div><h2>Leads recentes</h2><p>Acesso rápido aos contatos adicionados mais recentemente.</p></div>
           <button onClick={goPipeline}>Ver todos <ArrowRight size={15} /></button>
         </div>
         <div className="recent-table-wrap">
@@ -206,7 +217,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, go
                   <td><div className="recent-name"><div className="dashboard-avatar small">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div></td>
                   <td><span className={`recent-status status-${lead.status.toLowerCase().replaceAll(' ', '-')}`}>{lead.status}</span></td>
                   <td>{lead.origin || 'Outro'}</td>
-                  <td><strong>{currency(lead.value)}</strong></td>
+                  <td><strong>{currency(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong></td>
                   <td>{lead.nextContact ? prettyDate(lead.nextContact) : '—'}</td>
                   <td><button className="recent-whatsapp" onClick={event => { event.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /></button></td>
                 </tr>
