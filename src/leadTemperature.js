@@ -1,3 +1,5 @@
+if (typeof document !== 'undefined') import('./cooling.css');
+
 const CLOSED = new Set(['Vendido', 'Perdido']);
 
 const WINDOWS = {
