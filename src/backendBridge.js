@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { buildDemoLeads } from './domain';
 
 const ACCOUNTS_KEY = 'zapflow-accounts';
 const SESSION_KEY = 'zapflow-session';
@@ -22,7 +23,7 @@ export function applyAppTheme(theme) {
   document.documentElement.dataset.theme = nextTheme;
   localStorage.setItem(THEME_KEY, nextTheme);
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) themeMeta.setAttribute('content', nextTheme === 'dark' ? '#0f1412' : '#16A36A');
+  if (themeMeta) themeMeta.setAttribute('content', nextTheme === 'dark' ? '#101318' : '#16A36A');
   return nextTheme;
 }
 
@@ -111,8 +112,24 @@ function fromDbMessage(row) {
   };
 }
 
+function fromDbActivity(row) {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    kind: row.kind,
+    title: row.title,
+    detail: row.detail || '',
+    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+    createdAt: row.created_at,
+  };
+}
+
 export async function getProfile(userId) {
-  const { data, error } = await supabase.from('profiles').select('id,name,selling_type,goal,start_mode,onboarding_completed,theme').eq('id', userId).single();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme')
+    .eq('id', userId)
+    .single();
   if (error) throw error;
   return data;
 }
@@ -125,7 +142,7 @@ export async function updateProfileName(userId, name) {
     .from('profiles')
     .update({ name: cleanName })
     .eq('id', userId)
-    .select('id,name,selling_type,goal,start_mode,onboarding_completed,theme')
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme')
     .single();
   if (error) throw error;
 
@@ -174,6 +191,7 @@ export function mirrorAccount(user, profile) {
     email: user.email || '',
     createdAt: user.created_at || new Date().toISOString(),
     onboardingCompleted: Boolean(profile?.onboarding_completed),
+    tutorialCompleted: Boolean(profile?.tutorial_completed),
     onboarding,
     theme,
     backend: 'supabase',
@@ -202,6 +220,39 @@ export async function syncLeads(leads, userId) {
   const { data, error } = await supabase.from('leads').upsert(rows, { onConflict: 'id' }).select();
   if (error) throw error;
   return (data || []).map(fromDbLead);
+}
+
+export async function loadLeadActivities(userId, leadId, limit = 50) {
+  if (!userId || !isUuid(leadId)) return [];
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+  const { data, error } = await supabase
+    .from('lead_activities')
+    .select('id,lead_id,kind,title,detail,metadata,created_at')
+    .eq('user_id', userId)
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(safeLimit);
+  if (error) throw error;
+  return (data || []).map(fromDbActivity);
+}
+
+export async function recordLeadActivity({ userId, leadId, kind, title, detail = '', metadata = {} }) {
+  if (!userId || !isUuid(leadId) || !kind || !title) return null;
+  const row = {
+    user_id: userId,
+    lead_id: leadId,
+    kind,
+    title: String(title).trim(),
+    detail: String(detail || '').trim(),
+    metadata: metadata && typeof metadata === 'object' ? metadata : {},
+  };
+  const { data, error } = await supabase
+    .from('lead_activities')
+    .insert(row)
+    .select('id,lead_id,kind,title,detail,metadata,created_at')
+    .single();
+  if (error) throw error;
+  return fromDbActivity(data);
 }
 
 export async function loadMessages(userId) {
@@ -242,7 +293,9 @@ export async function hydrateBackend(user, profile) {
     } else if (profile?.start_mode === 'empty') {
       localStorage.setItem('zapflow-leads', '[]');
     } else {
-      localStorage.removeItem('zapflow-leads');
+      const demo = buildDemoLeads();
+      const syncedDemo = await syncLeads(demo, user.id);
+      localStorage.setItem('zapflow-leads', JSON.stringify(syncedDemo.length ? syncedDemo : demo));
     }
   }
 
