@@ -133,6 +133,13 @@ export function mirrorAccount(user, profile) {
   return account;
 }
 
+export async function loadLeads(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromDbLead);
+}
+
 export async function syncLeads(leads, userId) {
   if (!Array.isArray(leads) || !userId) return [];
   const idMap = loadIdMap(userId);
@@ -169,11 +176,10 @@ export async function hydrateBackend(user, profile) {
   mirrorAccount(user, profile);
   const legacyId = localStorage.getItem(`zapflow-legacy-account:${user.id}`) || legacyAccountFor(user.email, user.id)?.id;
 
-  const { data: dbLeads, error: leadsError } = await supabase.from('leads').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-  if (leadsError) throw leadsError;
+  const dbLeads = await loadLeads(user.id);
 
-  if (dbLeads?.length) {
-    localStorage.setItem('zapflow-leads', JSON.stringify(dbLeads.map(fromDbLead)));
+  if (dbLeads.length) {
+    localStorage.setItem('zapflow-leads', JSON.stringify(dbLeads));
   } else {
     const oldLeads = legacyData('zapflow-leads', legacyId);
     if (Array.isArray(oldLeads) && oldLeads.length) {
