@@ -29,6 +29,8 @@ async function hashPassword(password) {
 }
 
 const RESEND_COOLDOWN_SECONDS = 60;
+const OTP_MIN_LENGTH = 6;
+const OTP_MAX_LENGTH = 8;
 
 const SELL_OPTIONS = [
   { id: 'services', title: 'Serviços', text: 'Freelas, agências, técnicos e profissionais.', icon: BriefcaseBusiness },
@@ -77,7 +79,7 @@ function AuthScreen({ onAuthenticated }) {
     return () => window.clearTimeout(timer);
   }, [resendSeconds]);
 
-  const beginConfirmation = (address, startCooldown = true, message = 'Enviamos um código de 6 dígitos para seu email.') => {
+  const beginConfirmation = (address, startCooldown = true, message = 'Enviamos um código de confirmação para seu email.') => {
     setConfirmationEmail(address);
     setOtp('');
     setError('');
@@ -125,8 +127,8 @@ function AuthScreen({ onAuthenticated }) {
   const verifyCode = async event => {
     event.preventDefault();
     const cleanOtp = otp.replace(/\D/g, '');
-    if (cleanOtp.length !== 6) {
-      setError('Digite os 6 números enviados para seu email.');
+    if (cleanOtp.length < OTP_MIN_LENGTH || cleanOtp.length > OTP_MAX_LENGTH) {
+      setError('Digite o código completo enviado para seu email.');
       return;
     }
 
@@ -142,8 +144,11 @@ function AuthScreen({ onAuthenticated }) {
 
       if (verifyError) {
         const message = verifyError.message?.toLowerCase() || '';
-        if (message.includes('expired')) setError('Esse código expirou. Reenvie um novo código e tente novamente.');
-        else setError('Código inválido. Confira os 6 números e tente novamente.');
+        if (message.includes('expired') || message.includes('invalid')) {
+          setError('Não foi possível validar esse código. Ele pode estar inválido, expirado ou já ter sido usado. Solicite um novo código e tente novamente.');
+        } else {
+          setError(verifyError.message || 'Não foi possível confirmar esse código agora.');
+        }
         return;
       }
 
@@ -250,7 +255,7 @@ function AuthScreen({ onAuthenticated }) {
 
               <div className="auth-card-heading">
                 <h2>Confirme seu email</h2>
-                <p>Enviamos um código de 6 dígitos para <strong style={{ color: '#344054' }}>{confirmationEmail}</strong>.</p>
+                <p>Enviamos um código de confirmação para <strong style={{ color: '#344054' }}>{confirmationEmail}</strong>.</p>
               </div>
 
               <form className="auth-form" onSubmit={verifyCode}>
@@ -259,14 +264,14 @@ function AuthScreen({ onAuthenticated }) {
                   <div className="auth-input" style={{ height: 58, padding: '0 16px' }}>
                     <input
                       value={otp}
-                      onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, OTP_MAX_LENGTH))}
                       inputMode="numeric"
                       autoComplete="one-time-code"
-                      maxLength={6}
+                      maxLength={OTP_MAX_LENGTH}
                       autoFocus
-                      aria-label="Código de 6 dígitos"
-                      placeholder="000000"
-                      style={{ textAlign: 'center', fontSize: 25, fontWeight: 800, letterSpacing: 10, color: '#111827', fontVariantNumeric: 'tabular-nums' }}
+                      aria-label="Código de confirmação"
+                      placeholder="00000000"
+                      style={{ textAlign: 'center', fontSize: 25, fontWeight: 800, letterSpacing: 7, color: '#111827', fontVariantNumeric: 'tabular-nums' }}
                     />
                   </div>
                 </label>
@@ -274,7 +279,7 @@ function AuthScreen({ onAuthenticated }) {
                 {error && <div className="auth-error" role="alert">{error}</div>}
                 {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
 
-                <button className="auth-submit" disabled={verifyingOtp || otp.length !== 6}>
+                <button className="auth-submit" disabled={verifyingOtp || otp.length < OTP_MIN_LENGTH || otp.length > OTP_MAX_LENGTH}>
                   {verifyingOtp ? 'Confirmando...' : 'Confirmar email'}
                   {!verifyingOtp && <ArrowRight size={17} />}
                 </button>
@@ -289,7 +294,7 @@ function AuthScreen({ onAuthenticated }) {
                 </button>
               </form>
 
-              <p className="auth-local-note">Não precisa clicar em nenhum link no email. Copie o código e confirme aqui mesmo.</p>
+              <p className="auth-local-note">Não precisa clicar em nenhum link no email. Copie o código inteiro e confirme aqui mesmo.</p>
             </section>
           </main>
         </div>
