@@ -29,7 +29,9 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import FollowUps from './FollowUps';
 import './styles.css';
+import './detail.css';
 
 const STATUSES = [
   { id: 'Novo lead', className: 'new' },
@@ -43,12 +45,12 @@ const STATUSES = [
 const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
 
 const DEMO_LEADS = [
-  { id: '1', name: 'Studio Bella', company: 'Salão de beleza', phone: '21999999991', value: 350, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-09', nextContactTime: '15:00', nextAction: 'Fazer primeiro contato', notes: 'Primeiro contato pendente.' },
-  { id: '2', name: 'Mercado Silva', company: 'Mercado', phone: '21999999992', value: 250, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-10', nextContactTime: '', nextAction: 'Apresentar serviço', notes: '' },
-  { id: '3', name: 'Pet Care Feliz', company: 'Pet shop', phone: '21999999993', value: 400, status: 'Novo lead', origin: 'Instagram', nextContact: '2026-09-09', nextContactTime: '16:30', nextAction: 'Enviar mensagem', notes: '' },
-  { id: '4', name: 'Barbearia Prime', company: 'Barbearia', phone: '21999999994', value: 300, status: 'Contatado', origin: 'Google Maps', nextContact: '2026-09-10', nextContactTime: '11:00', nextAction: 'Perguntar se recebeu', notes: 'Mensagem enviada.' },
+  { id: '1', name: 'Studio Bella', company: 'Salão de beleza', phone: '21999999991', value: 350, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-08', nextContactTime: '15:00', nextAction: 'Fazer primeiro contato', notes: 'Primeiro contato pendente.' },
+  { id: '2', name: 'Mercado Silva', company: 'Mercado', phone: '21999999992', value: 250, status: 'Novo lead', origin: 'Google Maps', nextContact: '2026-09-09', nextContactTime: '', nextAction: 'Apresentar serviço', notes: '' },
+  { id: '3', name: 'Pet Care Feliz', company: 'Pet shop', phone: '21999999993', value: 400, status: 'Novo lead', origin: 'Instagram', nextContact: '2026-09-07', nextContactTime: '16:30', nextAction: 'Enviar mensagem', notes: '' },
+  { id: '4', name: 'Barbearia Prime', company: 'Barbearia', phone: '21999999994', value: 300, status: 'Contatado', origin: 'Google Maps', nextContact: '2026-09-08', nextContactTime: '11:00', nextAction: 'Perguntar se recebeu', notes: 'Mensagem enviada.' },
   { id: '5', name: 'Padaria do João', company: 'Padaria', phone: '21999999995', value: 500, status: 'Contatado', origin: 'Indicação', nextContact: '2026-09-10', nextContactTime: '14:00', nextAction: 'Retornar contato', notes: '' },
-  { id: '6', name: 'João Fotografia', company: 'Estúdio de fotografia', phone: '21999999996', value: 600, status: 'Interessado', origin: 'Instagram', nextContact: '2026-09-09', nextContactTime: '10:00', nextAction: 'Mandar proposta', notes: 'Gostou da proposta inicial.' },
+  { id: '6', name: 'João Fotografia', company: 'Estúdio de fotografia', phone: '21999999996', value: 600, status: 'Interessado', origin: 'Instagram', nextContact: '2026-09-08', nextContactTime: '10:00', nextAction: 'Mandar proposta', notes: 'Gostou da proposta inicial.' },
   { id: '7', name: 'Ana Design', company: 'Design gráfico', phone: '21999999997', value: 450, status: 'Interessado', origin: 'Instagram', nextContact: '2026-09-10', nextContactTime: '', nextAction: 'Alinhar escopo', notes: '' },
   { id: '8', name: 'Alpha Elétrica', company: 'Serviços elétricos', phone: '21999999998', value: 750, status: 'Proposta enviada', origin: 'Google Maps', nextContact: '2026-09-11', nextContactTime: '15:30', nextAction: 'Cobrar retorno da proposta', notes: 'Proposta enviada por WhatsApp.' },
   { id: '9', name: 'Oficina JM', company: 'Oficina mecânica', phone: '21999999999', value: 850, status: 'Proposta enviada', origin: 'Google Maps', nextContact: '2026-09-12', nextContactTime: '09:30', nextAction: 'Fazer follow-up', notes: '' },
@@ -75,6 +77,11 @@ const emptyForm = {
 const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency', currency: 'BRL', maximumFractionDigits: 0,
 }).format(value || 0);
+
+function localDateKey() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 function formatDate(value, long = false) {
   if (!value) return '';
@@ -113,6 +120,7 @@ function App() {
   const [draggedId, setDraggedId] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
+  const [activePage, setActivePage] = useState('Pipeline');
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -135,6 +143,7 @@ function App() {
   const potentialValue = leads
     .filter(lead => !['Vendido', 'Perdido'].includes(lead.status))
     .reduce((sum, lead) => sum + Number(lead.value || 0), 0);
+  const dueFollowups = leads.filter(lead => lead.nextContact && !['Vendido', 'Perdido'].includes(lead.status) && lead.nextContact <= localDateKey()).length;
 
   const metrics = [
     { label: 'Leads', value: leads.length, helper: '12%', icon: UserRound, tone: 'neutral' },
@@ -195,6 +204,20 @@ function App() {
     setEditingLead(null);
   };
 
+  const navigate = label => {
+    if (label === 'Pipeline' || label === 'Leads') {
+      setActivePage('Pipeline');
+      setSelectedLeadId(null);
+      setEditingLead(null);
+      return;
+    }
+    if (label === 'Follow-ups') {
+      setActivePage('Follow-ups');
+      setSelectedLeadId(null);
+      setEditingLead(null);
+    }
+  };
+
   const renderSidebar = () => (
     <aside className="sidebar">
       <div className="logo-wrap">
@@ -203,9 +226,9 @@ function App() {
       </div>
       <nav className="nav-list">
         {navItems.map(([label, Icon]) => (
-          <button key={label} className={`nav-item ${label === 'Pipeline' ? 'active' : ''}`} onClick={() => label === 'Pipeline' && setSelectedLeadId(null)}>
+          <button key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)}>
             <Icon size={18} /><span>{label}</span>
-            {label === 'Follow-ups' && <b className="nav-badge">3</b>}
+            {label === 'Follow-ups' && dueFollowups > 0 && <b className="nav-badge">{dueFollowups}</b>}
           </button>
         ))}
       </nav>
@@ -224,7 +247,7 @@ function App() {
       <main className="main-content detail-content">
         <div className="detail-topbar">
           <button className="back-button" onClick={() => { setSelectedLeadId(null); setEditingLead(null); }}>
-            <ArrowLeft size={18} /> Voltar ao pipeline
+            <ArrowLeft size={18} /> Voltar
           </button>
           <div className="detail-top-actions">
             {!editingLead && <button className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>}
@@ -368,7 +391,11 @@ function App() {
   return (
     <div className="app-shell">
       {renderSidebar()}
-      {selectedLead ? renderLeadDetail() : renderPipeline()}
+      {selectedLead
+        ? renderLeadDetail()
+        : activePage === 'Follow-ups'
+          ? <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} />
+          : renderPipeline()}
 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
