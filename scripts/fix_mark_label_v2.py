@@ -1,10 +1,9 @@
 from pathlib import Path
+import re
 
 p = Path('src/LeadsPage.jsx')
 text = p.read_text()
 
-# Remove the controlled select helper. The select will always display a dynamic
-# placeholder based on nextContact, avoiding browser quirks with selected disabled options.
 helper = """const markSelectValue = lead => {
   if (!lead?.nextContact) return '';
   const days = diff(lead.nextContact);
@@ -23,13 +22,12 @@ text = text.replace(
     'className="lead-mark-for mobile-mark-for" value="" onChange={event => handleMarkFor(event, lead)}',
 )
 
-# Replace placeholder + scheduled option in desktop and mobile with one dynamic label.
+# Remove every stale internal scheduled option, including duplicates from older patches.
+text = re.sub(r'\s*<option value="scheduled" disabled>\{lead\.nextContact \? `Marcado: \$\{pretty\(lead\.nextContact\)\}` : \'Marcado\'\}</option>', '', text)
+
+# Make the visible placeholder itself show the saved mark.
 text = text.replace(
-    '<option value="" disabled>Marcar para</option>\n                    <option value="scheduled" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : \'Marcado\'}</option>',
-    '<option value="" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : \'Marcar para\'}</option>',
-)
-text = text.replace(
-    '<option value="" disabled>Marcar para</option>\n                <option value="scheduled" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : \'Marcado\'}</option>',
+    '<option value="" disabled>Marcar para</option>',
     '<option value="" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : \'Marcar para\'}</option>',
 )
 
@@ -37,7 +35,7 @@ if 'markSelectValue' in text:
     raise SystemExit('markSelectValue still present')
 if 'value="scheduled"' in text:
     raise SystemExit('scheduled option still present')
-if text.count("lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : 'Marcar para'") < 2:
-    raise SystemExit('dynamic labels not installed in both selects')
+if text.count("lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : 'Marcar para'") != 2:
+    raise SystemExit('expected exactly two dynamic mark labels')
 
 p.write_text(text)
