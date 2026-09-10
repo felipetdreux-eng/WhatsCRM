@@ -22,7 +22,7 @@ button{cursor:pointer}
 
 .app-shell{min-height:100vh;display:flex}
 .sidebar{position:fixed;inset:0 auto 0 0;width:210px;background:#fff;border-right:1px solid #e8eaed;padding:24px 14px 18px;display:flex;flex-direction:column;z-index:30}
-.logo-wrap{display:flex;align-items:center;gap:10px;padding:0 8px 26px;font-size:22px;font-weight:700;letter-spacing:-.04em}
+.logo-wrap{display:flex;align-items:center;gap:11px;padding:0 8px 27px;font-size:27px;font-weight:800;letter-spacing:-.045em}
 .logo-mark{width:31px;height:31px;border-radius:9px;background:#eaf8f1;color:var(--green);display:grid;place-items:center}
 .nav-list{display:flex;flex-direction:column;gap:6px}
 .nav-item{width:100%;border:0;background:transparent;border-radius:10px;padding:11px 12px;display:flex;align-items:center;gap:11px;color:#475467;font-weight:500;text-align:left;position:relative}
