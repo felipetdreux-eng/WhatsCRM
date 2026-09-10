@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Moon, Play, Save, ShieldCheck, Sun, Target, UserRound } from 'lucide-react';
 import { updateProfileName, updateProfileTheme } from './backendBridge';
+import TeamPanel from './TeamPanel';
 import './settings.css';
 import './dark.css';
 import './dark-integrated.css';
@@ -82,7 +83,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
         <div>
           <span className="settings-kicker"><ShieldCheck size={14} /> Conta e preferências</span>
           <h1>Configurações</h1>
-          <p>Gerencie as informações básicas da sua conta ZapFlow.</p>
+          <p>Gerencie sua conta, aparência e equipe no Fuply.</p>
         </div>
         <button type="button" className="settings-tutorial-shortcut" onClick={restartTutorial}>
           <Play size={16} /> Rever tutorial
@@ -93,7 +94,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
         <section className="settings-card" aria-labelledby="profile-settings-title">
           <div className="settings-card-heading">
             <div className="settings-icon"><UserRound size={19} /></div>
-            <div><h2 id="profile-settings-title">Perfil</h2><p>Esse nome aparece dentro do ZapFlow.</p></div>
+            <div><h2 id="profile-settings-title">Perfil</h2><p>Esse nome aparece dentro do Fuply.</p></div>
           </div>
 
           <form className="settings-form" onSubmit={saveProfile}>
@@ -118,15 +119,17 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
         <section className="settings-card" aria-labelledby="preferences-settings-title">
           <div className="settings-card-heading">
             <div className="settings-icon"><Target size={19} /></div>
-            <div><h2 id="preferences-settings-title">Seu ZapFlow</h2><p>Resumo das escolhas feitas no cadastro.</p></div>
+            <div><h2 id="preferences-settings-title">Seu Fuply</h2><p>Resumo das escolhas feitas no cadastro.</p></div>
           </div>
 
           <dl className="settings-summary">
             <div><dt><BriefcaseBusiness size={16} /> Tipo de venda</dt><dd>{SELLING_LABELS[account?.onboarding?.selling] || 'Não informado'}</dd></div>
             <div><dt><Target size={16} /> Objetivo</dt><dd>{GOAL_LABELS[account?.onboarding?.goal] || 'Não informado'}</dd></div>
-            <div><dt><ShieldCheck size={16} /> Dados</dt><dd>Supabase com isolamento por conta</dd></div>
+            <div><dt><ShieldCheck size={16} /> Dados</dt><dd>Supabase com workspace compartilhado e RLS</dd></div>
           </dl>
         </section>
+
+        <TeamPanel account={account} />
 
         <section className="settings-card" aria-labelledby="appearance-settings-title">
           <div className="settings-card-heading">
