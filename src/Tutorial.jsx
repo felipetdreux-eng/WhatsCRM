@@ -100,7 +100,10 @@ function Tutorial() {
 
   const navigateTo = page => {
     const button = navButton(page);
-    if (button && !button.classList.contains('active')) button.click();
+    if (button && !button.classList.contains('active')) {
+      button.click();
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
   };
 
   useEffect(() => {
@@ -180,8 +183,11 @@ function Tutorial() {
       }
 
       targetRef.current = target;
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+      const targetRect = target.getBoundingClientRect();
+      const isVisible = targetRect.bottom > 72 && targetRect.top < window.innerHeight - 36;
+      if (!isVisible) {
+        target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+      }
       scheduleUpdate();
 
       if ('ResizeObserver' in window) {
@@ -264,20 +270,18 @@ function Tutorial() {
     cardStyle = { left: 14, right: 14, bottom: 14, top: 'auto', width: 'auto' };
   } else if (rect) {
     const width = 380;
-    const left = Math.min(window.innerWidth - width - 18, Math.max(18, rect.left + rect.width / 2 - width / 2));
-    const cardHeightEstimate = 250;
-    const roomBelow = window.innerHeight - rect.bottom;
-    const roomAbove = rect.top;
-    const placeBelow = roomBelow >= cardHeightEstimate + 28 || roomBelow >= roomAbove;
+    const gap = 18;
+    const targetCenter = rect.left + rect.width / 2;
+    const left = targetCenter >= window.innerWidth / 2
+      ? gap
+      : Math.max(gap, window.innerWidth - width - gap);
     cardStyle = {
       width,
       left,
-      top: placeBelow
-        ? Math.min(window.innerHeight - cardHeightEstimate - 18, rect.bottom + 18)
-        : Math.max(18, rect.top - cardHeightEstimate - 18),
+      top: 18,
     };
   } else {
-    cardStyle = { width: 380, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
+    cardStyle = { width: 380, left: '50%', top: 18, transform: 'translateX(-50%)' };
   }
 
   return (
