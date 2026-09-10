@@ -1,0 +1,272 @@
+.team-card {
+  grid-column: 1 / -1;
+}
+
+.team-heading {
+  align-items: center;
+}
+
+.team-member-count {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(22, 163, 106, 0.1);
+  color: #118357;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-loading {
+  min-height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6b7280;
+}
+
+.team-spin {
+  animation: team-spin 1s linear infinite;
+}
+
+@keyframes team-spin {
+  to { transform: rotate(360deg); }
+}
+
+.team-workspace-select {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.team-workspace-select > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.team-workspace-select select,
+.team-rename input,
+.team-code-input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #dbe2e8;
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #171a1f);
+  padding: 0 12px;
+  outline: none;
+}
+
+.team-workspace-select select:focus,
+.team-rename input:focus,
+.team-code-input:focus {
+  border-color: #16a36a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 106, 0.12);
+}
+
+.team-workspace-box {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+  background: rgba(22, 163, 106, 0.035);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.team-workspace-box > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.team-workspace-box strong {
+  font-size: 18px;
+}
+
+.team-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #118357;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-rename {
+  min-width: min(420px, 50%);
+  display: flex;
+  gap: 8px;
+}
+
+.team-members {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.team-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid #e7ebef;
+  border-radius: 12px;
+}
+
+.team-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: rgba(22, 163, 106, 0.12);
+  color: #118357;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.team-member-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.team-member-copy strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-member-copy span,
+.team-muted {
+  color: #7b8490;
+  font-size: 12px;
+}
+
+.team-owner-icon {
+  margin-left: auto;
+  color: #b57a00;
+}
+
+.team-actions-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-action-box {
+  padding: 16px;
+  border: 1px solid #e4e9ee;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.team-action-title {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.team-action-title > svg {
+  margin-top: 2px;
+  color: #16a36a;
+}
+
+.team-action-title > div {
+  display: grid;
+  gap: 3px;
+}
+
+.team-action-title span {
+  color: #7b8490;
+  font-size: 12px;
+}
+
+.team-main-action {
+  justify-self: start;
+}
+
+.team-invite-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #101318;
+  color: #fff;
+}
+
+.team-invite-code code {
+  letter-spacing: 0.15em;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.team-invite-code button {
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  min-height: 34px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.team-help {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(22, 163, 106, 0.06);
+  color: #56606b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+[data-theme='dark'] .team-workspace-box,
+[data-theme='dark'] .team-member,
+[data-theme='dark'] .team-action-box {
+  border-color: #2b3038;
+}
+
+[data-theme='dark'] .team-workspace-select select,
+[data-theme='dark'] .team-rename input,
+[data-theme='dark'] .team-code-input {
+  border-color: #343a43;
+  background: #171b21;
+  color: #f4f6f8;
+}
+
+[data-theme='dark'] .team-help {
+  color: #adb5bf;
+}
+
+@media (max-width: 760px) {
+  .team-workspace-box,
+  .team-rename {
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .team-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-member-count {
+    margin-left: 0;
+  }
+}
