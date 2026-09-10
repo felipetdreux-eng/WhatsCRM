@@ -1,0 +1,51 @@
+name: Fix realtime navigation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-realtime-navigation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch realtime synchronization
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          backend = Path('src/backendBridge.js')
+          text = backend.read_text()
+          old = """          const actorId = payload?.new?.last_modified_by || payload?.old?.last_modified_by || null;\n          if (actorId && actorId === userId) return;\n          window.setTimeout(() => window.location.reload(), 250);"""
+          new = """          const actorId = payload?.new?.last_modified_by || payload?.old?.last_modified_by || null;\n          if (actorId && actorId === userId) return;\n          window.clearTimeout(window.__zapflowRemoteRefreshTimer);\n          window.__zapflowRemoteRefreshTimer = window.setTimeout(async () => {\n            try {\n              const freshLeads = await loadLeads(userId);\n              lastSnapshot = new Map(freshLeads.map(lead => [lead.id, leadFingerprint(lead)]));\n              originalSetItem.call(localStorage, 'zapflow-leads', JSON.stringify(freshLeads));\n              window.dispatchEvent(new CustomEvent('zapflow:remote-leads', { detail: { leads: freshLeads } }));\n            } catch (error) {\n              console.error('Workspace realtime refresh failed:', error);\n            }\n          }, 120);"""
+          if old not in text:
+              raise SystemExit('Expected realtime reload block not found')
+          backend.write_text(text.replace(old, new, 1))
+
+          app = Path('src/App.jsx')
+          text = app.read_text()
+          old = """  useEffect(() => {\n    localStorage.setItem('zapflow-leads', JSON.stringify(leads));\n  }, [leads]);"""
+          new = """  useEffect(() => {\n    localStorage.setItem('zapflow-leads', JSON.stringify(leads));\n  }, [leads]);\n\n  useEffect(() => {\n    const handleRemoteLeads = event => {\n      const freshLeads = event?.detail?.leads;\n      if (!Array.isArray(freshLeads)) return;\n      setLeads(migrateLeads(freshLeads));\n    };\n    window.addEventListener('zapflow:remote-leads', handleRemoteLeads);\n    return () => window.removeEventListener('zapflow:remote-leads', handleRemoteLeads);\n  }, []);"""
+          if old not in text:
+              raise SystemExit('Expected App leads persistence block not found')
+          app.write_text(text.replace(old, new, 1))
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/backendBridge.js src/App.jsx
+          git commit -m "Keep current page during team realtime updates"
+          git push origin main
