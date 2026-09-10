@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAutopilotQueue, scoreAutopilotLead } from '../src/autopilotEngine.js';
+import { autopilotMessageSuggestion, buildAutopilotQueue, scoreAutopilotLead } from '../src/autopilotEngine.js';
 
 const NOW = new Date('2030-01-15T12:00:00');
 
@@ -62,4 +62,31 @@ test('valor potencial ajuda a desempatar, mas não domina prazo e etapa', () => 
   ], { now: NOW });
   assert.equal(queue[0].lead.id, 'alto');
   assert.equal(queue[1].lead.id, 'baixo');
+});
+
+
+test('autopilot 2.0 gera mensagem contextual para proposta', () => {
+  const item = scoreAutopilotLead(lead({
+    name: 'Adriano Cardoso',
+    status: 'Proposta enviada',
+    nextContact: '2030-01-14',
+    updatedAt: '2030-01-13T12:00:00.000Z',
+  }), NOW);
+  const message = autopilotMessageSuggestion(item, 'direct');
+  assert.match(message, /Adriano/);
+  assert.match(message.toLowerCase(), /proposta/);
+});
+
+test('autopilot 2.0 oferece abordagem leve e última tentativa diferentes', () => {
+  const item = scoreAutopilotLead(lead({
+    name: 'Marina Lopes',
+    status: 'Contatado',
+    nextContact: '',
+    updatedAt: '2030-01-05T12:00:00.000Z',
+  }), NOW);
+  const light = autopilotMessageSuggestion(item, 'light');
+  const last = autopilotMessageSuggestion(item, 'last');
+  assert.notEqual(light, last);
+  assert.match(light, /Marina/);
+  assert.match(last.toLowerCase(), /última|organizar/);
 });

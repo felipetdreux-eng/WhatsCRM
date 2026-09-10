@@ -228,6 +228,70 @@ export function autopilotRecommendation(item) {
   };
 }
 
+function firstName(value) {
+  const name = String(value || '').trim();
+  return name ? name.split(/\s+/)[0] : 'tudo bem';
+}
+
+export function autopilotMessageSuggestion(item, tone = 'direct') {
+  if (!item?.lead) return '';
+  const lead = item.lead;
+  const name = firstName(lead.name);
+  const status = lead.status || 'Novo lead';
+  const overdue = item.due != null && item.due < 0;
+  const veryCold = item.idleDays >= 7;
+
+  if (tone === 'last') {
+    if (status === 'Proposta enviada' || status === 'Negociação') {
+      return `Oi, ${name}! Vou encerrar meu acompanhamento por aqui para não ficar te cobrando. Antes disso, queria confirmar: ainda faz sentido avançarmos ou prefere deixar para outro momento?`;
+    }
+    return `Oi, ${name}! Passando uma última vez para saber se ainda faz sentido continuarmos essa conversa. Se não for prioridade agora, sem problema, só me avisa para eu organizar por aqui.`;
+  }
+
+  if (tone === 'light') {
+    if (status === 'Novo lead') {
+      return `Oi, ${name}! Tudo bem? Vi seu contato por aqui e queria entender melhor o que você está buscando. Posso te fazer uma pergunta rápida?`;
+    }
+    if (status === 'Proposta enviada') {
+      return `Oi, ${name}! Tudo bem? Passando rapidinho para saber se conseguiu dar uma olhada na proposta. Se ficou alguma dúvida, posso te ajudar por aqui.`;
+    }
+    if (status === 'Negociação') {
+      return `Oi, ${name}! Tudo certo? Queria retomar nossa conversa e ver se ficou algum ponto para ajustarmos antes de avançar.`;
+    }
+    if (veryCold) {
+      return `Oi, ${name}! Faz um tempinho que não nos falamos. Queria saber se isso ainda está nos seus planos ou se prefere retomar mais para frente.`;
+    }
+    return `Oi, ${name}! Tudo bem? Passando para retomar nossa conversa. Ainda faz sentido falarmos sobre isso?`;
+  }
+
+  if (overdue) {
+    if (status === 'Proposta enviada') {
+      return `Oi, ${name}! Nosso retorno ficou pendente. Você conseguiu analisar a proposta? Se tiver algum ponto travando a decisão, me fala que eu tento resolver por aqui.`;
+    }
+    if (status === 'Negociação') {
+      return `Oi, ${name}! Nosso retorno ficou pendente. Queria fechar os próximos passos da negociação. O que falta definirmos para conseguir avançar?`;
+    }
+    return `Oi, ${name}! Nosso retorno ficou pendente e estou retomando por aqui. Ainda faz sentido avançarmos nessa conversa?`;
+  }
+
+  if (status === 'Novo lead') {
+    return `Oi, ${name}! Tudo bem? Vi seu contato por aqui e queria entender melhor o que você precisa. Posso te fazer uma pergunta rápida para ver se consigo ajudar?`;
+  }
+  if (status === 'Interessado') {
+    return `Oi, ${name}! Queria retomar o que conversamos. Pelo que entendi, existe interesse. Qual é o principal ponto que você precisa resolver para conseguirmos avançar?`;
+  }
+  if (status === 'Proposta enviada') {
+    return `Oi, ${name}! Conseguiu analisar a proposta? Se tiver algum ponto travando a decisão, me fala que eu tento resolver por aqui.`;
+  }
+  if (status === 'Negociação') {
+    return `Oi, ${name}! Queria fechar os próximos passos da nossa negociação. O que falta definirmos para conseguir avançar?`;
+  }
+  if (veryCold) {
+    return `Oi, ${name}! Faz alguns dias que não nos falamos. Ainda faz sentido seguirmos com essa conversa? Se sim, eu organizo o próximo passo por aqui.`;
+  }
+  return `Oi, ${name}! Passando para retomar nosso contato. Ainda faz sentido conversarmos sobre isso?`;
+}
+
 export function buildAutopilotQueue(leads, { now = new Date(), limit = 12 } = {}) {
   return (Array.isArray(leads) ? leads : [])
     .filter(lead => !CLOSED.has(lead?.status))

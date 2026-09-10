@@ -2,20 +2,24 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   CalendarClock,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Copy,
   Flame,
   ListChecks,
   MessageCircle,
   RotateCcw,
   Sparkles,
   Target,
+  WandSparkles,
   X,
 } from 'lucide-react';
-import { autopilotRecommendation, buildAutopilotQueue as buildSmartAutopilotQueue } from './autopilotEngine';
+import { autopilotMessageSuggestion, autopilotRecommendation, buildAutopilotQueue as buildSmartAutopilotQueue } from './autopilotEngine';
 import './autopilot.css';
 import './autopilot-outcome.css';
+import './autopilot-v2.css';
 
 const CLOSED = ['Fechado', 'Perdido'];
 
@@ -231,6 +235,9 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
   const [followupDate, setFollowupDate] = useState('');
   const [followupAction, setFollowupAction] = useState('');
   const [outcomeError, setOutcomeError] = useState('');
+  const [messageTone, setMessageTone] = useState('direct');
+  const [draftMessage, setDraftMessage] = useState('');
+  const [copiedMessage, setCopiedMessage] = useState(false);
 
   const remaining = sessionQueue.filter(item => !handled.includes(item.lead.id));
   const currentBase = remaining[0] || null;
@@ -268,6 +275,9 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
       setFollowupDate('');
       setFollowupAction('');
       setOutcomeError('');
+      setMessageTone('direct');
+      setDraftMessage('');
+      setCopiedMessage(false);
     }
   }, [open]);
 
@@ -279,15 +289,18 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setFollowupDate('');
     setFollowupAction('');
     setOutcomeError('');
+    setMessageTone('direct');
+    setDraftMessage(autopilotMessageSuggestion(current, 'direct'));
+    setCopiedMessage(false);
   }, [current?.lead.id]);
 
   if (!open) return null;
 
   const markHandled = id => setHandled(ids => ids.includes(id) ? ids : [...ids, id]);
 
-  const contact = () => {
+  const contact = (message = '') => {
     if (!current) return;
-    const opened = openWhatsApp(current.lead, '', { skipFollowupPrompt: true, source: 'autopilot' });
+    const opened = openWhatsApp(current.lead, typeof message === 'string' ? message.trim() : '', { skipFollowupPrompt: true, source: 'autopilot-v2' });
     if (opened === false) {
       setOutcomeError('Esse lead não tem um WhatsApp válido para abrir.');
       return;
@@ -299,6 +312,24 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setFollowupDate('');
     setFollowupAction('');
     setOutcomeError('');
+  };
+
+  const chooseMessageTone = tone => {
+    if (!current) return;
+    setMessageTone(tone);
+    setDraftMessage(autopilotMessageSuggestion(current, tone));
+    setCopiedMessage(false);
+  };
+
+  const copyMessage = async () => {
+    if (!draftMessage.trim()) return;
+    try {
+      await navigator.clipboard.writeText(draftMessage.trim());
+      setCopiedMessage(true);
+      window.setTimeout(() => setCopiedMessage(false), 1600);
+    } catch {
+      setOutcomeError('Não foi possível copiar a mensagem automaticamente.');
+    }
   };
 
   const chooseOutcome = id => {
@@ -394,6 +425,9 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
     setFollowupDate('');
     setFollowupAction('');
     setOutcomeError('');
+    setMessageTone('direct');
+    setDraftMessage('');
+    setCopiedMessage(false);
   };
 
   return (
@@ -402,7 +436,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
         <header className="autopilot-topbar">
           <div className="autopilot-brand">
             <span><Sparkles size={17} /></span>
-            <div><strong>Fuply Autopilot</strong><small>Modo execução · decide a ordem, você fecha a venda</small></div>
+            <div><strong>Fuply Autopilot 2.0</strong><small>Prioriza o lead, explica o motivo e prepara a abordagem</small></div>
           </div>
           <button type="button" className="autopilot-close" onClick={onClose} aria-label="Fechar Autopilot"><X size={19} /></button>
         </header>
@@ -463,8 +497,25 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
                     <div><span>Faça isso agora</span><strong>{suggestion.title}</strong><p>{suggestion.detail}</p></div>
                   </div>
 
-                  <div className="autopilot-actions">
-                    <button type="button" className="autopilot-whatsapp" onClick={contact}><MessageCircle size={18} /> Abrir WhatsApp <ArrowRight size={16} /></button>
+                  <section className="autopilot-message-assistant" aria-label="Mensagem sugerida pelo Autopilot">
+                    <div className="autopilot-message-head">
+                      <div><span><WandSparkles size={14} /> Mensagem sugerida</span><strong>Abordagem pronta para este momento da negociação</strong></div>
+                      <div className="autopilot-message-tones" aria-label="Estilo da mensagem">
+                        <button type="button" className={messageTone === 'direct' ? 'active' : ''} onClick={() => chooseMessageTone('direct')}>Direta</button>
+                        <button type="button" className={messageTone === 'light' ? 'active' : ''} onClick={() => chooseMessageTone('light')}>Leve</button>
+                        <button type="button" className={messageTone === 'last' ? 'active' : ''} onClick={() => chooseMessageTone('last')}>Última tentativa</button>
+                      </div>
+                    </div>
+                    <textarea value={draftMessage} onChange={event => { setDraftMessage(event.target.value); setCopiedMessage(false); }} aria-label="Editar mensagem sugerida" />
+                    <div className="autopilot-message-foot">
+                      <span>Você pode editar antes de abrir o WhatsApp. O Fuply nunca envia sozinho.</span>
+                      <button type="button" onClick={copyMessage}>{copiedMessage ? <Check size={14} /> : <Copy size={14} />}{copiedMessage ? 'Copiada' : 'Copiar'}</button>
+                    </div>
+                  </section>
+
+                  <div className="autopilot-actions autopilot-actions-v2">
+                    <button type="button" className="autopilot-whatsapp" onClick={() => contact(draftMessage)} disabled={!draftMessage.trim()}><MessageCircle size={18} /> Abrir com mensagem <ArrowRight size={16} /></button>
+                    <button type="button" className="autopilot-inspect" onClick={() => contact('')}><MessageCircle size={16} /> Só abrir WhatsApp</button>
                     <button type="button" className="autopilot-inspect" onClick={inspect}>Ver negociação</button>
                     <button type="button" className="autopilot-skip" onClick={skip}>Pular por agora</button>
                   </div>
@@ -546,7 +597,7 @@ export default function Autopilot({ open, onClose, leads, openLead, openWhatsApp
 
                   <div className="autopilot-outcome-actions">
                     <button type="button" className="autopilot-whatsapp" disabled={!selectedOutcome} onClick={registerOutcome}><CheckCircle2 size={17} /> Registrar e continuar <ArrowRight size={15} /></button>
-                    <button type="button" className="autopilot-inspect" onClick={contact}><MessageCircle size={16} /> Abrir WhatsApp de novo</button>
+                    <button type="button" className="autopilot-inspect" onClick={() => contact('')}><MessageCircle size={16} /> Abrir WhatsApp de novo</button>
                     <button type="button" className="autopilot-skip" onClick={skip}>Não registrar agora</button>
                   </div>
                 </section>
