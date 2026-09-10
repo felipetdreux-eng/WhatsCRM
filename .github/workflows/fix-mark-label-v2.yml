@@ -30,3 +30,4 @@ jobs:
           git add src/LeadsPage.jsx
           git commit -m "Show saved lead mark label"
           git push origin main
+# retry after removing stale scheduled options
