@@ -66,7 +66,7 @@ const GOAL_OPTIONS = [
 function BrandPanel() {
   return (
     <aside className="auth-brand-panel">
-      <div className="auth-brand"><div className="auth-brand-mark"><MessageCircle size={25} strokeWidth={2.4} /></div><span>ZapFlow</span></div>
+      <div className="auth-brand"><div className="auth-brand-mark"><MessageCircle size={25} strokeWidth={2.4} /></div><span>Fuply</span></div>
       <div className="auth-brand-copy">
         <span className="auth-eyebrow">Venda pelo WhatsApp sem perder o fio</span>
         <h1>Seus clientes estão no WhatsApp. Suas vendas não precisam estar perdidas nele.</h1>
@@ -295,7 +295,7 @@ function AuthScreen({ onAuthenticated }) {
         <div className="auth-layout">
           <BrandPanel />
           <main className="auth-form-panel">
-            <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div>
+            <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>Fuply</span></div>
             <section className="auth-card">
               <button
                 type="button"
@@ -363,7 +363,7 @@ function AuthScreen({ onAuthenticated }) {
       <div className="auth-layout">
         <BrandPanel />
         <main className="auth-form-panel">
-          <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div>
+          <div className="auth-mobile-brand"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>Fuply</span></div>
           <section className="auth-card">
             <div className="auth-tabs" role="tablist" aria-label="Acesso">
               <button className={mode === 'login' ? 'active' : ''} aria-selected={mode === 'login'} role="tab" onClick={() => switchMode('login')} type="button" disabled={loading}>Entrar</button>
@@ -376,7 +376,7 @@ function AuthScreen({ onAuthenticated }) {
               <label><span>Senha</span><div className="auth-input"><LockKeyhole size={17} /><input required minLength={6} type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" className="auth-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
               {error && <div className="auth-error" role="alert">{error}</div>}
               {notice && <div className="auth-error" role="status" style={{ background: '#eefaf4', color: '#126b47', borderColor: '#cdebdc' }}>{notice}</div>}
-              <button type="submit" className="auth-submit" disabled={loading}>{loading ? (mode === 'register' ? 'Criando conta...' : 'Entrando...') : mode === 'login' ? 'Entrar no ZapFlow' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
+              <button type="submit" className="auth-submit" disabled={loading}>{loading ? (mode === 'register' ? 'Criando conta...' : 'Entrando...') : mode === 'login' ? 'Entrar no Fuply' : 'Criar conta'}{!loading && <ArrowRight size={17} />}</button>
             </form>
             <p className="auth-local-note">Acesso protegido pelo Supabase Auth. Seus leads ficam vinculados à sua conta.</p>
           </section>
@@ -422,14 +422,14 @@ function Onboarding({ user, profile, onComplete }) {
   return (
     <div className="auth-overlay onboarding-overlay">
       <main className="onboarding-shell">
-        <header className="onboarding-topbar"><div className="auth-brand compact"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>ZapFlow</span></div><div className="onboarding-progress-copy">Passo {step} de 3</div></header>
+        <header className="onboarding-topbar"><div className="auth-brand compact"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>Fuply</span></div><div className="onboarding-progress-copy">Passo {step} de 3</div></header>
         <div className="onboarding-progress"><span style={{ width: `${(step / 3) * 100}%` }} /></div>
         <section className="onboarding-card">
-          {step === 1 && <><span className="onboarding-kicker">Pra começar</span><h1>Como você vende?</h1><p>Isso ajuda o ZapFlow a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p><div className="onboarding-options">{SELL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={selling === option.id ? 'selected' : ''} onClick={() => setSelling(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{selling === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
+          {step === 1 && <><span className="onboarding-kicker">Pra começar</span><h1>Como você vende?</h1><p>Isso ajuda o Fuply a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p><div className="onboarding-options">{SELL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={selling === option.id ? 'selected' : ''} onClick={() => setSelling(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{selling === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
           {step === 2 && <><span className="onboarding-kicker">Seu foco</span><h1>Qual é seu principal objetivo?</h1><p>Escolha o problema que você mais quer parar de carregar na cabeça.</p><div className="onboarding-options">{GOAL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={goal === option.id ? 'selected' : ''} onClick={() => setGoal(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{goal === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
-          {step === 3 && <><span className="onboarding-kicker">Último passo</span><h1>Como quer começar?</h1><p>Você pode explorar o ZapFlow com exemplos ou entrar com o sistema limpo.</p><div className="onboarding-start-grid"><button type="button" className={startMode === 'demo' ? 'selected' : ''} onClick={() => setStartMode('demo')}><div className="onboarding-option-icon"><Sparkles size={21} /></div><strong>Usar dados de exemplo</strong><span>Veja o pipeline, leads e follow-ups já preenchidos.</span>{startMode === 'demo' && <Check className="onboarding-check" size={17} />}</button><button type="button" className={startMode === 'empty' ? 'selected' : ''} onClick={() => setStartMode('empty')}><div className="onboarding-option-icon"><UsersRound size={21} /></div><strong>Começar vazio</strong><span>Entre sem contatos e adicione seu primeiro lead.</span>{startMode === 'empty' && <Check className="onboarding-check" size={17} />}</button></div></>}
+          {step === 3 && <><span className="onboarding-kicker">Último passo</span><h1>Como quer começar?</h1><p>Você pode explorar o Fuply com exemplos ou entrar com o sistema limpo.</p><div className="onboarding-start-grid"><button type="button" className={startMode === 'demo' ? 'selected' : ''} onClick={() => setStartMode('demo')}><div className="onboarding-option-icon"><Sparkles size={21} /></div><strong>Usar dados de exemplo</strong><span>Veja o pipeline, leads e follow-ups já preenchidos.</span>{startMode === 'demo' && <Check className="onboarding-check" size={17} />}</button><button type="button" className={startMode === 'empty' ? 'selected' : ''} onClick={() => setStartMode('empty')}><div className="onboarding-option-icon"><UsersRound size={21} /></div><strong>Começar vazio</strong><span>Entre sem contatos e adicione seu primeiro lead.</span>{startMode === 'empty' && <Check className="onboarding-check" size={17} />}</button></div></>}
           {error && <div className="auth-error" role="alert">{error}</div>}
-          <footer className="onboarding-actions"><button type="button" className="onboarding-back" disabled={step === 1 || saving} onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft size={17} /> Voltar</button>{step < 3 ? <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={() => setStep(value => Math.min(3, value + 1))}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={finish}>{saving ? 'Salvando...' : 'Entrar no ZapFlow'} {!saving && <ArrowRight size={17} />}</button>}</footer>
+          <footer className="onboarding-actions"><button type="button" className="onboarding-back" disabled={step === 1 || saving} onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft size={17} /> Voltar</button>{step < 3 ? <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={() => setStep(value => Math.min(3, value + 1))}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={finish}>{saving ? 'Salvando...' : 'Entrar no Fuply'} {!saving && <ArrowRight size={17} />}</button>}</footer>
         </section>
       </main>
     </div>

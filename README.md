@@ -1,4 +1,4 @@
-# ZapFlow
+# Fuply
 
 CRM simples para quem vende serviços pelo WhatsApp.
 

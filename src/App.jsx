@@ -577,7 +577,7 @@ export default function App() {
     <aside className="sidebar">
       <button type="button" className="logo-wrap logo-button" onClick={() => navigate('Dashboard')} aria-label="Ir para Dashboard">
         <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
-        <span>ZapFlow</span>
+        <span>Fuply</span>
       </button>
       <nav className="nav-list" aria-label="Navegação principal">
         {NAV_ITEMS.map(([label, Icon]) => (

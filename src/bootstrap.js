@@ -20,7 +20,7 @@ async function boot(sessionUser = null) {
       await import('./main.jsx');
       bootedUserId = user.id;
     } catch (bootError) {
-      console.error('ZapFlow backend boot failed:', bootError);
+      console.error('Fuply backend boot failed:', bootError);
     } finally {
       bootPromise = null;
     }
@@ -29,7 +29,7 @@ async function boot(sessionUser = null) {
   return bootPromise;
 }
 
-boot().catch(bootError => console.error('ZapFlow initial boot failed:', bootError));
+boot().catch(bootError => console.error('Fuply initial boot failed:', bootError));
 
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
@@ -39,7 +39,7 @@ supabase.auth.onAuthStateChange((event, session) => {
 
   if (session?.user && ['SIGNED_IN', 'INITIAL_SESSION', 'USER_UPDATED'].includes(event)) {
     window.setTimeout(() => {
-      boot(session.user).catch(bootError => console.error('ZapFlow auth boot failed:', bootError));
+      boot(session.user).catch(bootError => console.error('Fuply auth boot failed:', bootError));
     }, 0);
   }
 });

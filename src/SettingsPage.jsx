@@ -44,7 +44,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
       setName(cleanName);
       setNotice('Nome atualizado com sucesso.');
     } catch (saveError) {
-      console.error('ZapFlow profile update failed:', saveError);
+      console.error('Fuply profile update failed:', saveError);
       setError('Não foi possível salvar seu nome agora.');
     } finally {
       setSaving(false);
@@ -64,7 +64,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
       onAccountChange?.({ ...account, theme: nextTheme });
       setNotice(nextTheme === 'dark' ? 'Modo escuro ativado.' : 'Modo claro ativado.');
     } catch (themeError) {
-      console.error('ZapFlow theme update failed:', themeError);
+      console.error('Fuply theme update failed:', themeError);
       setTheme(previousTheme);
       document.documentElement.dataset.theme = previousTheme;
       setError('Não foi possível salvar a aparência agora.');

@@ -116,7 +116,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
           if (remoteLeads.length || !leadOptions.length) setLeadOptions(remoteLeads);
         }
       } catch (loadError) {
-        console.error('ZapFlow message load failed:', loadError);
+        console.error('Fuply message load failed:', loadError);
         if (active) setError('Não foi possível carregar suas mensagens agora.');
       } finally {
         if (active) setLoading(false);
@@ -170,7 +170,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
       setTemplates(current => current.map(item => item.id === next.id ? next : item));
       setEditing(null);
     } catch (saveError) {
-      console.error('ZapFlow message save failed:', saveError);
+      console.error('Fuply message save failed:', saveError);
       setError('Não foi possível salvar essa mensagem no Supabase.');
     } finally {
       setSaving(false);
@@ -186,7 +186,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
       setTemplates(DEFAULT_TEMPLATES);
       setEditing(null);
     } catch (restoreError) {
-      console.error('ZapFlow message restore failed:', restoreError);
+      console.error('Fuply message restore failed:', restoreError);
       setError('Não foi possível restaurar os modelos agora.');
     } finally {
       setSaving(false);
@@ -270,7 +270,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
         <div className="modal-backdrop" onMouseDown={() => !saving && setEditing(null)}>
           <section className="modal message-edit-modal" onMouseDown={event => event.stopPropagation()}>
             <div className="modal-header">
-              <div><h2>Editar mensagem</h2><p>O modelo fica salvo na sua conta do ZapFlow.</p></div>
+              <div><h2>Editar mensagem</h2><p>O modelo fica salvo na sua conta do Fuply.</p></div>
               <button className="icon-button" onClick={() => setEditing(null)} disabled={saving}><X size={20} /></button>
             </div>
             <form className="message-edit-form" onSubmit={saveEdit}>
