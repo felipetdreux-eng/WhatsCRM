@@ -9,37 +9,49 @@ const STEPS = [
     page: 'Dashboard',
     selector: '.dashboard-header-actions .primary-button',
     title: 'Adicione seu primeiro lead',
-    text: 'Nome e WhatsApp já bastam para começar. Depois você pode adicionar valor, origem e o próximo contato.',
+    text: 'Comece com nome e WhatsApp. Depois você pode definir empresa, valor, origem, responsável, observações e o próximo contato.',
   },
   {
     page: 'Leads',
-    selector: '.leads-import-button',
-    title: 'Já tem uma planilha? Traga tudo de uma vez',
-    text: 'Use Importar planilha para trazer CSV, Excel ou PDF e revisar os contatos antes de confirmar. No computador, você também pode arrastar o arquivo e soltar em qualquer lugar do Fuply.',
-  },
-  {
-    page: 'Pipeline',
-    selector: '.pipeline-scroll',
-    title: 'Acompanhe a negociação no Pipeline',
-    text: 'Cada coluna representa uma etapa. Conforme a conversa avança, mova o lead até Fechado ou Perdido.',
+    selector: '.leads-directory',
+    title: 'Organize e atualize seus leads',
+    text: 'Aqui fica sua base de contatos. Abra um lead para editar as informações, mudar o status, definir o responsável e acompanhar tudo que já aconteceu na negociação.',
   },
   {
     page: 'Leads',
     selector: '.leads-summary',
-    title: 'Nunca esqueça um follow-up',
-    text: 'Aqui aparecem atrasados, contatos de hoje e leads sem próximo passo. Reagende, conclua o retorno ou abra o WhatsApp em poucos cliques.',
+    title: 'Marque quem precisa de retorno',
+    text: 'Use “Marcar para” em cada lead para escolher Hoje, Amanhã, +3 dias, +7 dias ou uma data personalizada. Depois, use os filtros para encontrar atrasados, contatos de hoje, próximos 7 dias e leads sem próximo contato.',
+  },
+  {
+    page: 'Pipeline',
+    selector: '.pipeline-scroll',
+    title: 'Acompanhe cada negociação no Pipeline',
+    text: 'Cada coluna representa uma etapa da venda. Conforme a conversa avança, mova o lead entre as etapas até Fechado ou Perdido e filtre por responsável quando estiver trabalhando em equipe.',
   },
   {
     page: 'Mensagens',
     selector: '.messages-controls',
-    title: 'Use mensagens prontas sem parecer um robô',
-    text: 'Escolha um lead e o sistema preenche nome, empresa e valor nos seus modelos antes de abrir a conversa no WhatsApp.',
+    title: 'Use mensagens prontas no WhatsApp',
+    text: 'Escolha um lead e o Fuply personaliza os modelos com nome, empresa e valor. Você também tem mensagens para primeiro contato, follow-up, proposta, última tentativa e para pedir atendimento de uma pessoa responsável.',
+  },
+  {
+    page: 'Dashboard',
+    selector: '.team-dashboard',
+    title: 'Acompanhe o desempenho da equipe',
+    text: 'Veja leads, vendas, conversão, faturamento e follow-ups por responsável. Use o filtro para comparar a equipe inteira ou analisar cada membro separadamente.',
+  },
+  {
+    page: 'Configurações',
+    selector: '.team-card',
+    title: 'Trabalhe com sua equipe sem dividir senha',
+    text: 'Em Configurações → Equipe, gere um código de convite para novos membros ou entre em outro workspace. Cada pessoa usa a própria conta, mas todos compartilham os leads, o Pipeline e o histórico da equipe.',
   },
   {
     page: 'Dashboard',
     selector: '.focus-shell',
-    title: 'Comece o dia por aqui',
-    text: 'O Dashboard coloca primeiro quem está atrasado, quem precisa de resposta e quem ainda não tem próximo contato marcado.',
+    title: 'Comece o dia pelas prioridades',
+    text: 'O Dashboard coloca atrasados, contatos de hoje, leads sem próximo passo e negociações esfriando na sua frente. Assim você abre o Fuply e já sabe o que precisa fazer primeiro.',
   },
 ];
 
@@ -68,9 +80,9 @@ function Tutorial() {
   const step = STEPS[stepIndex];
 
   const goalHint = useMemo(() => {
-    if (goal === 'followups') return 'Como seu foco é follow-up, preste atenção especialmente aos passos 4 e 6.';
-    if (goal === 'sales') return 'Como seu foco é vender mais, Pipeline e Dashboard vão ser suas telas principais.';
-    if (goal === 'organize') return 'Como seu foco é organização, importação, Pipeline e Leads vão concentrar quase todo o seu trabalho.';
+    if (goal === 'followups') return 'Como seu foco é follow-up, preste atenção especialmente em Marcar para e nas prioridades do Dashboard.';
+    if (goal === 'sales') return 'Como seu foco é vender mais, Pipeline, Mensagens e Dashboard da equipe vão ser suas telas principais.';
+    if (goal === 'organize') return 'Como seu foco é organização, Leads, responsáveis, marcações e Pipeline vão concentrar quase todo o seu trabalho.';
     return '';
   }, [goal]);
 
