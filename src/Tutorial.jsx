@@ -31,7 +31,7 @@ const STEPS = [
   },
   {
     page: 'Pipeline',
-    selector: '.pipeline-scroll',
+    selector: '.pipeline-board .pipeline-column',
     title: 'Acompanhe cada negociação no Pipeline',
     text: 'Cada coluna representa uma etapa da venda. Conforme a conversa avança, mova o lead entre as etapas até Fechado ou Perdido e filtre por responsável quando estiver trabalhando em equipe.',
   },
@@ -49,19 +49,19 @@ const STEPS = [
   },
   {
     page: 'Dashboard',
-    selector: '.team-dashboard',
+    selector: '.team-metrics-grid',
     title: 'Acompanhe o desempenho da equipe',
     text: 'Veja leads, vendas, conversão, faturamento e follow-ups por responsável. Use o filtro para comparar a equipe inteira ou analisar cada membro separadamente.',
   },
   {
     page: 'Configurações',
-    selector: '.team-card',
+    selector: '.team-heading',
     title: 'Trabalhe com sua equipe sem dividir senha',
     text: 'Em Configurações → Equipe, gere um código de convite para novos membros ou entre em outro workspace. Cada pessoa usa a própria conta, mas todos compartilham os leads, o Pipeline e o histórico da equipe.',
   },
   {
     page: 'Dashboard',
-    selector: '.focus-shell',
+    selector: '.focus-tabs',
     title: 'Comece o dia pelas prioridades',
     text: 'O Dashboard coloca atrasados, contatos de hoje, leads sem próximo passo e negociações esfriando na sua frente. Assim você abre o Fuply e já sabe o que precisa fazer primeiro.',
   },
@@ -257,38 +257,28 @@ function Tutorial() {
   if (!open) return null;
 
   const isMobile = window.innerWidth < 720;
-  const pad = 7;
-  const spotlight = rect ? {
-    left: Math.max(6, rect.left - pad),
-    top: Math.max(6, rect.top - pad),
-    width: Math.min(window.innerWidth - 12, Math.max(0, rect.width + pad * 2)),
-    height: Math.min(window.innerHeight - 12, Math.max(0, rect.height + pad * 2)),
-  } : null;
-
-  let cardStyle = {};
-  if (isMobile) {
-    cardStyle = { left: 14, right: 14, bottom: 14, top: 'auto', width: 'auto' };
-  } else if (rect) {
-    const width = 380;
-    const gap = 18;
-    const targetCenter = rect.left + rect.width / 2;
-    const left = targetCenter >= window.innerWidth / 2
-      ? gap
-      : Math.max(gap, window.innerWidth - width - gap);
-    cardStyle = {
-      width,
+  const pad = 6;
+  const spotlight = rect ? (() => {
+    const left = Math.max(8, rect.left - pad);
+    const top = Math.max(8, rect.top - pad);
+    const right = Math.min(window.innerWidth - 8, rect.right + pad);
+    const bottom = Math.min(window.innerHeight - 8, rect.bottom + pad);
+    return {
       left,
-      top: 18,
+      top,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
     };
-  } else {
-    cardStyle = { width: 380, left: '50%', top: 18, transform: 'translateX(-50%)' };
-  }
+  })() : null;
+
+  const cardStyle = isMobile
+    ? { left: 14, right: 14, bottom: 14, top: 'auto', width: 'auto' }
+    : { width: 380, left: '50%', top: 18, transform: 'translateX(-50%)' };
 
   return (
     <div className="tutorial-layer" aria-live="polite">
       {spotlight ? <div className="tutorial-spotlight" style={spotlight} /> : <div className="tutorial-backdrop" />}
       <section
-        key={stepIndex}
         className={`tutorial-card ${rect ? 'is-ready' : 'is-locating'}`}
         style={cardStyle}
         role="dialog"
@@ -303,7 +293,7 @@ function Tutorial() {
         <div className="tutorial-progress" aria-hidden="true">
           {STEPS.map((_, index) => <span key={index} className={index <= stepIndex ? 'active' : ''} />)}
         </div>
-        <div className="tutorial-step-copy">
+        <div className="tutorial-step-copy" key={stepIndex}>
           <h2 id="tutorial-title">{step.title}</h2>
           <p>{step.text}</p>
           {stepIndex === 0 && goalHint && <div className="tutorial-hint">{goalHint}</div>}
