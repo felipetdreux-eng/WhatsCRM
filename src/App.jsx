@@ -603,7 +603,6 @@ export default function App() {
             <ArrowLeft size={18} /> Voltar
           </button>
           <div className="detail-top-actions">
-            {!editingLead && <button type="button" className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>}
             <button type="button" className="primary-button" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
           </div>
         </div>
@@ -681,7 +680,10 @@ export default function App() {
           <div className="detail-grid">
             <div className="detail-main-column">
               <section className="detail-card">
-                <div className="section-heading"><div><h2>Informações</h2><p>Dados principais deste lead.</p></div></div>
+                <div className="section-heading">
+                  <div><h2>Informações</h2><p>Dados principais deste lead.</p></div>
+                  <button type="button" className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>
+                </div>
                 <div className="info-grid">
                   <div className="info-item"><UserRound size={18} /><div><span>Nome</span><strong>{selectedLead.name}</strong></div></div>
                   <div className="info-item"><Building2 size={18} /><div><span>Empresa</span><strong>{selectedLead.company || 'Não informado'}</strong></div></div>
