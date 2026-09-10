@@ -458,7 +458,17 @@ export function installSyncBridge(userId) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `workspace_id=eq.${workspaceId}` }, payload => {
           const actorId = payload?.new?.last_modified_by || payload?.old?.last_modified_by || null;
           if (actorId && actorId === userId) return;
-          window.setTimeout(() => window.location.reload(), 250);
+          window.clearTimeout(window.__zapflowRemoteRefreshTimer);
+          window.__zapflowRemoteRefreshTimer = window.setTimeout(async () => {
+            try {
+              const freshLeads = await loadLeads(userId);
+              lastSnapshot = new Map(freshLeads.map(lead => [lead.id, leadFingerprint(lead)]));
+              originalSetItem.call(localStorage, 'zapflow-leads', JSON.stringify(freshLeads));
+              window.dispatchEvent(new CustomEvent('zapflow:remote-leads', { detail: { leads: freshLeads } }));
+            } catch (error) {
+              console.error('Workspace realtime refresh failed:', error);
+            }
+          }, 120);
         })
         .subscribe();
       window.__zapflowRealtimeChannel = channel;

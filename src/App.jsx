@@ -226,6 +226,16 @@ export default function App() {
   }, [leads]);
 
   useEffect(() => {
+    const handleRemoteLeads = event => {
+      const freshLeads = event?.detail?.leads;
+      if (!Array.isArray(freshLeads)) return;
+      setLeads(migrateLeads(freshLeads));
+    };
+    window.addEventListener('zapflow:remote-leads', handleRemoteLeads);
+    return () => window.removeEventListener('zapflow:remote-leads', handleRemoteLeads);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     if (!account?.id) return undefined;
     loadWorkspaceContext(account.id)
