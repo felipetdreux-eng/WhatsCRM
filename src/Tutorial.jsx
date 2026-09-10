@@ -21,7 +21,7 @@ const STEPS = [
     page: 'Pipeline',
     selector: '.pipeline-scroll',
     title: 'Acompanhe a negociação no Pipeline',
-    text: 'Cada coluna representa uma etapa. Conforme a conversa avança, mova o lead até Vendido ou Perdido.',
+    text: 'Cada coluna representa uma etapa. Conforme a conversa avança, mova o lead até Fechado ou Perdido.',
   },
   {
     page: 'Leads',

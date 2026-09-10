@@ -50,6 +50,6 @@ test('watchlist prioriza esfriando antes de atenção e proposta antes de etapas
 });
 
 test('vendidos e perdidos não recebem temperatura operacional', () => {
-  assert.equal(getLeadTemperature(lead({ status: 'Vendido' }), NOW), null);
+  assert.equal(getLeadTemperature(lead({ status: 'Fechado' }), NOW), null);
   assert.equal(getLeadTemperature(lead({ status: 'Perdido' }), NOW), null);
 });

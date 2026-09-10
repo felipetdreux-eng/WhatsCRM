@@ -39,7 +39,7 @@ test('proposta sem próximo contato vira prioridade acionável', () => {
 
 test('vendidos e perdidos nunca entram na fila', () => {
   const queue = buildAutopilotQueue([
-    lead({ id: 'vendido', status: 'Vendido', nextContact: '2030-01-10' }),
+    lead({ id: 'vendido', status: 'Fechado', nextContact: '2030-01-10' }),
     lead({ id: 'perdido', status: 'Perdido', nextContact: '2030-01-10' }),
     lead({ id: 'aberto', status: 'Interessado', nextContact: '', updatedAt: '2030-01-12T12:00:00.000Z' }),
   ], { now: NOW });

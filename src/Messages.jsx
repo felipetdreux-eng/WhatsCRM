@@ -41,7 +41,7 @@ const currency = value => new Intl.NumberFormat('pt-BR', {
 
 const leadValue = lead => {
   if (!lead) return 0;
-  const raw = lead.status === 'Vendido' ? (lead.saleValue ?? lead.value) : lead.value;
+  const raw = lead.status === 'Fechado' ? (lead.saleValue ?? lead.value) : lead.value;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? value : 0;
 };
@@ -211,7 +211,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
           <span>Personalizar para</span>
           <select value={selectedLeadId} onChange={event => { setSelectedLeadId(event.target.value); setError(''); }}>
             <option value="">Nenhum lead selecionado</option>
-            {leadOptions.filter(lead => !['Vendido', 'Perdido'].includes(lead.status)).map(lead => (
+            {leadOptions.filter(lead => !['Fechado', 'Perdido'].includes(lead.status)).map(lead => (
               <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>
             ))}
           </select>

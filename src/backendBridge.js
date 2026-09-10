@@ -70,7 +70,7 @@ async function resolveActiveWorkspaceId(userId) {
 }
 
 function toDbLead(lead, userId, idMap, workspaceId) {
-  const sold = lead.status === 'Vendido';
+  const sold = lead.status === 'Fechado';
   const saleValue = sold ? Number(lead.saleValue ?? lead.value ?? 0) : null;
   return {
     id: stableLeadId(lead.id, userId, idMap),
@@ -330,7 +330,7 @@ export async function syncLeads(leads, userId) {
   const workspaceId = await resolveActiveWorkspaceId(userId);
   if (!workspaceId) return [];
   const idMap = loadIdMap(userId);
-  const rows = leads.map(lead => toDbLead(lead, userId, idMap, workspaceId)).filter(row => row.status !== 'Vendido' || Number(row.sale_value) > 0);
+  const rows = leads.map(lead => toDbLead(lead, userId, idMap, workspaceId)).filter(row => row.status !== 'Fechado' || Number(row.sale_value) > 0);
   if (!rows.length) return [];
   const { data, error } = await supabase.from('leads').upsert(rows, { onConflict: 'id' }).select();
   if (error) throw error;

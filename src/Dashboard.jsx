@@ -19,12 +19,13 @@ import Autopilot, { buildAutopilotQueue } from './Autopilot';
 import { buildCoolingWatchlist } from './leadTemperature';
 import './dashboard.css';
 
-const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
+const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
 const PRIORITY_STATUS = {
-  'Proposta enviada': 0,
-  Interessado: 1,
-  Contatado: 2,
-  'Novo lead': 3,
+  'Negociação': 0,
+  'Proposta enviada': 1,
+  Interessado: 2,
+  Contatado: 3,
+  'Novo lead': 4,
 };
 
 const currency = value => new Intl.NumberFormat('pt-BR', {
@@ -65,8 +66,8 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
   const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   const data = useMemo(() => {
-    const active = leads.filter(lead => !['Vendido', 'Perdido'].includes(lead.status));
-    const sold = leads.filter(lead => lead.status === 'Vendido');
+    const active = leads.filter(lead => !['Fechado', 'Perdido'].includes(lead.status));
+    const sold = leads.filter(lead => lead.status === 'Fechado');
     const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || 0), 0);
     const potentialValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
     const conversion = leads.length ? Math.round((sold.length / leads.length) * 100) : 0;
@@ -163,7 +164,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
       tone: 'blue',
     },
     {
-      label: 'Vendido',
+      label: 'Fechado',
       value: currency(data.soldValue),
       detail: `${data.sold.length} venda${data.sold.length === 1 ? '' : 's'} fechada${data.sold.length === 1 ? '' : 's'}`,
       icon: TrendingUp,
@@ -340,7 +341,7 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
             {data.recent.length ? data.recent.map(lead => (
               <article className="recent-card" key={lead.id}>
                 <button type="button" className="recent-main" onClick={() => openLead(lead)}><div className="dashboard-avatar small">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || lead.origin || 'Sem empresa'}</span></div></button>
-                <div className="recent-meta"><span className={`recent-status status-${statusClass(lead.status)}`}>{lead.status}</span><strong>{currency(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong></div>
+                <div className="recent-meta"><span className={`recent-status status-${statusClass(lead.status)}`}>{lead.status}</span><strong>{currency(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong></div>
                 <button type="button" className="recent-whatsapp" aria-label={`Abrir WhatsApp de ${lead.name}`} onClick={() => openWhatsApp(lead)}><MessageCircle size={16} /></button>
               </article>
             )) : (

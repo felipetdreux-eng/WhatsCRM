@@ -29,7 +29,7 @@ test('datas demo acompanham a data atual em vez de ficar hardcoded', () => {
 });
 
 test('vendas demo sempre têm valor final positivo', () => {
-  const sold = buildDemoLeads(new Date('2030-01-15T12:00:00')).filter(lead => lead.status === 'Vendido');
+  const sold = buildDemoLeads(new Date('2030-01-15T12:00:00')).filter(lead => lead.status === 'Fechado');
   assert.ok(sold.length > 0);
   assert.ok(sold.every(lead => Number(lead.saleValue) > 0));
 });

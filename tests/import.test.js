@@ -28,7 +28,8 @@ test('normaliza valores, datas e status de planilhas reais', () => {
   assert.equal(parseMoney('R$ 1.250,90'), 1250.9);
   assert.equal(normalizeDate('09/09/2026'), '2026-09-09');
   assert.equal(normalizeStatus('Orçamento enviado'), 'Proposta enviada');
-  assert.equal(normalizeStatus('Pago'), 'Vendido');
+  assert.equal(normalizeStatus('Pago'), 'Fechado');
+  assert.equal(normalizeStatus('Em negociação'), 'Negociação');
   assert.equal(normalizeStatus('NAO RESPONDIDO'), 'Contatado');
   assert.equal(normalizeStatus('DESCARTADO'), 'Perdido');
 });

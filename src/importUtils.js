@@ -13,7 +13,7 @@ export const IMPORT_FIELDS = [
   { key: 'notes', label: 'Observações / pedido', aliases: ['observacao', 'observação', 'observacoes', 'observações', 'obs', 'pedido', 'descricao', 'descrição', 'produto', 'servico', 'serviço'] },
 ];
 
-const CLOSED = ['Vendido', 'Perdido'];
+const CLOSED = ['Fechado', 'Perdido'];
 const PHONE_PATTERN = /(?:\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g;
 
 export const normalizeText = value => String(value ?? '')
@@ -169,10 +169,11 @@ export function normalizeTime(value) {
 export function normalizeStatus(value) {
   const text = normalizeText(value);
   if (!text) return '';
-  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Vendido';
+  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Fechado';
   if (/(descartado|perdido|cancelado|recusado|desistiu|sem retorno|nao interessado|sem interesse)/.test(text)) return 'Perdido';
-  if (/(proposta|orcamento|cotacao|enviado|trabalhando)/.test(text)) return 'Proposta enviada';
-  if (/(interessado|negociacao|negociando|quente|em andamento)/.test(text)) return 'Interessado';
+  if (/(proposta|orcamento|cotacao|enviado)/.test(text)) return 'Proposta enviada';
+  if (/(negociacao|negociando|trabalhando|em andamento|contraproposta|ajuste)/.test(text)) return 'Negociação';
+  if (/(interessado|quente)/.test(text)) return 'Interessado';
   if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
   if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo lead';
   return '';
@@ -287,8 +288,8 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       notes: String(cellAt(row, effectiveMapping.notes)).trim(),
     };
 
-    if (status === 'Vendido' && !(Number(value) > 0)) {
-      errors.push({ line, message: 'Status vendido exige um valor maior que zero.' });
+    if (status === 'Fechado' && !(Number(value) > 0)) {
+      errors.push({ line, message: 'Status fechado exige um valor maior que zero.' });
       return;
     }
 
@@ -334,10 +335,10 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       updatedAt: now,
       createdAt: existing?.createdAt || now,
       lastFollowupAt: existing?.lastFollowupAt || null,
-      soldAt: status === 'Vendido' ? (existing?.soldAt || now) : null,
+      soldAt: status === 'Fechado' ? (existing?.soldAt || now) : null,
       lostAt: status === 'Perdido' ? (existing?.lostAt || now) : null,
-      saleValue: status === 'Vendido' ? Number(entry.value ?? existing?.saleValue ?? value) : null,
-      saleValueSource: status === 'Vendido' ? 'confirmed' : null,
+      saleValue: status === 'Fechado' ? Number(entry.value ?? existing?.saleValue ?? value) : null,
+      saleValueSource: status === 'Fechado' ? 'confirmed' : null,
     };
     records.push({
       mode: existing ? 'update' : 'create',

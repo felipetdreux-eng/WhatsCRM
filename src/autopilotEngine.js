@@ -1,6 +1,7 @@
-const CLOSED = new Set(['Vendido', 'Perdido']);
+const CLOSED = new Set(['Fechado', 'Perdido']);
 
 const STATUS_WEIGHT = {
+  'Negociação': 40,
   'Proposta enviada': 34,
   Interessado: 20,
   Contatado: 10,
@@ -8,10 +9,11 @@ const STATUS_WEIGHT = {
 };
 
 const STATUS_ORDER = {
-  'Proposta enviada': 0,
-  Interessado: 1,
-  Contatado: 2,
-  'Novo lead': 3,
+  'Negociação': 0,
+  'Proposta enviada': 1,
+  Interessado: 2,
+  Contatado: 3,
+  'Novo lead': 4,
 };
 
 export function localDateKey(date = new Date()) {
@@ -46,6 +48,7 @@ function valueWeight(rawValue) {
 }
 
 function coolingThreshold(status) {
+  if (status === 'Negociação') return 2;
   if (status === 'Proposta enviada') return 2;
   if (status === 'Interessado') return 3;
   if (status === 'Contatado') return 4;
@@ -66,8 +69,10 @@ function priorityFromScore(score) {
 function urgencyRank({ due, lead, idleDays }) {
   if (due != null && due < 0) return 0;
   if (due === 0) return 1;
-  if (lead.status === 'Proposta enviada' && !lead.nextContact) return 2;
-  if (lead.status === 'Proposta enviada' && idleDays >= 2) return 3;
+  if (lead.status === 'Negociação' && !lead.nextContact) return 2;
+  if (lead.status === 'Negociação' && idleDays >= 2) return 3;
+  if (lead.status === 'Proposta enviada' && !lead.nextContact) return 4;
+  if (lead.status === 'Proposta enviada' && idleDays >= 2) return 5;
   if (!lead.nextContact && ['Interessado', 'Contatado'].includes(lead.status)) return 4;
   if (idleDays >= coolingThreshold(lead.status)) return 5;
   if (lead.status === 'Novo lead' && !lead.nextContact) return 6;
@@ -112,15 +117,16 @@ export function scoreAutopilotLead(lead, now = new Date()) {
     score += 30;
     operationalSignal = true;
     pushReason(reasons, 'retorno marcado para amanhã', 30, 'upcoming');
-  } else if (due === 2 && lead.status === 'Proposta enviada') {
+  } else if (due === 2 && ['Negociação', 'Proposta enviada'].includes(lead.status)) {
     score += 18;
     operationalSignal = true;
     pushReason(reasons, 'proposta com retorno nos próximos 2 dias', 18, 'upcoming');
   }
 
   if (!lead.nextContact) {
-    const weight = lead.status === 'Proposta enviada' ? 42
-      : lead.status === 'Interessado' ? 32
+    const weight = lead.status === 'Negociação' ? 48
+      : lead.status === 'Proposta enviada' ? 42
+        : lead.status === 'Interessado' ? 32
         : lead.status === 'Contatado' ? 22
           : 15;
     score += weight;
@@ -144,7 +150,10 @@ export function scoreAutopilotLead(lead, now = new Date()) {
     );
   }
 
-  if (lead.status === 'Proposta enviada') {
+  if (lead.status === 'Negociação') {
+    operationalSignal = true;
+    pushReason(reasons, 'negociação ativa', STATUS_WEIGHT['Negociação'], 'stage');
+  } else if (lead.status === 'Proposta enviada') {
     operationalSignal = true;
     pushReason(reasons, 'proposta já enviada', STATUS_WEIGHT['Proposta enviada'], 'stage');
   } else if (lead.status === 'Interessado') {
@@ -182,6 +191,14 @@ export function autopilotRecommendation(item) {
   if (item.due === 0) return {
     title: 'Resolva o contato de hoje',
     detail: 'Esse retorno já estava combinado. Faça o contato e registre o resultado antes de seguir.',
+  };
+  if (item.lead.status === 'Negociação' && !item.lead.nextContact) return {
+    title: 'Defina o próximo passo da negociação',
+    detail: 'A negociação está ativa, mas sem uma próxima ação marcada. Defina o retorno e conduza o lead para uma decisão.',
+  };
+  if (item.lead.status === 'Negociação') return {
+    title: 'Conduza para uma decisão',
+    detail: 'Esse lead já está negociando. Resolva objeções, ajuste o necessário e busque um sim ou não claro.',
   };
   if (item.lead.status === 'Proposta enviada' && !item.lead.nextContact) return {
     title: 'Não deixe a proposta sem retorno',

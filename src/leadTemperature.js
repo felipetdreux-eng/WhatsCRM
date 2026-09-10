@@ -1,8 +1,9 @@
 if (typeof document !== 'undefined') import('./cooling.css');
 
-const CLOSED = new Set(['Vendido', 'Perdido']);
+const CLOSED = new Set(['Fechado', 'Perdido']);
 
 const WINDOWS = {
+  'Negociação': { attention: 2, cooling: 4 },
   'Proposta enviada': { attention: 2, cooling: 4 },
   Interessado: { attention: 3, cooling: 6 },
   Contatado: { attention: 4, cooling: 7 },
@@ -103,7 +104,7 @@ export function getLeadTemperature(lead, now = new Date()) {
 }
 
 export function buildCoolingWatchlist(leads, { now = new Date(), limit = 6 } = {}) {
-  const stageOrder = { 'Proposta enviada': 0, Interessado: 1, Contatado: 2, 'Novo lead': 3 };
+  const stageOrder = { 'Negociação': 0, 'Proposta enviada': 1, Interessado: 2, Contatado: 3, 'Novo lead': 4 };
   return (Array.isArray(leads) ? leads : [])
     .map(lead => ({ lead, temperature: getLeadTemperature(lead, now) }))
     .filter(item => item.temperature?.atRisk)

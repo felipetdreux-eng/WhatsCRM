@@ -19,8 +19,8 @@ import LeadImporter from './LeadImporter';
 import { buildCoolingWatchlist, getLeadTemperature } from './leadTemperature';
 import './leads.css';
 
-const CLOSED = ['Vendido', 'Perdido'];
-const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Vendido', 'Perdido'];
+const CLOSED = ['Fechado', 'Perdido'];
+const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
 const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
@@ -109,7 +109,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const changeStatus = (lead, next) => {
     if (lead.status === next) return;
     updateLeadStatus?.(lead.id, next);
-    flash(next === 'Vendido' ? `Confirme o valor final da venda de ${lead.name}.` : `${lead.name} atualizado para ${next}.`);
+    flash(next === 'Fechado' ? `Confirme o valor final da venda de ${lead.name}.` : `${lead.name} atualizado para ${next}.`);
   };
 
   const complete = lead => {
@@ -211,7 +211,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
                 <td><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span><TemperatureBadge lead={lead} /></div></div></td>
                 <td onClick={event => event.stopPropagation()}><select className="leads-status-select" value={lead.status} onChange={event => changeStatus(lead, event.target.value)} aria-label={`Status de ${lead.name}`}>{STATUSES.map(item => <option key={item}>{item}</option>)}</select></td>
                 <td><span className="lead-origin">{lead.origin || 'Outro'}</span></td>
-                <td><strong className="leads-value">{money(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong></td>
+                <td><strong className="leads-value">{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong></td>
                 <td><span className={`leads-next ${lead.nextContact ? '' : 'muted'} ${diff(lead.nextContact) < 0 ? 'overdue' : ''}`}><CalendarClock size={14} />{pretty(lead.nextContact)}{lead.nextContactTime ? ` · ${lead.nextContactTime}` : ''}</span></td>
                 <td>{lead.nextAction || '—'}</td>
                 <td onClick={event => event.stopPropagation()}><div className="lead-row-actions">
@@ -229,7 +229,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           <article className="lead-directory-card" key={lead.id}>
             <div className="lead-directory-card-top"><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div><div className="lead-mobile-badges"><span className={`leads-status status-${statusClass(lead.status)}`}>{lead.status}</span><TemperatureBadge lead={lead} /></div></div>
             <div className="lead-directory-card-meta"><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
-            <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Vendido' ? lead.saleValue : lead.value)}</strong><div>
+            <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
               {!CLOSED.includes(lead.status) && <button type="button" className="mobile-open" onClick={() => openReschedule(lead)} aria-label={`Reagendar ${lead.name}`}><RefreshCw size={15} /></button>}
               {lead.nextContact && !CLOSED.includes(lead.status) && <button type="button" className="mobile-open" onClick={() => complete(lead)} aria-label={`Concluir follow-up de ${lead.name}`}><Check size={15} /></button>}

@@ -17,7 +17,7 @@ import { autopilotRecommendation, buildAutopilotQueue as buildSmartAutopilotQueu
 import './autopilot.css';
 import './autopilot-outcome.css';
 
-const CLOSED = ['Vendido', 'Perdido'];
+const CLOSED = ['Fechado', 'Perdido'];
 
 const OUTCOME_OPTIONS = [
   {
@@ -54,10 +54,19 @@ const OUTCOME_OPTIONS = [
     tone: 'proposal',
   },
   {
+    id: 'negotiation',
+    label: 'Entrou em negociação',
+    detail: 'A proposta virou uma negociação ativa. Registre o próximo passo para conduzir ao fechamento.',
+    nextDays: 2,
+    nextAction: 'Avançar negociação',
+    status: 'Negociação',
+    tone: 'proposal',
+  },
+  {
     id: 'won',
     label: 'Fechou',
-    detail: 'Venda concluída. O lead sai da fila de follow-up e entra como vendido.',
-    status: 'Vendido',
+    detail: 'Venda concluída. O lead sai da fila de follow-up e entra como fechado.',
+    status: 'Fechado',
     tone: 'won',
   },
   {
