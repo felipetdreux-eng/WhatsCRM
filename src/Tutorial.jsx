@@ -13,6 +13,12 @@ const STEPS = [
   },
   {
     page: 'Leads',
+    selector: '.leads-import-button',
+    title: 'Já tem contatos? Importe sua planilha',
+    text: 'Use Importar planilha para trazer seus contatos de CSV, Excel ou PDF e revisar tudo antes de confirmar. No computador, você também pode arrastar o arquivo para o Fuply e soltar para começar a importação.',
+  },
+  {
+    page: 'Leads',
     selector: '.leads-directory',
     title: 'Organize e atualize seus leads',
     text: 'Aqui fica sua base de contatos. Abra um lead para editar as informações, mudar o status, definir o responsável e acompanhar tudo que já aconteceu na negociação.',
@@ -34,6 +40,12 @@ const STEPS = [
     selector: '.messages-controls',
     title: 'Use mensagens prontas no WhatsApp',
     text: 'Escolha um lead e o Fuply personaliza os modelos com nome, empresa e valor. Você também tem mensagens para primeiro contato, follow-up, proposta, última tentativa e para pedir atendimento de uma pessoa responsável.',
+  },
+  {
+    page: 'Dashboard',
+    selector: '.autopilot-dashboard',
+    title: 'Deixe o Autopilot montar sua fila de vendas',
+    text: 'O Autopilot analisa seus leads e ordena quem merece atenção primeiro usando atraso, etapa da negociação, valor e tempo sem interação. Abra a fila e avance pelas oportunidades sem precisar decidir manualmente por onde começar.',
   },
   {
     page: 'Dashboard',
@@ -80,9 +92,9 @@ function Tutorial() {
   const step = STEPS[stepIndex];
 
   const goalHint = useMemo(() => {
-    if (goal === 'followups') return 'Como seu foco é follow-up, preste atenção especialmente em Marcar para e nas prioridades do Dashboard.';
-    if (goal === 'sales') return 'Como seu foco é vender mais, Pipeline, Mensagens e Dashboard da equipe vão ser suas telas principais.';
-    if (goal === 'organize') return 'Como seu foco é organização, Leads, responsáveis, marcações e Pipeline vão concentrar quase todo o seu trabalho.';
+    if (goal === 'followups') return 'Como seu foco é follow-up, preste atenção especialmente em Marcar para, Autopilot e nas prioridades do Dashboard.';
+    if (goal === 'sales') return 'Como seu foco é vender mais, Pipeline, Mensagens, Autopilot e Dashboard da equipe vão ser suas telas principais.';
+    if (goal === 'organize') return 'Como seu foco é organização, Importar planilha, Leads, responsáveis, marcações e Pipeline vão concentrar quase todo o seu trabalho.';
     return '';
   }, [goal]);
 
