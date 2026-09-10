@@ -6,6 +6,7 @@ const SESSION_KEY = 'zapflow-session';
 const OWNER_KEY = 'zapflow-storage-owner';
 const ID_MAP_KEY_PREFIX = 'zapflow-lead-id-map';
 const THEME_KEY = 'zapflow-theme';
+const workspaceCache = new Map();
 
 const readJSON = (key, fallback) => {
   try {
@@ -54,12 +55,29 @@ function stableLeadId(leadId, userId, idMap) {
   return idMap[key];
 }
 
-function toDbLead(lead, userId, idMap) {
+async function resolveActiveWorkspaceId(userId) {
+  if (!userId) return null;
+  if (workspaceCache.has(userId)) return workspaceCache.get(userId);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('active_workspace_id')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  const workspaceId = data?.active_workspace_id || null;
+  workspaceCache.set(userId, workspaceId);
+  return workspaceId;
+}
+
+function toDbLead(lead, userId, idMap, workspaceId) {
   const sold = lead.status === 'Vendido';
   const saleValue = sold ? Number(lead.saleValue ?? lead.value ?? 0) : null;
   return {
     id: stableLeadId(lead.id, userId, idMap),
     user_id: userId,
+    workspace_id: workspaceId,
+    assigned_to: lead.assignedTo || userId,
+    last_modified_by: userId,
     name: String(lead.name || '').trim() || 'Lead sem nome',
     company: String(lead.company || ''),
     phone: String(lead.phone || '').replace(/\D/g, ''),
@@ -83,6 +101,10 @@ function toDbLead(lead, userId, idMap) {
 function fromDbLead(row) {
   return {
     id: row.id,
+    workspaceId: row.workspace_id || null,
+    assignedTo: row.assigned_to || null,
+    createdBy: row.user_id || null,
+    lastModifiedBy: row.last_modified_by || null,
     name: row.name,
     company: row.company || '',
     phone: row.phone || '',
@@ -116,6 +138,7 @@ function fromDbActivity(row) {
   return {
     id: row.id,
     leadId: row.lead_id,
+    actorId: row.user_id || null,
     kind: row.kind,
     title: row.title,
     detail: row.detail || '',
@@ -127,10 +150,11 @@ function fromDbActivity(row) {
 export async function getProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme')
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme,active_workspace_id')
     .eq('id', userId)
     .single();
   if (error) throw error;
+  workspaceCache.set(userId, data?.active_workspace_id || null);
   return data;
 }
 
@@ -142,7 +166,7 @@ export async function updateProfileName(userId, name) {
     .from('profiles')
     .update({ name: cleanName })
     .eq('id', userId)
-    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme')
+    .select('id,name,selling_type,goal,start_mode,onboarding_completed,tutorial_completed,theme,active_workspace_id')
     .single();
   if (error) throw error;
 
@@ -194,8 +218,10 @@ export function mirrorAccount(user, profile) {
     tutorialCompleted: Boolean(profile?.tutorial_completed),
     onboarding,
     theme,
+    activeWorkspaceId: profile?.active_workspace_id || null,
     backend: 'supabase',
   };
+  workspaceCache.set(user.id, account.activeWorkspaceId);
   const next = Array.isArray(accounts) ? accounts.filter(item => item.id !== user.id) : [];
   next.push(account);
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(next));
@@ -205,17 +231,106 @@ export function mirrorAccount(user, profile) {
   return account;
 }
 
+export async function loadWorkspaceContext(userId) {
+  if (!userId) return { activeWorkspace: null, workspaces: [], members: [], myRole: null };
+  const profile = await getProfile(userId);
+
+  const { data: ownMemberships, error: membershipsError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id,user_id,role,joined_at')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: true });
+  if (membershipsError) throw membershipsError;
+
+  const workspaceIds = (ownMemberships || []).map(item => item.workspace_id);
+  if (!workspaceIds.length) return { activeWorkspace: null, workspaces: [], members: [], myRole: null };
+
+  const { data: workspaceRows, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('id,name,owner_id,created_at,updated_at')
+    .in('id', workspaceIds)
+    .order('created_at', { ascending: true });
+  if (workspaceError) throw workspaceError;
+
+  const activeId = workspaceIds.includes(profile?.active_workspace_id) ? profile.active_workspace_id : workspaceIds[0];
+  workspaceCache.set(userId, activeId);
+  const activeWorkspace = (workspaceRows || []).find(item => item.id === activeId) || null;
+
+  const { data: memberRows, error: memberError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id,user_id,role,joined_at')
+    .eq('workspace_id', activeId)
+    .order('joined_at', { ascending: true });
+  if (memberError) throw memberError;
+
+  const memberIds = (memberRows || []).map(item => item.user_id);
+  let profileRows = [];
+  if (memberIds.length) {
+    const { data, error } = await supabase.from('profiles').select('id,name').in('id', memberIds);
+    if (error) throw error;
+    profileRows = data || [];
+  }
+  const names = new Map(profileRows.map(item => [item.id, item.name || 'Membro']));
+  const members = (memberRows || []).map(item => ({
+    ...item,
+    name: names.get(item.user_id) || (item.user_id === userId ? 'Você' : 'Membro'),
+  }));
+  const myRole = members.find(item => item.user_id === userId)?.role || null;
+
+  return { activeWorkspace, workspaces: workspaceRows || [], members, myRole };
+}
+
+export async function createWorkspaceInvite(workspaceId) {
+  if (!workspaceId) throw new Error('Equipe inválida.');
+  const { data, error } = await supabase.rpc('create_workspace_invite', { _workspace_id: workspaceId });
+  if (error) throw error;
+  return data;
+}
+
+export async function joinWorkspaceByCode(userId, code) {
+  const cleanCode = String(code || '').trim().toUpperCase();
+  if (!userId || cleanCode.length < 6) throw new Error('Código de convite inválido.');
+  const { data, error } = await supabase.rpc('join_workspace_by_code', { _code: cleanCode });
+  if (error) throw error;
+  workspaceCache.set(userId, data || null);
+  return data;
+}
+
+export async function setActiveWorkspace(userId, workspaceId) {
+  if (!userId || !workspaceId) throw new Error('Equipe inválida.');
+  const { error } = await supabase.rpc('set_active_workspace', { _workspace_id: workspaceId });
+  if (error) throw error;
+  workspaceCache.set(userId, workspaceId);
+}
+
+export async function renameWorkspace(workspaceId, name) {
+  const cleanName = String(name || '').trim();
+  if (!workspaceId || cleanName.length < 2) throw new Error('Nome de equipe inválido.');
+  const { data, error } = await supabase
+    .from('workspaces')
+    .update({ name: cleanName })
+    .eq('id', workspaceId)
+    .select('id,name,owner_id,created_at,updated_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function loadLeads(userId) {
   if (!userId) return [];
-  const { data, error } = await supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  const workspaceId = await resolveActiveWorkspaceId(userId);
+  if (!workspaceId) return [];
+  const { data, error } = await supabase.from('leads').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(fromDbLead);
 }
 
 export async function syncLeads(leads, userId) {
   if (!Array.isArray(leads) || !userId) return [];
+  const workspaceId = await resolveActiveWorkspaceId(userId);
+  if (!workspaceId) return [];
   const idMap = loadIdMap(userId);
-  const rows = leads.map(lead => toDbLead(lead, userId, idMap)).filter(row => row.status !== 'Vendido' || Number(row.sale_value) > 0);
+  const rows = leads.map(lead => toDbLead(lead, userId, idMap, workspaceId)).filter(row => row.status !== 'Vendido' || Number(row.sale_value) > 0);
   if (!rows.length) return [];
   const { data, error } = await supabase.from('leads').upsert(rows, { onConflict: 'id' }).select();
   if (error) throw error;
@@ -227,8 +342,7 @@ export async function loadLeadActivities(userId, leadId, limit = 50) {
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
   const { data, error } = await supabase
     .from('lead_activities')
-    .select('id,lead_id,kind,title,detail,metadata,created_at')
-    .eq('user_id', userId)
+    .select('id,user_id,lead_id,kind,title,detail,metadata,created_at')
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false })
     .limit(safeLimit);
@@ -249,7 +363,7 @@ export async function recordLeadActivity({ userId, leadId, kind, title, detail =
   const { data, error } = await supabase
     .from('lead_activities')
     .insert(row)
-    .select('id,lead_id,kind,title,detail,metadata,created_at')
+    .select('id,user_id,lead_id,kind,title,detail,metadata,created_at')
     .single();
   if (error) throw error;
   return fromDbActivity(data);
@@ -279,6 +393,7 @@ export async function syncMessages(templates, userId) {
 
 export async function hydrateBackend(user, profile) {
   mirrorAccount(user, profile);
+  workspaceCache.set(user.id, profile?.active_workspace_id || null);
   const legacyId = localStorage.getItem(`zapflow-legacy-account:${user.id}`) || legacyAccountFor(user.email, user.id)?.id;
 
   const dbLeads = await loadLeads(user.id);
@@ -306,11 +421,16 @@ export async function hydrateBackend(user, profile) {
   }
 }
 
+function leadFingerprint(lead) {
+  return JSON.stringify(lead || {});
+}
+
 export function installSyncBridge(userId) {
   if (window.__zapflowSyncBridgeInstalled) return;
   window.__zapflowSyncBridgeInstalled = true;
   const originalSetItem = Storage.prototype.setItem;
   let leadTimer;
+  let lastSnapshot = new Map((readJSON('zapflow-leads', []) || []).map(lead => [lead.id, leadFingerprint(lead)]));
 
   Storage.prototype.setItem = function(key, value) {
     originalSetItem.call(this, key, value);
@@ -318,10 +438,32 @@ export function installSyncBridge(userId) {
     if (key === 'zapflow-leads') {
       clearTimeout(leadTimer);
       leadTimer = setTimeout(() => {
-        try { syncLeads(JSON.parse(value), userId).catch(console.error); } catch {}
+        try {
+          const nextLeads = JSON.parse(value);
+          if (!Array.isArray(nextLeads)) return;
+          const nextSnapshot = new Map(nextLeads.map(lead => [lead.id, leadFingerprint(lead)]));
+          const changed = nextLeads.filter(lead => lastSnapshot.get(lead.id) !== nextSnapshot.get(lead.id));
+          lastSnapshot = nextSnapshot;
+          if (changed.length) syncLeads(changed, userId).catch(console.error);
+        } catch {}
       }, 180);
     }
   };
+
+  resolveActiveWorkspaceId(userId)
+    .then(workspaceId => {
+      if (!workspaceId) return;
+      const channel = supabase
+        .channel(`workspace-leads-${workspaceId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `workspace_id=eq.${workspaceId}` }, payload => {
+          const actorId = payload?.new?.last_modified_by || payload?.old?.last_modified_by || null;
+          if (actorId && actorId === userId) return;
+          window.setTimeout(() => window.location.reload(), 250);
+        })
+        .subscribe();
+      window.__zapflowRealtimeChannel = channel;
+    })
+    .catch(error => console.error('Workspace realtime setup failed:', error));
 
   window.__zapflowSupabaseSignOut = () => supabase.auth.signOut({ scope: 'local' });
 }
