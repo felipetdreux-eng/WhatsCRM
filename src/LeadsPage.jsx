@@ -21,7 +21,7 @@ import './leads.css';
 
 const CLOSED = ['Fechado', 'Perdido'];
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
-const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
+const SCOPES = ['Todos', 'Hoje', 'Amanhã', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const noon = value => new Date(`${value}T12:00:00`);
@@ -52,6 +52,7 @@ function inScope(lead, scope) {
   if (scope === 'Sem próximo contato') return !lead.nextContact && !closed;
   if (closed || !lead.nextContact) return false;
   if (scope === 'Hoje') return days === 0;
+  if (scope === 'Amanhã') return days === 1;
   if (scope === 'Atrasados') return days < 0;
   if (scope === 'Próx. 7 dias') return days > 0 && days <= 7;
   return true;
@@ -72,6 +73,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     return {
       overdue: dated.filter(lead => diff(lead.nextContact) < 0),
       today: dated.filter(lead => diff(lead.nextContact) === 0),
+      tomorrow: dated.filter(lead => diff(lead.nextContact) === 1),
       week: dated.filter(lead => diff(lead.nextContact) > 0 && diff(lead.nextContact) <= 7),
       without: active.filter(lead => !lead.nextContact),
       cooling: buildCoolingWatchlist(active, { limit: Math.max(1, active.length) }),
@@ -190,6 +192,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       <section className="leads-summary">
         <button type="button" className={`critical ${scope === 'Atrasados' ? 'active' : ''}`} onClick={() => setScope(scope === 'Atrasados' ? 'Todos' : 'Atrasados')}><AlertTriangle size={18} /><span>Atrasados<strong>{summary.overdue.length}</strong></span></button>
         <button type="button" className={`today ${scope === 'Hoje' ? 'active' : ''}`} onClick={() => setScope(scope === 'Hoje' ? 'Todos' : 'Hoje')}><CalendarClock size={18} /><span>Para hoje<strong>{summary.today.length}</strong></span></button>
+        <button type="button" className={`tomorrow ${scope === 'Amanhã' ? 'active' : ''}`} onClick={() => setScope(scope === 'Amanhã' ? 'Todos' : 'Amanhã')}><Clock3 size={18} /><span>Amanhã<strong>{summary.tomorrow.length}</strong></span></button>
         <button type="button" className={`upcoming ${scope === 'Próx. 7 dias' ? 'active' : ''}`} onClick={() => setScope(scope === 'Próx. 7 dias' ? 'Todos' : 'Próx. 7 dias')}><Clock3 size={18} /><span>Próx. 7 dias<strong>{summary.week.length}</strong></span></button>
         <button type="button" className={`missing ${scope === 'Sem próximo contato' ? 'active' : ''}`} onClick={() => setScope(scope === 'Sem próximo contato' ? 'Todos' : 'Sem próximo contato')}><Target size={18} /><span>Sem próximo contato<strong>{summary.without.length}</strong></span></button>
         <button type="button" className={`cooling ${scope === 'Esfriando' ? 'active' : ''}`} onClick={() => setScope(scope === 'Esfriando' ? 'Todos' : 'Esfriando')}><Snowflake size={18} /><span>Esfriando<strong>{summary.cooling.length}</strong></span></button>
