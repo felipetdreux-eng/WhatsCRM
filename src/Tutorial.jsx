@@ -91,6 +91,17 @@ function rectChanged(previous, next) {
   return ['left', 'top', 'width', 'height'].some(key => Math.abs(previous[key] - next[key]) > 0.5);
 }
 
+function resetDocumentScroll() {
+  const scrollingElement = document.scrollingElement || document.documentElement;
+  if (scrollingElement) {
+    scrollingElement.scrollTop = 0;
+    scrollingElement.scrollLeft = 0;
+  }
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+}
+
 function Tutorial() {
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -109,11 +120,10 @@ function Tutorial() {
   }, [goal]);
 
   const navigateTo = page => {
+    resetDocumentScroll();
     const button = navButton(page);
-    if (button && !button.classList.contains('active')) {
-      button.click();
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    }
+    if (button && !button.classList.contains('active')) button.click();
+    resetDocumentScroll();
   };
 
   useEffect(() => {
@@ -142,9 +152,12 @@ function Tutorial() {
 
     bootstrap();
     const startTutorial = () => {
+      resetDocumentScroll();
+      targetRef.current = null;
       setStepIndex(0);
       setRect(null);
       setOpen(true);
+      window.requestAnimationFrame(resetDocumentScroll);
     };
     window.addEventListener('zapflow:start-tutorial', startTutorial);
     return () => {
@@ -164,6 +177,8 @@ function Tutorial() {
     let retryTimer = null;
     let startTimer = null;
     let animationFrame = null;
+    let settleFrameOne = null;
+    let settleFrameTwo = null;
     let resizeObserver = null;
     setRect(null);
     targetRef.current = null;
@@ -192,18 +207,26 @@ function Tutorial() {
         return;
       }
 
-      targetRef.current = target;
       const targetRect = target.getBoundingClientRect();
       const isVisible = targetRect.bottom > 72 && targetRect.top < window.innerHeight - 36;
       if (!isVisible) {
         target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
       }
-      scheduleUpdate();
 
-      if ('ResizeObserver' in window) {
-        resizeObserver = new ResizeObserver(scheduleUpdate);
-        resizeObserver.observe(target);
-      }
+      settleFrameOne = window.requestAnimationFrame(() => {
+        settleFrameOne = null;
+        settleFrameTwo = window.requestAnimationFrame(() => {
+          settleFrameTwo = null;
+          if (cancelled || !target.isConnected) return;
+          targetRef.current = target;
+          updateRect();
+
+          if ('ResizeObserver' in window) {
+            resizeObserver = new ResizeObserver(scheduleUpdate);
+            resizeObserver.observe(target);
+          }
+        });
+      });
     };
 
     startTimer = window.setTimeout(() => attachTarget(), 60);
@@ -216,6 +239,8 @@ function Tutorial() {
       if (startTimer) window.clearTimeout(startTimer);
       if (retryTimer) window.clearTimeout(retryTimer);
       if (animationFrame != null) window.cancelAnimationFrame(animationFrame);
+      if (settleFrameOne != null) window.cancelAnimationFrame(settleFrameOne);
+      if (settleFrameTwo != null) window.cancelAnimationFrame(settleFrameTwo);
       resizeObserver?.disconnect();
       window.removeEventListener('resize', scheduleUpdate);
       window.removeEventListener('scroll', scheduleUpdate, true);
