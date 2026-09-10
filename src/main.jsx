@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import GlobalImportDrop from './GlobalImportDrop';
 import { getActiveAccount } from './accountStorage';
+import './pipelineDragScroll';
 
 const rootHost = document.getElementById('root');
 const activeAccount = getActiveAccount();
