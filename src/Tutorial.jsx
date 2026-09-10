@@ -8,60 +8,70 @@ const STEPS = [
   {
     page: 'Dashboard',
     selector: '.dashboard-header-actions .primary-button',
+    side: 'left',
     title: 'Adicione seu primeiro lead',
     text: 'Comece com nome e WhatsApp. Depois você pode definir empresa, valor, origem, responsável, observações e o próximo contato.',
   },
   {
     page: 'Leads',
     selector: '.leads-import-button',
+    side: 'left',
     title: 'Já tem contatos? Importe sua planilha',
     text: 'Use Importar planilha para trazer seus contatos de CSV, Excel ou PDF e revisar tudo antes de confirmar. No computador, você também pode arrastar o arquivo para o Fuply e soltar para começar a importação.',
   },
   {
     page: 'Leads',
-    selector: '.leads-directory',
+    selector: '.leads-search',
+    side: 'right',
     title: 'Organize e atualize seus leads',
     text: 'Aqui fica sua base de contatos. Abra um lead para editar as informações, mudar o status, definir o responsável e acompanhar tudo que já aconteceu na negociação.',
   },
   {
     page: 'Leads',
-    selector: '.leads-summary',
+    selector: '.leads-summary button',
+    side: 'right',
     title: 'Marque quem precisa de retorno',
     text: 'Use “Marcar para” em cada lead para escolher Hoje, Amanhã, +3 dias, +7 dias ou uma data personalizada. Depois, use os filtros para encontrar atrasados, contatos de hoje, próximos 7 dias e leads sem próximo contato.',
   },
   {
     page: 'Pipeline',
     selector: '.pipeline-board .pipeline-column',
+    side: 'right',
     title: 'Acompanhe cada negociação no Pipeline',
     text: 'Cada coluna representa uma etapa da venda. Conforme a conversa avança, mova o lead entre as etapas até Fechado ou Perdido e filtre por responsável quando estiver trabalhando em equipe.',
   },
   {
     page: 'Mensagens',
-    selector: '.messages-controls',
+    selector: '.messages-lead-picker',
+    side: 'left',
     title: 'Use mensagens prontas no WhatsApp',
     text: 'Escolha um lead e o Fuply personaliza os modelos com nome, empresa e valor. Você também tem mensagens para primeiro contato, follow-up, proposta, última tentativa e para pedir atendimento de uma pessoa responsável.',
   },
   {
     page: 'Dashboard',
-    selector: '.autopilot-dashboard',
+    selector: '.autopilot-dashboard-button',
+    side: 'left',
     title: 'Deixe o Autopilot montar sua fila de vendas',
     text: 'O Autopilot analisa seus leads e ordena quem merece atenção primeiro usando atraso, etapa da negociação, valor e tempo sem interação. Abra a fila e avance pelas oportunidades sem precisar decidir manualmente por onde começar.',
   },
   {
     page: 'Dashboard',
-    selector: '.team-metrics-grid',
+    selector: '.team-metric-card',
+    side: 'right',
     title: 'Acompanhe o desempenho da equipe',
     text: 'Veja leads, vendas, conversão, faturamento e follow-ups por responsável. Use o filtro para comparar a equipe inteira ou analisar cada membro separadamente.',
   },
   {
     page: 'Configurações',
-    selector: '.team-heading',
+    selector: '.team-actions-grid .team-action-box',
+    side: 'right',
     title: 'Trabalhe com sua equipe sem dividir senha',
     text: 'Em Configurações → Equipe, gere um código de convite para novos membros ou entre em outro workspace. Cada pessoa usa a própria conta, mas todos compartilham os leads, o Pipeline e o histórico da equipe.',
   },
   {
     page: 'Dashboard',
-    selector: '.focus-tabs',
+    selector: '.focus-tabs > div',
+    side: 'right',
     title: 'Comece o dia pelas prioridades',
     text: 'O Dashboard coloca atrasados, contatos de hoje, leads sem próximo passo e negociações esfriando na sua frente. Assim você abre o Fuply e já sabe o que precisa fazer primeiro.',
   },
@@ -273,7 +283,9 @@ function Tutorial() {
 
   const cardStyle = isMobile
     ? { left: 14, right: 14, bottom: 14, top: 'auto', width: 'auto' }
-    : { width: 380, left: '50%', top: 18, transform: 'translateX(-50%)' };
+    : step.side === 'left'
+      ? { width: 380, left: 18, right: 'auto', top: 18, transform: 'none' }
+      : { width: 380, right: 18, left: 'auto', top: 18, transform: 'none' };
 
   return (
     <div className="tutorial-layer" aria-live="polite">
