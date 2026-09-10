@@ -13,6 +13,12 @@ const DEFAULT_TEMPLATES = [
     text: 'Oi, {nome}! Tudo bem? Vi seu trabalho e queria conversar sobre uma possível parceria. Trabalho com serviços que podem ajudar no seu objetivo e posso te explicar rapidinho por aqui.',
   },
   {
+    id: 'human-contact',
+    title: 'Falar com responsável',
+    category: 'Triagem',
+    text: 'Oi! Preciso falar com um atendente humano ou com a pessoa responsável pelo comercial/marketing da {empresa}. Você pode me encaminhar, por favor? É sobre uma proposta de parceria.',
+  },
+  {
     id: 'follow-up',
     title: 'Follow-up',
     category: 'Retorno',
