@@ -14,6 +14,7 @@ export const IMPORT_FIELDS = [
 ];
 
 const CLOSED = ['Vendido', 'Perdido'];
+const PHONE_PATTERN = /(?:\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g;
 
 export const normalizeText = value => String(value ?? '')
   .normalize('NFD')
@@ -72,6 +73,25 @@ export function parseDelimitedText(text) {
   return rows;
 }
 
+function embeddedPhone(value) {
+  const text = String(value ?? '');
+  const matches = text.match(PHONE_PATTERN) || [];
+  return matches.find(candidate => validBrazilPhone(canonicalPhone(candidate))) || '';
+}
+
+function cleanEmbeddedIdentity(value, phone) {
+  let text = String(value ?? '');
+  if (phone) text = text.replace(phone, ' ');
+  text = text
+    .replace(/\bwhats\s*app\s*:?/gi, ' ')
+    .replace(/\btelefone\s*:?/gi, ' ')
+    .replace(/\bcelular\s*:?/gi, ' ')
+    .replace(/[—–|]+\s*$/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text;
+}
+
 export function detectMapping(headers) {
   const normalizedHeaders = headers.map(normalizeText);
   const used = new Set();
@@ -88,6 +108,20 @@ export function detectMapping(headers) {
     mapping[field.key] = index >= 0 ? index : '';
     if (index >= 0) used.add(index);
   }
+
+  // Some Google Sheets / Excel PDFs are exported without a header row. In that
+  // case the first lead becomes "the header" to the generic importer. Detect a
+  // real Brazilian phone inside that first row and temporarily map the same cell
+  // as identity + phone; analyzeImport will split it safely below.
+  const dataPhoneIndex = headers.findIndex(header => embeddedPhone(header));
+  if (dataPhoneIndex >= 0) {
+    if (mapping.phone === '' || mapping.phone == null) mapping.phone = dataPhoneIndex;
+    const identity = cleanEmbeddedIdentity(headers[dataPhoneIndex], embeddedPhone(headers[dataPhoneIndex]));
+    if ((mapping.name === '' || mapping.name == null) && (mapping.company === '' || mapping.company == null) && identity) {
+      mapping.name = dataPhoneIndex;
+    }
+  }
+
   return mapping;
 }
 
@@ -136,10 +170,10 @@ export function normalizeStatus(value) {
   const text = normalizeText(value);
   if (!text) return '';
   if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Vendido';
-  if (/(perdido|cancelado|recusado|desistiu|sem retorno|nao interessado)/.test(text)) return 'Perdido';
-  if (/(proposta|orcamento|cotacao|enviado)/.test(text)) return 'Proposta enviada';
-  if (/(interessado|negociacao|negociando|quente)/.test(text)) return 'Interessado';
-  if (/(contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
+  if (/(descartado|perdido|cancelado|recusado|desistiu|sem retorno|nao interessado|sem interesse)/.test(text)) return 'Perdido';
+  if (/(proposta|orcamento|cotacao|enviado|trabalhando)/.test(text)) return 'Proposta enviada';
+  if (/(interessado|negociacao|negociando|quente|em andamento)/.test(text)) return 'Interessado';
+  if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
   if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo lead';
   return '';
 }
@@ -164,16 +198,58 @@ function appendNotes(base, extra) {
   return left ? `${left}\n${right}` : right;
 }
 
+function extractHeaderlessPdfRows(headers, rows, mapping) {
+  if (mapping.phone === '' || mapping.phone == null) return null;
+  const phoneIndex = Number(mapping.phone);
+  const headerPhone = embeddedPhone(headers[phoneIndex]);
+  const sameIdentityColumn = Number(mapping.name) === phoneIndex || Number(mapping.company) === phoneIndex;
+  if (!headerPhone || !sameIdentityColumn) return null;
+
+  const sourceRows = [headers, ...rows];
+  const extracted = [];
+  let pendingIdentity = '';
+
+  sourceRows.forEach((row, index) => {
+    const cells = (Array.isArray(row) ? row : []).map(cell => String(cell ?? '').trim()).filter(Boolean);
+    if (!cells.length) return;
+    const joined = cells.join(' ').replace(/\s+/g, ' ').trim();
+    const phone = embeddedPhone(joined);
+
+    if (!phone) {
+      const statusOnly = normalizeStatus(joined);
+      if (!statusOnly && joined.length > 1) pendingIdentity = joined;
+      return;
+    }
+
+    const phoneAt = joined.indexOf(phone);
+    const beforePhone = phoneAt >= 0 ? joined.slice(0, phoneAt) : joined;
+    const afterPhone = phoneAt >= 0 ? joined.slice(phoneAt + phone.length) : '';
+    const identity = cleanEmbeddedIdentity(beforePhone, '') || pendingIdentity;
+    const status = normalizeStatus(afterPhone) || normalizeStatus(cells.slice(1).join(' '));
+
+    if (identity && validBrazilPhone(canonicalPhone(phone))) {
+      extracted.push({ row: [identity, phone, status], line: index + 1 });
+      pendingIdentity = '';
+    }
+  });
+
+  return extracted.length ? extracted : null;
+}
+
 export function analyzeImport({ headers = [], rows = [], mapping = {}, existingLeads = [] }) {
   const errors = [];
   const warnings = [];
   const grouped = new Map();
+  const headerlessPdfRows = extractHeaderlessPdfRows(headers, rows, mapping);
+  const effectiveMapping = headerlessPdfRows
+    ? { ...mapping, name: 0, company: '', phone: 1, status: 2, value: '', origin: '', nextContact: '', nextContactTime: '', nextAction: '', notes: '' }
+    : mapping;
+  const rowEntries = headerlessPdfRows || rows.map((row, index) => ({ row, line: index + 2 }));
 
-  rows.forEach((row, index) => {
-    const line = index + 2;
-    const company = String(cellAt(row, mapping.company)).trim();
-    const name = String(cellAt(row, mapping.name)).trim() || company;
-    const rawPhone = cellAt(row, mapping.phone);
+  rowEntries.forEach(({ row, line }) => {
+    const company = String(cellAt(row, effectiveMapping.company)).trim();
+    const name = String(cellAt(row, effectiveMapping.name)).trim() || company;
+    const rawPhone = cellAt(row, effectiveMapping.phone);
     const phone = canonicalPhone(rawPhone);
     if (!name) {
       errors.push({ line, message: 'Sem nome do cliente ou empresa.' });
@@ -184,7 +260,7 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       return;
     }
 
-    const rawValue = cellAt(row, mapping.value);
+    const rawValue = cellAt(row, effectiveMapping.value);
     const value = parseMoney(rawValue);
     if (rawValue !== '' && rawValue != null && value == null) warnings.push({ line, message: 'Valor não reconhecido e ignorado.' });
     if (value != null && value < 0) {
@@ -192,11 +268,11 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       return;
     }
 
-    const rawDate = cellAt(row, mapping.nextContact);
+    const rawDate = cellAt(row, effectiveMapping.nextContact);
     const nextContact = normalizeDate(rawDate);
     if (rawDate !== '' && rawDate != null && !nextContact) warnings.push({ line, message: 'Data de próximo contato não reconhecida e ignorada.' });
-    const status = normalizeStatus(cellAt(row, mapping.status));
-    const origin = normalizeOrigin(cellAt(row, mapping.origin));
+    const status = normalizeStatus(cellAt(row, effectiveMapping.status));
+    const origin = normalizeOrigin(cellAt(row, effectiveMapping.origin));
     const entry = {
       line,
       name,
@@ -206,9 +282,9 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       status,
       origin,
       nextContact,
-      nextContactTime: normalizeTime(cellAt(row, mapping.nextContactTime)),
-      nextAction: String(cellAt(row, mapping.nextAction)).trim(),
-      notes: String(cellAt(row, mapping.notes)).trim(),
+      nextContactTime: normalizeTime(cellAt(row, effectiveMapping.nextContactTime)),
+      nextAction: String(cellAt(row, effectiveMapping.nextAction)).trim(),
+      notes: String(cellAt(row, effectiveMapping.notes)).trim(),
     };
 
     if (status === 'Vendido' && !(Number(value) > 0)) {
@@ -278,7 +354,7 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
     errors,
     warnings,
     stats: {
-      rows: rows.length,
+      rows: rowEntries.length,
       valid: records.length,
       create: records.filter(record => record.mode === 'create').length,
       update: records.filter(record => record.mode === 'update').length,
