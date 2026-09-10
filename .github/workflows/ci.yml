@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test-and-build:
@@ -20,7 +20,18 @@ jobs:
         with:
           node-version: '22.12.0'
           cache: npm
+      - name: Apply pipeline status update
+        run: node scripts/patch-pipeline-statuses.mjs
       - name: Install dependencies
         run: npm ci
       - name: Run checks
         run: npm run check
+      - name: Commit pipeline update
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "Update Fuply pipeline statuses"
+          git push
