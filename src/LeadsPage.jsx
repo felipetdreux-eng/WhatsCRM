@@ -37,6 +37,12 @@ const pretty = value => {
 };
 const full = value => noon(value).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '');
 const statusClass = status => status.toLowerCase().replaceAll(' ', '-');
+const markSelectValue = lead => {
+  if (!lead?.nextContact) return '';
+  const days = diff(lead.nextContact);
+  if ([0, 1, 3, 7].includes(days)) return String(days);
+  return 'scheduled';
+};
 
 function TemperatureBadge({ lead }) {
   const temperature = getLeadTemperature(lead);
@@ -165,7 +171,6 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
 
   const handleMarkFor = (event, lead) => {
     const value = event.target.value;
-    event.target.value = '';
     if (!value) return;
     if (value === 'custom') {
       openReschedule(lead);
@@ -251,8 +256,10 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
                 <td>{lead.nextAction || '—'}</td>
                 <td onClick={event => event.stopPropagation()}><div className="lead-row-actions">
                   <button type="button" className="leads-whatsapp" onClick={() => openWhatsApp(lead)} title="Abrir WhatsApp" aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
-                  {!CLOSED.includes(lead.status) && <select className="lead-mark-for" defaultValue="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
+                  {!CLOSED.includes(lead.status) && <select className="lead-mark-for" value={markSelectValue(lead)} onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
                     <option value="" disabled>Marcar para</option>
+                <option value="scheduled" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : 'Marcado'}</option>
+                    <option value="scheduled" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : 'Marcado'}</option>
                     <option value="0">Hoje</option>
                     <option value="1">Amanhã</option>
                     <option value="3">+3 dias</option>
@@ -273,7 +280,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
             <div className="lead-directory-card-meta"><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
             <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
-              {!CLOSED.includes(lead.status) && <select className="lead-mark-for mobile-mark-for" defaultValue="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
+              {!CLOSED.includes(lead.status) && <select className="lead-mark-for mobile-mark-for" value={markSelectValue(lead)} onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
                 <option value="" disabled>Marcar para</option>
                 <option value="0">Hoje</option>
                 <option value="1">Amanhã</option>
