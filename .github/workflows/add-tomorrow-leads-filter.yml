@@ -1,0 +1,77 @@
+name: Add tomorrow leads filter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-tomorrow-leads-filter.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch Leads filters
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/LeadsPage.jsx')
+          text = p.read_text()
+
+          text = text.replace(
+            "const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];",
+            "const SCOPES = ['Todos', 'Hoje', 'Amanhã', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];",
+            1,
+          )
+
+          text = text.replace(
+            "  if (scope === 'Hoje') return days === 0;\n  if (scope === 'Atrasados') return days < 0;",
+            "  if (scope === 'Hoje') return days === 0;\n  if (scope === 'Amanhã') return days === 1;\n  if (scope === 'Atrasados') return days < 0;",
+            1,
+          )
+
+          text = text.replace(
+            "      today: dated.filter(lead => diff(lead.nextContact) === 0),\n      week: dated.filter(lead => diff(lead.nextContact) > 0 && diff(lead.nextContact) <= 7),",
+            "      today: dated.filter(lead => diff(lead.nextContact) === 0),\n      tomorrow: dated.filter(lead => diff(lead.nextContact) === 1),\n      week: dated.filter(lead => diff(lead.nextContact) > 0 && diff(lead.nextContact) <= 7),",
+            1,
+          )
+
+          old = "        <button type=\"button\" className={`today ${scope === 'Hoje' ? 'active' : ''}`} onClick={() => setScope(scope === 'Hoje' ? 'Todos' : 'Hoje')}><CalendarClock size={18} /><span>Para hoje<strong>{summary.today.length}</strong></span></button>\n        <button type=\"button\" className={`upcoming ${scope === 'Próx. 7 dias' ? 'active' : ''}`}"
+          new = "        <button type=\"button\" className={`today ${scope === 'Hoje' ? 'active' : ''}`} onClick={() => setScope(scope === 'Hoje' ? 'Todos' : 'Hoje')}><CalendarClock size={18} /><span>Para hoje<strong>{summary.today.length}</strong></span></button>\n        <button type=\"button\" className={`tomorrow ${scope === 'Amanhã' ? 'active' : ''}`} onClick={() => setScope(scope === 'Amanhã' ? 'Todos' : 'Amanhã')}><Clock3 size={18} /><span>Amanhã<strong>{summary.tomorrow.length}</strong></span></button>\n        <button type=\"button\" className={`upcoming ${scope === 'Próx. 7 dias' ? 'active' : ''}`}"
+          if old not in text:
+            raise SystemExit('Leads summary anchor not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          css = Path('src/leads-integrated.css')
+          css_text = css.read_text()
+          css_text = css_text.replace(
+            '.leads-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));',
+            '.leads-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));',
+            1,
+          )
+          css_text = css_text.replace(
+            '.leads-summary button.today svg{color:#12875a}.leads-summary button.upcoming svg{color:#2f80ed}',
+            '.leads-summary button.today svg{color:#12875a}.leads-summary button.tomorrow svg{color:#0f9f8c}.leads-summary button.upcoming svg{color:#2f80ed}',
+            1,
+          )
+          css.write_text(css_text)
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/LeadsPage.jsx src/leads-integrated.css
+          git commit -m "Add tomorrow quick filter to Leads"
+          git push origin main
