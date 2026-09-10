@@ -31,7 +31,7 @@ import LeadHistory from './LeadHistory';
 import Messages from './Messages';
 import SettingsPage from './SettingsPage';
 import { getActiveAccount, logoutAccount } from './accountStorage';
-import { recordLeadActivity, syncLeads } from './backendBridge';
+import { loadWorkspaceContext, recordLeadActivity, syncLeads } from './backendBridge';
 import {
   buildDemoLeads,
   canonicalPhone,
@@ -45,6 +45,7 @@ import './styles.css';
 import './detail.css';
 import './account.css';
 import './followup.css';
+import './team-leads.css';
 
 const ACTIVE_ACCOUNT = getActiveAccount();
 const CLOSED = ['Vendido', 'Perdido'];
@@ -74,7 +75,7 @@ const NAV_ITEMS = [
 ];
 
 const EMPTY_FORM = {
-  name: '', company: '', phone: '', value: '', status: 'Novo lead', origin: 'Google Maps',
+  name: '', company: '', phone: '', value: '', status: 'Novo lead', origin: 'Google Maps', assignedTo: '',
   nextContact: '', nextContactTime: '', nextAction: '', notes: '',
 };
 
@@ -122,6 +123,7 @@ function migrateLead(rawLead) {
     value,
     status,
     origin: lead.origin || 'Outro',
+    assignedTo: lead.assignedTo || null,
     nextContact: lead.nextContact || '',
     nextContactTime: lead.nextContactTime || '',
     nextAction: lead.nextAction || '',
@@ -201,9 +203,11 @@ export default function App() {
       return migrateLeads(buildDemoLeads());
     }
   });
+  const [teamMembers, setTeamMembers] = useState([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [originFilter, setOriginFilter] = useState('Todas');
+  const [assigneeFilter, setAssigneeFilter] = useState('Todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [draggedId, setDraggedId] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
@@ -221,16 +225,30 @@ export default function App() {
     localStorage.setItem('zapflow-leads', JSON.stringify(leads));
   }, [leads]);
 
+  useEffect(() => {
+    let active = true;
+    if (!account?.id) return undefined;
+    loadWorkspaceContext(account.id)
+      .then(context => {
+        if (!active) return;
+        setTeamMembers(context?.members || []);
+      })
+      .catch(error => console.error('Team members load failed:', error));
+    return () => { active = false; };
+  }, [account?.id]);
+
   const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
   const accountName = account?.name || 'Usuário';
   const accountGoal = GOAL_LABELS[account?.onboarding?.goal] || 'Plano gratuito';
+  const memberName = userId => teamMembers.find(member => member.user_id === userId)?.name || (userId === account?.id ? accountName : 'Sem responsável');
 
   const filteredLeads = useMemo(() => leads.filter(lead => {
     const haystack = `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.notes || ''} ${lead.nextAction || ''}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase())
       && (statusFilter === 'Todos' || lead.status === statusFilter)
-      && (originFilter === 'Todas' || lead.origin === originFilter);
-  }), [leads, query, statusFilter, originFilter]);
+      && (originFilter === 'Todas' || lead.origin === originFilter)
+      && (assigneeFilter === 'Todos' || lead.assignedTo === assigneeFilter);
+  }), [leads, query, statusFilter, originFilter, assigneeFilter]);
 
   const dueFollowups = leads.filter(lead => lead.nextContact && !CLOSED.includes(lead.status) && lead.nextContact <= localDateKey()).length;
 
@@ -266,7 +284,7 @@ export default function App() {
   };
 
   const openNewLead = (status = 'Novo lead') => {
-    setForm({ ...EMPTY_FORM, status: OPEN_STATUSES.some(item => item.id === status) ? status : 'Novo lead' });
+    setForm({ ...EMPTY_FORM, status: OPEN_STATUSES.some(item => item.id === status) ? status : 'Novo lead', assignedTo: account?.id || '' });
     setFormError('');
     setModalOpen(true);
   };
@@ -447,6 +465,7 @@ export default function App() {
     const next = {
       id: crypto.randomUUID(),
       ...form,
+      assignedTo: form.assignedTo || account?.id || null,
       name: form.name.trim(),
       company: form.company.trim(),
       status: CLOSED.includes(form.status) ? 'Novo lead' : form.status,
@@ -467,7 +486,7 @@ export default function App() {
 
     if (account?.id) {
       syncLeads([next], account.id)
-        .then(() => logActivity(next, 'lead_created', 'Lead criado', `${next.status} · ${next.origin || 'Outro'}.`, { status: next.status, origin: next.origin }))
+        .then(() => logActivity(next, 'lead_created', 'Lead criado', `${next.status} · ${next.origin || 'Outro'} · Responsável: ${memberName(next.assignedTo)}.`, { status: next.status, origin: next.origin, assignedTo: next.assignedTo }))
         .catch(error => console.error('New lead initial sync failed:', error));
     }
   };
@@ -481,7 +500,7 @@ export default function App() {
   const startEditing = () => {
     if (!selectedLead) return;
     setFormError('');
-    setEditingLead({ ...selectedLead, value: selectedLead.value ?? '', saleValue: selectedLead.saleValue ?? '' });
+    setEditingLead({ ...selectedLead, assignedTo: selectedLead.assignedTo || account?.id || '', value: selectedLead.value ?? '', saleValue: selectedLead.saleValue ?? '' });
   };
 
   const saveLead = event => {
@@ -497,6 +516,7 @@ export default function App() {
     const previous = selectedLead;
     const draft = {
       ...editingLead,
+      assignedTo: editingLead.assignedTo || account?.id || null,
       name: editingLead.name.trim(),
       company: String(editingLead.company || '').trim(),
       phone: canonicalPhone(editingLead.phone),
@@ -511,6 +531,8 @@ export default function App() {
       } else {
         logActivity(previous, 'status_changed', `Status alterado para ${next.status}`, `Antes: ${previous.status}.`, { from: previous.status, to: next.status });
       }
+    } else if (previous.assignedTo !== next.assignedTo) {
+      logActivity(previous, 'lead_reassigned', 'Responsável alterado', `${memberName(previous.assignedTo)} → ${memberName(next.assignedTo)}.`, { from: previous.assignedTo || null, to: next.assignedTo || null });
     } else if (previous.nextContact !== next.nextContact || previous.nextContactTime !== next.nextContactTime || previous.nextAction !== next.nextAction) {
       logActivity(previous, 'followup_scheduled', next.nextContact ? 'Próximo contato atualizado' : 'Próximo contato removido', next.nextContact ? `${formatDate(next.nextContact, true)}${next.nextContactTime ? ` às ${next.nextContactTime}` : ''} · ${next.nextAction || 'Retornar contato'}` : 'O lead ficou sem próximo contato marcado.');
     } else {
@@ -603,6 +625,7 @@ export default function App() {
               <label><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
               {editingLead.status === 'Vendido' && <label><span>Valor vendido *</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></label>}
               <label><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
+              <label><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
               <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={editingLead.nextContact || ''} onChange={e => setEditingLead({ ...editingLead, nextContact: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
               <label><span>Horário</span><input type="time" value={editingLead.nextContactTime || ''} onChange={e => setEditingLead({ ...editingLead, nextContactTime: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
               <label className="full"><span>Próxima ação</span><input value={editingLead.nextAction || ''} onChange={e => setEditingLead({ ...editingLead, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" disabled={CLOSED.includes(editingLead.status)} /></label>
@@ -627,6 +650,7 @@ export default function App() {
                   {selectedLead.status === 'Vendido' && <div className="info-item"><CheckCircle2 size={18} /><div><span>Valor vendido</span><strong>{currency(selectedLead.saleValue)}</strong></div></div>}
                   <div className="info-item"><Target size={18} /><div><span>Status</span><strong>{selectedLead.status}</strong></div></div>
                   <div className="info-item"><MapPin size={18} /><div><span>Origem</span><strong>{selectedLead.origin || 'Não informado'}</strong></div></div>
+                  <div className="info-item"><UsersRound size={18} /><div><span>Responsável</span><strong>{memberName(selectedLead.assignedTo)}</strong></div></div>
                 </div>
               </section>
 
@@ -676,6 +700,7 @@ export default function App() {
           <label className="search-box"><Search size={17} /><span className="sr-only">Buscar clientes</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar clientes" /></label>
           <label className="filter-control"><Filter size={16} /><span className="sr-only">Filtrar por status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrar por status"><option>Todos</option>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
           <label className="filter-control hide-tablet"><span className="sr-only">Filtrar por origem</span><select value={originFilter} onChange={e => setOriginFilter(e.target.value)} aria-label="Filtrar por origem"><option>Todas</option>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
+          {teamMembers.length > 1 && <label className="filter-control team-filter"><UsersRound size={16} /><span className="sr-only">Filtrar por responsável</span><select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} aria-label="Filtrar por responsável"><option value="Todos">Todos da equipe</option>{teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.user_id === account?.id ? 'Meus leads' : member.name}</option>)}</select></label>}
           <button type="button" className="primary-button" onClick={() => openNewLead()}><Plus size={18} /> Novo lead</button>
         </div>
       </header>
@@ -702,6 +727,7 @@ export default function App() {
                     <article className="lead-card" key={lead.id} draggable onDragStart={() => setDraggedId(lead.id)} onDragEnd={() => setDraggedId(null)} onClick={() => openLead(lead)}>
                       <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div><button type="button" className="icon-button" aria-label={`Abrir ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button></div>
                       <b className="lead-value">{currency(status.id === 'Vendido' ? lead.saleValue : lead.value)}</b>
+                      {teamMembers.length > 1 && <div className="lead-assignee"><UserRound size={13} /><span>{memberName(lead.assignedTo)}</span></div>}
                       <label className="mobile-status-control" onClick={e => e.stopPropagation()}>
                         <span>Status</span>
                         <select value={lead.status} onChange={e => requestStatusChange(lead.id, e.target.value)} aria-label={`Alterar status de ${lead.name}`}>
@@ -752,6 +778,7 @@ export default function App() {
               <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="350,00" /></label>
               <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{OPEN_STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
               <label><span>Origem</span><select value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
+              <label><span>Responsável</span><select value={form.assignedTo || account?.id || ''} onChange={e => setForm({ ...form, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
               <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={form.nextContact} onChange={e => setForm({ ...form, nextContact: e.target.value })} /></label>
               <label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e => setForm({ ...form, nextContactTime: e.target.value })} /></label>
               <label className="full"><span>Próxima ação</span><input value={form.nextAction} onChange={e => setForm({ ...form, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" /></label>
