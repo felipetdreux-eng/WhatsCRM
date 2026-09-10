@@ -625,28 +625,58 @@ export default function App() {
         </section>
 
         {editingLead ? (
-          <section className="detail-card edit-card">
-            <div className="section-heading"><div><h2>Editar cliente</h2><p>Atualize as informações e salve.</p></div></div>
-            <form className="lead-form detail-edit-form" onSubmit={saveLead}>
-              <label><span>Nome *</span><input required value={editingLead.name} onChange={e => setEditingLead({ ...editingLead, name: e.target.value })} /></label>
-              <label><span>WhatsApp *</span><input required inputMode="tel" value={editingLead.phone} onChange={e => setEditingLead({ ...editingLead, phone: e.target.value })} /></label>
-              <label><span>Empresa</span><input value={editingLead.company || ''} onChange={e => setEditingLead({ ...editingLead, company: e.target.value })} /></label>
-              <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></label>
-              <label><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
-              {editingLead.status === 'Vendido' && <label><span>Valor vendido *</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></label>}
-              <label><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
-              <label><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
-              <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={editingLead.nextContact || ''} onChange={e => setEditingLead({ ...editingLead, nextContact: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
-              <label><span>Horário</span><input type="time" value={editingLead.nextContactTime || ''} onChange={e => setEditingLead({ ...editingLead, nextContactTime: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
-              <label className="full"><span>Próxima ação</span><input value={editingLead.nextAction || ''} onChange={e => setEditingLead({ ...editingLead, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" disabled={CLOSED.includes(editingLead.status)} /></label>
-              <label className="full"><span>Observações</span><textarea value={editingLead.notes || ''} onChange={e => setEditingLead({ ...editingLead, notes: e.target.value })} /></label>
-              {formError && <div className="auth-error full" role="alert">{formError}</div>}
-              <div className="modal-actions full">
-                <button type="button" className="secondary-button" onClick={() => { setEditingLead(null); setFormError(''); }}>Cancelar</button>
-                <button className="primary-button"><Save size={16} /> Salvar alterações</button>
-              </div>
-            </form>
-          </section>
+          <form className="detail-grid inline-detail-edit" onSubmit={saveLead}>
+            <div className="detail-main-column">
+              <section className="detail-card info-edit-card">
+                <div className="section-heading inline-section-heading">
+                  <div><h2>Informações</h2><p>Edite os dados diretamente aqui.</p></div>
+                  <div className="inline-edit-actions">
+                    <button type="button" className="secondary-button" onClick={() => { setEditingLead(null); setFormError(''); }}>Cancelar</button>
+                    <button className="primary-button"><Save size={16} /> Salvar</button>
+                  </div>
+                </div>
+                <div className="info-grid editable-info-grid">
+                  <label className="info-item info-edit-item"><UserRound size={18} /><div><span>Nome</span><input required value={editingLead.name} onChange={e => setEditingLead({ ...editingLead, name: e.target.value })} /></div></label>
+                  <label className="info-item info-edit-item"><Building2 size={18} /><div><span>Empresa</span><input value={editingLead.company || ''} onChange={e => setEditingLead({ ...editingLead, company: e.target.value })} placeholder="Não informado" /></div></label>
+                  <label className="info-item info-edit-item"><Phone size={18} /><div><span>WhatsApp</span><input required inputMode="tel" value={editingLead.phone} onChange={e => setEditingLead({ ...editingLead, phone: e.target.value })} /></div></label>
+                  <label className="info-item info-edit-item"><CircleDollarSign size={18} /><div><span>Valor potencial</span><input type="number" min="0" step="0.01" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></div></label>
+                  <label className="info-item info-edit-item"><Target size={18} /><div><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></div></label>
+                  {editingLead.status === 'Vendido' && <label className="info-item info-edit-item"><CheckCircle2 size={18} /><div><span>Valor vendido</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></div></label>}
+                  <label className="info-item info-edit-item"><MapPin size={18} /><div><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></div></label>
+                  <label className="info-item info-edit-item"><UsersRound size={18} /><div><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></div></label>
+                </div>
+                {formError && <div className="auth-error inline-edit-error" role="alert">{formError}</div>}
+              </section>
+
+              <section className="detail-card">
+                <div className="section-heading"><div><h2>Observações</h2><p>Contexto importante da conversa.</p></div></div>
+                <textarea className="inline-notes-editor" value={editingLead.notes || ''} onChange={e => setEditingLead({ ...editingLead, notes: e.target.value })} placeholder="Adicione observações sobre este lead..." />
+              </section>
+
+              <LeadHistory userId={account?.id} leadId={selectedLead.id} />
+            </div>
+
+            <aside className="detail-side-column">
+              <section className="detail-card next-action-card">
+                <div className="section-heading"><div><h2>Próxima ação</h2><p>Edite o próximo passo sem sair desta tela.</p></div></div>
+                <div className="inline-next-form">
+                  <label><span>Data</span><input type="date" min={localDateKey()} value={editingLead.nextContact || ''} onChange={e => setEditingLead({ ...editingLead, nextContact: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
+                  <label><span>Horário</span><input type="time" value={editingLead.nextContactTime || ''} onChange={e => setEditingLead({ ...editingLead, nextContactTime: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
+                  <label className="full"><span>Ação</span><input value={editingLead.nextAction || ''} onChange={e => setEditingLead({ ...editingLead, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" disabled={CLOSED.includes(editingLead.status)} /></label>
+                  {CLOSED.includes(editingLead.status) && <small>Leads vendidos ou perdidos não precisam de próximo contato.</small>}
+                </div>
+              </section>
+
+              <section className="detail-card">
+                <div className="section-heading"><div><h2>Ações</h2><p>Salve antes de avançar a negociação.</p></div></div>
+                <div className="detail-actions-stack">
+                  <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
+                  <button type="submit" className="detail-action sold-action"><Save size={17} /> Salvar alterações</button>
+                  <button type="button" className="detail-action" onClick={() => { setEditingLead(null); setFormError(''); }}><X size={17} /> Cancelar edição</button>
+                </div>
+              </section>
+            </aside>
+          </form>
         ) : (
           <div className="detail-grid">
             <div className="detail-main-column">
