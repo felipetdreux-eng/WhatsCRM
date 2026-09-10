@@ -29,6 +29,8 @@ test('normaliza valores, datas e status de planilhas reais', () => {
   assert.equal(normalizeDate('09/09/2026'), '2026-09-09');
   assert.equal(normalizeStatus('Orçamento enviado'), 'Proposta enviada');
   assert.equal(normalizeStatus('Pago'), 'Vendido');
+  assert.equal(normalizeStatus('NAO RESPONDIDO'), 'Contatado');
+  assert.equal(normalizeStatus('DESCARTADO'), 'Perdido');
 });
 
 test('une WhatsApps repetidos e reconhece cliente existente', () => {
@@ -49,4 +51,33 @@ test('une WhatsApps repetidos e reconhece cliente existente', () => {
   assert.equal(ana.lead.value, 650);
   assert.match(ana.lead.notes, /Landing page/);
   assert.match(ana.lead.notes, /Também pediu logo/);
+});
+
+test('reconstrói PDF sem cabeçalho com nome, telefone e status misturados', () => {
+  const headers = ['Atelier da Beleza — WhatsApp: (21) 98939-7763', 'NAO RESPONDIDO'];
+  const rows = [
+    ['REFLECT BEAUTY STUDIO — WhatsApp: (21) 3173-7477', 'DESCARTADO'],
+    ['Clínica de Estética Taila Coutinho'],
+    ['(21) 99680-1994'],
+    ['Nail Designer – Leticia Vieira (21) 99156-1468'],
+  ];
+  const mapping = detectMapping(headers);
+  const result = analyzeImport({ headers, rows, mapping, existingLeads: [] });
+
+  assert.equal(mapping.name, 0);
+  assert.equal(mapping.phone, 0);
+  assert.equal(result.stats.create, 4);
+  assert.equal(result.stats.errors, 0);
+  assert.deepEqual(result.records.map(record => record.lead.name), [
+    'Atelier da Beleza',
+    'REFLECT BEAUTY STUDIO',
+    'Clínica de Estética Taila Coutinho',
+    'Nail Designer – Leticia Vieira',
+  ]);
+  assert.deepEqual(result.records.map(record => record.lead.status), [
+    'Contatado',
+    'Perdido',
+    'Novo lead',
+    'Novo lead',
+  ]);
 });
