@@ -1,0 +1,65 @@
+name: Add team dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-team-dashboard.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch dashboard wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('src/Dashboard.jsx')
+          text = dashboard.read_text()
+          old_import = "import { buildCoolingWatchlist } from './leadTemperature';\nimport './dashboard.css';"
+          new_import = "import { buildCoolingWatchlist } from './leadTemperature';\nimport TeamDashboard from './TeamDashboard';\nimport './dashboard.css';"
+          if old_import not in text:
+              raise SystemExit('Dashboard import anchor not found')
+          text = text.replace(old_import, new_import, 1)
+
+          old_sig = "export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps }) {"
+          new_sig = "export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps, teamMembers = [], currentUserId = null }) {"
+          if old_sig not in text:
+              raise SystemExit('Dashboard function signature not found')
+          text = text.replace(old_sig, new_sig, 1)
+
+          header_end = '''      </header>\n\n      <section className="autopilot-dashboard" aria-label="Autopilot de vendas">'''
+          header_new = '''      </header>\n\n      <TeamDashboard leads={leads} members={teamMembers} currentUserId={currentUserId} />\n\n      <section className="autopilot-dashboard" aria-label="Autopilot de vendas">'''
+          if header_end not in text:
+              raise SystemExit('Dashboard header anchor not found')
+          text = text.replace(header_end, header_new, 1)
+          dashboard.write_text(text)
+
+          app = Path('src/App.jsx')
+          app_text = app.read_text()
+          old_dashboard = "if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;"
+          new_dashboard = "if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} teamMembers={teamMembers} currentUserId={account?.id || null} />;"
+          if old_dashboard not in app_text:
+              raise SystemExit('App Dashboard render anchor not found')
+          app_text = app_text.replace(old_dashboard, new_dashboard, 1)
+          app.write_text(app_text)
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit team dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Dashboard.jsx src/App.jsx
+          git commit -m "Wire team dashboard into Fuply"
+          git push origin main
