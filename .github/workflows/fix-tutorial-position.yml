@@ -1,0 +1,32 @@
+name: Fix tutorial position
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-tutorial-position.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply patch
+        run: python scripts/fix_tutorial_position.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Tutorial.jsx
+          git commit -m "Keep tutorial card fixed near top"
+          git push origin main
