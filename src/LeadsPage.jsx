@@ -21,7 +21,7 @@ import './leads.css';
 
 const CLOSED = ['Fechado', 'Perdido'];
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
-const SCOPES = ['Todos', 'Hoje', 'Amanhã', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
+const SCOPES = ['Todos', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const noon = value => new Date(`${value}T12:00:00`);
@@ -52,7 +52,6 @@ function inScope(lead, scope) {
   if (scope === 'Sem próximo contato') return !lead.nextContact && !closed;
   if (closed || !lead.nextContact) return false;
   if (scope === 'Hoje') return days === 0;
-  if (scope === 'Amanhã') return days === 1;
   if (scope === 'Atrasados') return days < 0;
   if (scope === 'Próx. 7 dias') return days > 0 && days <= 7;
   return true;
@@ -73,7 +72,6 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     return {
       overdue: dated.filter(lead => diff(lead.nextContact) < 0),
       today: dated.filter(lead => diff(lead.nextContact) === 0),
-      tomorrow: dated.filter(lead => diff(lead.nextContact) === 1),
       week: dated.filter(lead => diff(lead.nextContact) > 0 && diff(lead.nextContact) <= 7),
       without: active.filter(lead => !lead.nextContact),
       cooling: buildCoolingWatchlist(active, { limit: Math.max(1, active.length) }),
@@ -141,6 +139,41 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     setSchedule({ date: lead.nextContact || today(), time: lead.nextContactTime || '', action: lead.nextAction || 'Retornar contato' });
   };
 
+  const markFor = (lead, days) => {
+    if (!lead || CLOSED.includes(lead.status)) return;
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + days);
+    const nextContact = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const action = lead.nextAction || 'Retornar contato';
+    const now = new Date().toISOString();
+    setLeads(current => current.map(item => item.id === lead.id ? {
+      ...item,
+      nextContact,
+      nextAction: action,
+      updatedAt: now,
+    } : item));
+    onActivity?.(
+      lead,
+      'followup_scheduled',
+      lead.nextContact ? 'Follow-up reagendado' : 'Follow-up marcado',
+      `${full(nextContact)} · ${action}`,
+      { date: nextContact, time: lead.nextContactTime || '', action },
+    );
+    flash(`${lead.name} marcado para ${pretty(nextContact).toLowerCase()}.`);
+  };
+
+  const handleMarkFor = (event, lead) => {
+    const value = event.target.value;
+    event.target.value = '';
+    if (!value) return;
+    if (value === 'custom') {
+      openReschedule(lead);
+      return;
+    }
+    markFor(lead, Number(value));
+  };
+
   const quick = days => {
     const date = new Date();
     date.setHours(12, 0, 0, 0);
@@ -192,7 +225,6 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       <section className="leads-summary">
         <button type="button" className={`critical ${scope === 'Atrasados' ? 'active' : ''}`} onClick={() => setScope(scope === 'Atrasados' ? 'Todos' : 'Atrasados')}><AlertTriangle size={18} /><span>Atrasados<strong>{summary.overdue.length}</strong></span></button>
         <button type="button" className={`today ${scope === 'Hoje' ? 'active' : ''}`} onClick={() => setScope(scope === 'Hoje' ? 'Todos' : 'Hoje')}><CalendarClock size={18} /><span>Para hoje<strong>{summary.today.length}</strong></span></button>
-        <button type="button" className={`tomorrow ${scope === 'Amanhã' ? 'active' : ''}`} onClick={() => setScope(scope === 'Amanhã' ? 'Todos' : 'Amanhã')}><Clock3 size={18} /><span>Amanhã<strong>{summary.tomorrow.length}</strong></span></button>
         <button type="button" className={`upcoming ${scope === 'Próx. 7 dias' ? 'active' : ''}`} onClick={() => setScope(scope === 'Próx. 7 dias' ? 'Todos' : 'Próx. 7 dias')}><Clock3 size={18} /><span>Próx. 7 dias<strong>{summary.week.length}</strong></span></button>
         <button type="button" className={`missing ${scope === 'Sem próximo contato' ? 'active' : ''}`} onClick={() => setScope(scope === 'Sem próximo contato' ? 'Todos' : 'Sem próximo contato')}><Target size={18} /><span>Sem próximo contato<strong>{summary.without.length}</strong></span></button>
         <button type="button" className={`cooling ${scope === 'Esfriando' ? 'active' : ''}`} onClick={() => setScope(scope === 'Esfriando' ? 'Todos' : 'Esfriando')}><Snowflake size={18} /><span>Esfriando<strong>{summary.cooling.length}</strong></span></button>
@@ -219,7 +251,14 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
                 <td>{lead.nextAction || '—'}</td>
                 <td onClick={event => event.stopPropagation()}><div className="lead-row-actions">
                   <button type="button" className="leads-whatsapp" onClick={() => openWhatsApp(lead)} title="Abrir WhatsApp" aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
-                  {!CLOSED.includes(lead.status) && <button type="button" className="lead-mini-action" onClick={() => openReschedule(lead)} title="Reagendar" aria-label={`Reagendar ${lead.name}`}><RefreshCw size={15} /></button>}
+                  {!CLOSED.includes(lead.status) && <select className="lead-mark-for" defaultValue="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
+                    <option value="" disabled>Marcar para</option>
+                    <option value="0">Hoje</option>
+                    <option value="1">Amanhã</option>
+                    <option value="3">+3 dias</option>
+                    <option value="7">+7 dias</option>
+                    <option value="custom">Escolher data…</option>
+                  </select>}
                   {lead.nextContact && !CLOSED.includes(lead.status) && <button type="button" className="lead-mini-action done" onClick={() => complete(lead)} title="Concluir follow-up" aria-label={`Concluir follow-up de ${lead.name}`}><Check size={15} /></button>}
                   <button type="button" className="lead-open-button" onClick={() => openLead(lead)} aria-label={`Abrir ${lead.name}`}><ChevronRight size={16} /></button>
                 </div></td>
@@ -234,7 +273,14 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
             <div className="lead-directory-card-meta"><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
             <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
-              {!CLOSED.includes(lead.status) && <button type="button" className="mobile-open" onClick={() => openReschedule(lead)} aria-label={`Reagendar ${lead.name}`}><RefreshCw size={15} /></button>}
+              {!CLOSED.includes(lead.status) && <select className="lead-mark-for mobile-mark-for" defaultValue="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
+                <option value="" disabled>Marcar para</option>
+                <option value="0">Hoje</option>
+                <option value="1">Amanhã</option>
+                <option value="3">+3 dias</option>
+                <option value="7">+7 dias</option>
+                <option value="custom">Escolher data…</option>
+              </select>}
               {lead.nextContact && !CLOSED.includes(lead.status) && <button type="button" className="mobile-open" onClick={() => complete(lead)} aria-label={`Concluir follow-up de ${lead.name}`}><Check size={15} /></button>}
               <button type="button" className="mobile-open" onClick={() => openLead(lead)} aria-label={`Abrir ${lead.name}`}><ChevronRight size={15} /></button>
             </div></div>
@@ -247,13 +293,13 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       {rescheduling && (
         <div className="modal-backdrop" onMouseDown={() => setRescheduling(null)}>
           <section className="modal reschedule-modal" role="dialog" aria-modal="true" aria-labelledby="reschedule-title" onMouseDown={event => event.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="reschedule-title">Reagendar follow-up</h2><p>{rescheduling.name} · {rescheduling.company || 'Sem empresa'}</p></div><button type="button" className="icon-button" onClick={() => setRescheduling(null)} aria-label="Fechar"><X size={20} /></button></div>
-            <div className="quick-dates"><span>Atalhos</span><button type="button" onClick={() => quick(1)}>Amanhã</button><button type="button" onClick={() => quick(3)}>+3 dias</button><button type="button" onClick={() => quick(7)}>+7 dias</button></div>
+            <div className="modal-header"><div><h2 id="reschedule-title">Marcar para</h2><p>{rescheduling.name} · {rescheduling.company || 'Sem empresa'}</p></div><button type="button" className="icon-button" onClick={() => setRescheduling(null)} aria-label="Fechar"><X size={20} /></button></div>
+            <div className="quick-dates"><span>Atalhos</span><button type="button" onClick={() => quick(0)}>Hoje</button><button type="button" onClick={() => quick(1)}>Amanhã</button><button type="button" onClick={() => quick(3)}>+3 dias</button><button type="button" onClick={() => quick(7)}>+7 dias</button></div>
             <form className="lead-form" onSubmit={save}>
               <label><span>Data *</span><input required type="date" min={today()} value={schedule.date} onChange={event => setSchedule({ ...schedule, date: event.target.value })} /></label>
               <label><span>Horário</span><input type="time" value={schedule.time} onChange={event => setSchedule({ ...schedule, time: event.target.value })} /></label>
               <label className="full"><span>Próxima ação</span><input value={schedule.action} onChange={event => setSchedule({ ...schedule, action: event.target.value })} /></label>
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => setRescheduling(null)}>Cancelar</button><button className="primary-button"><RefreshCw size={16} /> Reagendar</button></div>
+              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => setRescheduling(null)}>Cancelar</button><button className="primary-button"><CalendarClock size={16} /> Salvar marcação</button></div>
             </form>
           </section>
         </div>
