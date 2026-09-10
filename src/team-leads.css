@@ -1,0 +1,35 @@
+.lead-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 7px 0 2px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(22, 163, 106, 0.08);
+  color: #157a55;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lead-assignee span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-filter {
+  min-width: 145px;
+}
+
+[data-theme='dark'] .lead-assignee {
+  background: rgba(58, 210, 148, 0.12);
+  color: #70dfb2;
+}
+
+@media (max-width: 980px) {
+  .team-filter {
+    min-width: 0;
+  }
+}
