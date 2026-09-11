@@ -31,3 +31,4 @@ jobs:
             git commit -m "Add smart lead prioritization UI"
             git push
           fi
+# trigger smart-leads patch
