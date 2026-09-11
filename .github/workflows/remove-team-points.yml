@@ -1,0 +1,61 @@
+name: Remove team points system
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/remove-team-points.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Remove team points dashboard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('src/Dashboard.jsx')
+          text = dashboard.read_text()
+
+          text = text.replace("import TeamDashboard from './TeamDashboard';\n", '', 1)
+          text = text.replace(
+              "export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps, teamMembers = [], currentUserId = null }) {",
+              "export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps }) {",
+              1,
+          )
+          text = text.replace("\n      <TeamDashboard leads={leads} members={teamMembers} currentUserId={currentUserId} />\n", '', 1)
+          dashboard.write_text(text)
+
+          app = Path('src/App.jsx')
+          app_text = app.read_text()
+          app_text = app_text.replace(
+              "if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} teamMembers={teamMembers} currentUserId={account?.id || null} />;",
+              "if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;",
+              1,
+          )
+          app.write_text(app_text)
+
+          for file_name in ('src/TeamDashboard.jsx', 'src/team-dashboard.css'):
+              path = Path(file_name)
+              if path.exists():
+                  path.unlink()
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit removal
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Remove team points system"
+          git push origin main
