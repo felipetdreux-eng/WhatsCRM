@@ -1,0 +1,33 @@
+name: Fix dark mode
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix_dark_mode.py'
+      - '.github/workflows/fix-dark-mode.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply dark mode fixes
+        run: python scripts/fix_dark_mode.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Run checks
+        run: npm run check
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main.jsx src/daily-pages.css
+          git commit -m "Fix dark mode on daily pages" || exit 0
+          git push origin main
