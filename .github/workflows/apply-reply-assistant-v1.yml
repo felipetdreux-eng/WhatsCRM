@@ -1,0 +1,33 @@
+name: Apply reply assistant V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-reply-assistant-v1.yml'
+      - 'scripts/add_reply_assistant_v1.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-reply-assistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply reply assistant V1
+        run: python scripts/add_reply_assistant_v1.py
+      - name: Commit reply assistant V1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Wire reply assistant V1 into lead detail"
+            git push
+          fi
