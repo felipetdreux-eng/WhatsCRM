@@ -1,0 +1,33 @@
+name: Apply duplicate leads
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-duplicate-leads.yml'
+      - 'scripts/add_duplicate_leads.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply duplicate lead UI
+        run: python scripts/add_duplicate_leads.py
+      - name: Commit duplicate lead UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/LeadsPage.jsx src/leads-integrated.css
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add duplicate lead identification"
+            git push
+          fi
