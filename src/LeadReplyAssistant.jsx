@@ -87,6 +87,14 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
     }
   };
 
+  const engineLabel = result?.source === 'openai'
+    ? `IA ativa${result?.model ? ` · ${result.model}` : ''}`
+    : result?.aiConfigured === false
+      ? 'IA aguardando configuração'
+      : result
+        ? 'Fallback automático'
+        : '';
+
   if (!open) {
     return (
       <section className="detail-card reply-assistant-collapsed">
@@ -124,7 +132,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
           />
         </label>
         <div className="reply-assistant-form-footer">
-          <small>V1 backend: análise processada com segurança pelo Supabase.</small>
+          <small>A análise usa o contexto deste lead e nunca envia a mensagem sem sua aprovação.</small>
           <button type="submit" disabled={!message.trim() || loading}>
             {loading ? <LoaderCircle className="reply-assistant-spinner" size={15} /> : <Sparkles size={15} />}
             {loading ? 'Analisando...' : 'Analisar mensagem'}
@@ -135,6 +143,9 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
 
       {result && (
         <div className="reply-assistant-result">
+          <div className={`reply-engine-badge ${result.source === 'openai' ? 'active' : 'fallback'}`}>
+            <Sparkles size={12} /> {engineLabel}
+          </div>
           <div className="reply-analysis-grid">
             <article><span>Objeção detectada</span><strong>{result.objection}</strong></article>
             <article><span>Intenção provável</span><strong>{result.intent}</strong></article>
@@ -159,7 +170,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
 
           <div className="reply-actions">
             <button type="button" className="reply-copy" onClick={copyReply}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Copiado' : 'Copiar'}</button>
-            <button type="button" className="reply-whatsapp" onClick={() => openWhatsApp?.(lead, reply, { source: 'reply-assistant-edge-v1' })}><MessageCircle size={15} /> Abrir no WhatsApp</button>
+            <button type="button" className="reply-whatsapp" onClick={() => openWhatsApp?.(lead, reply, { source: 'reply-assistant-ai' })}><MessageCircle size={15} /> Abrir no WhatsApp</button>
           </div>
         </div>
       )}
