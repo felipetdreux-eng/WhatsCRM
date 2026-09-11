@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-5.4-mini";
+
 type Lead = {
   id: string;
   name: string;
@@ -33,7 +36,29 @@ type Analysis = {
   };
 };
 
-function analyzeMessage(message: string, lead: Lead): Analysis {
+const analysisSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    objection: { type: "string", minLength: 1, maxLength: 80 },
+    intent: { type: "string", minLength: 1, maxLength: 220 },
+    strategy: { type: "string", minLength: 1, maxLength: 260 },
+    nextAction: { type: "string", minLength: 1, maxLength: 180 },
+    replies: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        direct: { type: "string", minLength: 1, maxLength: 500 },
+        consultative: { type: "string", minLength: 1, maxLength: 700 },
+        persuasive: { type: "string", minLength: 1, maxLength: 700 },
+      },
+      required: ["direct", "consultative", "persuasive"],
+    },
+  },
+  required: ["objection", "intent", "strategy", "nextAction", "replies"],
+} as const;
+
+function fallbackAnalysis(message: string, lead: Lead): Analysis {
   const text = message.toLowerCase();
   const firstName = String(lead.name || "").trim().split(/\s+/)[0] || "cliente";
 
@@ -106,14 +131,80 @@ function analyzeMessage(message: string, lead: Lead): Analysis {
   };
 }
 
+function extractOutputText(payload: any): string {
+  if (typeof payload?.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
+  for (const item of Array.isArray(payload?.output) ? payload.output : []) {
+    if (item?.type !== "message") continue;
+    for (const part of Array.isArray(item?.content) ? item.content : []) {
+      if (part?.type === "output_text" && typeof part?.text === "string" && part.text.trim()) return part.text.trim();
+    }
+  }
+  return "";
+}
+
+async function analyzeWithAI(customerMessage: string, lead: Lead): Promise<Analysis> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY_NOT_CONFIGURED");
+
+  const context = {
+    cliente: lead.name,
+    empresaOuInteresse: lead.company || "Não informado",
+    status: lead.status,
+    valorPotencial: Number(lead.value || 0),
+    origem: lead.origin || "Não informada",
+    observacoes: String(lead.notes || "").slice(0, 2500) || "Sem observações",
+    proximaAcao: lead.next_action || "Não definida",
+    proximoContato: lead.next_contact || "Não definido",
+    mensagemDoCliente: customerMessage,
+  };
+
+  const instructions = `Você é o assistente comercial do Fuply, um CRM para pequenas e médias empresas brasileiras.\n\nAnalise a mensagem do cliente junto com o contexto da negociação e ajude o vendedor a avançar a conversa de forma natural no WhatsApp.\n\nRegras:\n- Responda sempre em português do Brasil.\n- Não invente preços, prazos, descontos, condições, garantias ou informações que não estejam no contexto.\n- Não ofereça desconto automaticamente. Se houver objeção de preço, primeiro ajude a entender orçamento, valor percebido ou escopo.\n- Não seja agressivo, manipulador, insistente ou artificial.\n- As mensagens devem parecer escritas por uma pessoa real, não por um robô corporativo.\n- A resposta direta deve ser curta. A consultiva pode fazer uma pergunta para entender melhor. A persuasiva deve reforçar valor sem pressionar.\n- Se a mensagem já indicar intenção forte de compra, priorize facilitar o próximo passo em vez de continuar vendendo.\n- Se não houver informação suficiente, reconheça a incerteza e faça uma pergunta útil.\n- Não inclua aspas em volta das respostas prontas.\n- Entregue apenas os campos definidos no schema.`;
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      store: false,
+      reasoning: { effort: "none" },
+      instructions,
+      input: JSON.stringify(context),
+      max_output_tokens: 1200,
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "fuply_sales_reply_analysis",
+          strict: true,
+          schema: analysisSchema,
+        },
+      },
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    const message = payload?.error?.message || `OpenAI HTTP ${response.status}`;
+    throw new Error(`OPENAI_ERROR: ${message}`);
+  }
+
+  const outputText = extractOutputText(payload);
+  if (!outputText) throw new Error("OPENAI_EMPTY_RESPONSE");
+
+  const parsed = JSON.parse(outputText) as Analysis;
+  if (!parsed?.objection || !parsed?.replies?.direct || !parsed?.replies?.consultative || !parsed?.replies?.persuasive) {
+    throw new Error("OPENAI_INVALID_RESPONSE");
+  }
+  return parsed;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Método não permitido." }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Método não permitido." }), { status: 405, headers: jsonHeaders });
   }
 
   try {
@@ -124,24 +215,9 @@ Deno.serve(async (req: Request) => {
     const leadId = String(body?.leadId || "").trim();
     const customerMessage = String(body?.customerMessage || "").trim();
 
-    if (!leadId) {
-      return new Response(JSON.stringify({ error: "leadId é obrigatório." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!customerMessage) {
-      return new Response(JSON.stringify({ error: "A mensagem do cliente é obrigatória." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (customerMessage.length > 5000) {
-      return new Response(JSON.stringify({ error: "Mensagem muito longa." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!leadId) return new Response(JSON.stringify({ error: "leadId é obrigatório." }), { status: 400, headers: jsonHeaders });
+    if (!customerMessage) return new Response(JSON.stringify({ error: "A mensagem do cliente é obrigatória." }), { status: 400, headers: jsonHeaders });
+    if (customerMessage.length > 5000) return new Response(JSON.stringify({ error: "Mensagem muito longa." }), { status: 400, headers: jsonHeaders });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -156,16 +232,29 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (error || !lead) {
-      return new Response(JSON.stringify({ error: "Lead não encontrado ou sem acesso." }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "Lead não encontrado ou sem acesso." }), { status: 404, headers: jsonHeaders });
     }
 
-    const analysis = analyzeMessage(customerMessage, lead as Lead);
+    let analysis: Analysis;
+    let source = "openai";
+    let aiConfigured = true;
+    let model: string | null = OPENAI_MODEL;
+
+    try {
+      analysis = await analyzeWithAI(customerMessage, lead as Lead);
+    } catch (aiError) {
+      console.error("sales-assistant AI fallback:", aiError);
+      analysis = fallbackAnalysis(customerMessage, lead as Lead);
+      source = "rules-fallback";
+      aiConfigured = Boolean(Deno.env.get("OPENAI_API_KEY"));
+      model = null;
+    }
+
     return new Response(JSON.stringify({
       ...analysis,
-      source: "edge-v1",
+      source,
+      aiConfigured,
+      model,
       context: {
         leadId: lead.id,
         name: lead.name,
@@ -175,14 +264,11 @@ Deno.serve(async (req: Request) => {
         origin: lead.origin,
         nextAction: lead.next_action,
       },
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    }), { status: 200, headers: jsonHeaders });
   } catch (error) {
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro inesperado." }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: jsonHeaders,
     });
   }
 });
