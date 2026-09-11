@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import Autopilot, { buildAutopilotQueue } from './Autopilot';
 import { buildCoolingWatchlist } from './leadTemperature';
-import TeamDashboard from './TeamDashboard';
 import './dashboard.css';
 
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
@@ -63,7 +62,7 @@ function overdueLabel(value) {
   return `${days} dia${days === 1 ? '' : 's'} atrasado${days === 1 ? '' : 's'}`;
 }
 
-export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps, teamMembers = [], currentUserId = null }) {
+export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOutcome, onNewLead, goPipeline, goFollowUps }) {
   const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   const data = useMemo(() => {
@@ -201,8 +200,6 @@ export default function Dashboard({ leads, openLead, openWhatsApp, onAutopilotOu
           <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
         </div>
       </header>
-
-      <TeamDashboard leads={leads} members={teamMembers} currentUserId={currentUserId} />
 
       <section className="autopilot-dashboard" aria-label="Autopilot de vendas">
         <div className="autopilot-dashboard-main">
