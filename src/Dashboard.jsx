@@ -42,6 +42,11 @@ function statusClass(status = '') {
   return status.toLowerCase().replaceAll(' ', '-');
 }
 
+function lostReason(lead) {
+  const match = String(lead?.notes || '').match(/Motivo da perda:\s*([^\n]+)/i);
+  return match?.[1]?.trim() || 'Sem motivo informado';
+}
+
 export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
   const data = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
@@ -85,6 +90,15 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
     const openStages = funnel.filter(item => OPEN.includes(item.status));
     const bottleneck = [...openStages].sort((a, b) => b.count - a.count)[0] || { status: 'Novo lead', count: 0 };
 
+    const lossReasonMap = new Map();
+    lost.forEach(lead => {
+      const reason = lostReason(lead);
+      lossReasonMap.set(reason, (lossReasonMap.get(reason) || 0) + 1);
+    });
+    const lossReasons = [...lossReasonMap.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count);
+
     const teamMap = new Map();
     list.forEach(lead => {
       const key = lead.assignedTo || 'unassigned';
@@ -116,6 +130,7 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
       maxFunnel,
       origins,
       bottleneck,
+      lossReasons,
       team,
     };
   }, [leads]);
@@ -183,10 +198,19 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
             <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Total fechado</strong><span>{data.sold.length} vendas</span></div><b>{money(data.soldValue)}</b></button>
             <button type="button" onClick={() => goPipeline()}><div><strong>Valor em aberto</strong><span>{data.active.length} oportunidades</span></div><b>{money(data.pipelineValue)}</b></button>
             <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Ticket médio</strong><span>média das vendas fechadas</span></div><b>{money(data.avgTicket)}</b></button>
-            <button type="button" onClick={() => goLeads({ status: 'Perdido' })}><div><strong>Leads perdidos</strong><span>revise padrões de perda</span></div><b>{data.lost.length}</b></button>
+            <button type="button" onClick={() => goLeads({ status: 'Perdido' })}><div><strong>Leads perdidos</strong><span>{data.lossReasons[0] ? `Principal motivo: ${data.lossReasons[0].reason}` : 'revise padrões de perda'}</span></div><b>{data.lost.length}</b></button>
           </div>
         </div>
       </section>
+
+      {data.lossReasons.length > 0 && (
+        <section className="dashboard-panel" style={{ marginTop: 14 }}>
+          <div className="dashboard-panel-head"><div><h2>Por que as vendas estão sendo perdidas?</h2><p>Motivos registrados quando um lead é marcado como perdido.</p></div><button type="button" onClick={() => goLeads({ status: 'Perdido' })}>Ver perdidos <ArrowRight size={14} /></button></div>
+          <div className="results-list">
+            {data.lossReasons.slice(0, 5).map(item => <button type="button" key={item.reason} onClick={() => goLeads({ status: 'Perdido' })}><div><strong>{item.reason}</strong><span>{item.count} lead{item.count === 1 ? '' : 's'} perdido{item.count === 1 ? '' : 's'}</span></div><b>{item.count}</b></button>)}
+          </div>
+        </section>
+      )}
 
       {data.team.length > 1 && (
         <section className="dashboard-panel" style={{ marginTop: 14 }}>

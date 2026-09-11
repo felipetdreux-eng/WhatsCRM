@@ -228,6 +228,8 @@ export default function App() {
   const [undoAction, setUndoAction] = useState(null);
   const [pendingSale, setPendingSale] = useState(null);
   const [saleError, setSaleError] = useState('');
+  const [pendingLoss, setPendingLoss] = useState(null);
+  const [lossReason, setLossReason] = useState('');
   const [pendingFollowup, setPendingFollowup] = useState(null);
   const [followupForm, setFollowupForm] = useState({ date: '', time: '', action: 'Retornar contato' });
   const [followupError, setFollowupError] = useState('');
@@ -435,10 +437,10 @@ export default function App() {
     window.location.reload();
   };
 
-  const commitStatusChange = (id, status, saleValue) => {
+  const commitStatusChange = (id, status, saleValue, draft = {}) => {
     const previous = leads.find(lead => lead.id === id);
     if (!previous || previous.status === status) return;
-    const next = applyStatusTransition(previous, {}, status, saleValue);
+    const next = applyStatusTransition(previous, draft, status, saleValue);
     setUndoAction({ id: Date.now(), message: `${previous.name}: ${previous.status} → ${status}`, lead: previous });
     setLeads(current => current.map(lead => lead.id === id ? next : lead));
 
@@ -455,6 +457,11 @@ export default function App() {
     if (status === 'Fechado') {
       setSaleError('');
       setPendingSale({ id, name: lead.name, value: lead.saleValue ?? lead.value ?? '' });
+      return;
+    }
+    if (status === 'Perdido') {
+      setLossReason('');
+      setPendingLoss({ id, name: lead.name });
       return;
     }
     commitStatusChange(id, status);
@@ -479,6 +486,21 @@ export default function App() {
     commitStatusChange(pendingSale.id, 'Fechado', value);
     setPendingSale(null);
     setSaleError('');
+  };
+
+  const confirmLoss = event => {
+    event.preventDefault();
+    if (!pendingLoss) return;
+    const reason = lossReason.trim();
+    if (!reason) return;
+    const lead = leads.find(item => item.id === pendingLoss.id);
+    if (!lead) { setPendingLoss(null); return; }
+    const cleanNotes = String(lead.notes || '').replace(/(?:^|\n)Motivo da perda:.*(?:\n|$)/gi, '\n').trim();
+    const notes = [`Motivo da perda: ${reason}`, cleanNotes].filter(Boolean).join('\n\n');
+    commitStatusChange(pendingLoss.id, 'Perdido', undefined, { notes });
+    logActivity(lead, 'lead_lost', 'Lead marcado como perdido', `Motivo: ${reason}.`, { reason });
+    setPendingLoss(null);
+    setLossReason('');
   };
 
   const addLead = event => {
@@ -919,7 +941,19 @@ export default function App() {
             </form>
           </section>
         </div>
-      )}
+
+
+      {pendingLoss && (
+        <div className="modal-backdrop" onMouseDown={() => { setPendingLoss(null); setLossReason(''); }}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="loss-modal-title" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header"><div><h2 id="loss-modal-title">Por que essa venda foi perdida?</h2><p>{pendingLoss.name} · isso ajuda o Fuply a mostrar onde seu processo está falhando.</p></div><button type="button" className="icon-button" onClick={() => { setPendingLoss(null); setLossReason(''); }} aria-label="Fechar"><X size={20} /></button></div>
+            <form className="lead-form" onSubmit={confirmLoss}>
+              <label className="full"><span>Motivo *</span><select autoFocus required value={lossReason} onChange={e => setLossReason(e.target.value)}><option value="" disabled>Selecione um motivo</option><option>Preço</option><option>Sem resposta</option><option>Escolheu concorrente</option><option>Sem orçamento agora</option><option>Prazo</option><option>Não tinha interesse real</option><option>Outro</option></select></label>
+              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setPendingLoss(null); setLossReason(''); }}>Cancelar</button><button className="primary-button lost-action"><XCircle size={16} /> Confirmar perda</button></div>
+            </form>
+          </section>
+        </div>
+      )}      )}
     </div>
   );
 }
