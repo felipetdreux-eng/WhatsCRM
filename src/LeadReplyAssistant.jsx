@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, LoaderCircle, MessageCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './lead-reply-assistant.css';
@@ -9,7 +9,7 @@ const replyLabels = {
   persuasive: 'Persuasiva',
 };
 
-export default function LeadReplyAssistant({ lead, openWhatsApp }) {
+export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [result, setResult] = useState(null);
@@ -17,6 +17,13 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    if (!openSignal) return;
+    setOpen(true);
+    window.setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+  }, [openSignal]);
 
   const reply = useMemo(() => result?.replies?.[activeReply] || '', [result, activeReply]);
 
@@ -97,24 +104,24 @@ export default function LeadReplyAssistant({ lead, openWhatsApp }) {
 
   if (!open) {
     return (
-      <section className="detail-card reply-assistant-collapsed">
+      <section ref={sectionRef} id="reply-assistant" className="detail-card reply-assistant-collapsed">
         <div className="reply-assistant-intro">
           <div className="reply-assistant-icon"><Sparkles size={18} /></div>
           <div>
-            <strong>Não sabe o que responder?</strong>
-            <span>Cole a mensagem do cliente e o Fuply sugere como continuar a conversa.</span>
+            <strong>Assistente de Vendas IA</strong>
+            <span>Cole a mensagem do cliente. A IA analisa a negociação e monta sua próxima resposta.</span>
           </div>
         </div>
-        <button type="button" className="reply-assistant-open" onClick={() => setOpen(true)}><Sparkles size={16} /> Me ajuda a responder</button>
+        <button type="button" className="reply-assistant-open" onClick={() => setOpen(true)}><Sparkles size={16} /> Responder com IA</button>
       </section>
     );
   }
 
   return (
-    <section className="detail-card reply-assistant-card">
+    <section ref={sectionRef} id="reply-assistant" className="detail-card reply-assistant-card">
       <div className="section-heading reply-assistant-heading">
         <div>
-          <h2><Sparkles size={17} /> Me ajuda a responder</h2>
+          <h2><Sparkles size={17} /> Responder com IA</h2>
           <p>Cole exatamente o que o cliente falou.</p>
         </div>
         <button type="button" className="reply-assistant-close" onClick={() => { setOpen(false); setResult(null); setError(''); }}>Fechar</button>

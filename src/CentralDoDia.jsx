@@ -42,7 +42,7 @@ function recommendationFor(lead) {
   return getLeadIntelligence(lead)?.recommendedAction || lead.nextAction || 'Definir próximo passo';
 }
 
-export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps, goAutopilot }) {
+export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps, goAutopilot, onReplyWithAI }) {
   const data = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
     const active = list.filter(lead => !['Fechado', 'Perdido'].includes(lead.status));
@@ -100,6 +100,8 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
     else goPipeline();
   };
 
+  const aiLead = data.queue[0]?.lead || data.active[0] || null;
+
   const typeLabel = item => {
     if (item.type === 'site') return 'Novo lead do site';
     if (item.type === 'overdue') return `${Math.abs(dayDiff(item.lead.nextContact) || 1)}d atrasado`;
@@ -133,6 +135,18 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
           </div>
         </section>
       )}
+
+      <section className="home-ai-spotlight">
+        <div className="home-ai-icon"><Sparkles size={22} /></div>
+        <div className="home-ai-copy">
+          <span>Assistente de Vendas IA</span>
+          <h2>Cliente respondeu? Descubra o que dizer para avançar a venda.</h2>
+          <p>Cole a mensagem recebida e o Fuply identifica objeções, sugere estratégia e cria três respostas prontas para WhatsApp.</p>
+        </div>
+        <button type="button" className="home-ai-button" onClick={() => aiLead ? onReplyWithAI?.(aiLead) : goFollowUps({})}>
+          <Sparkles size={16} /> {aiLead ? `Responder ${String(aiLead.name || '').split(' ')[0]} com IA` : 'Escolher um lead'}
+        </button>
+      </section>
 
       <section className="daily-hero">
         <div>

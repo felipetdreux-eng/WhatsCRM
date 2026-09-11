@@ -234,6 +234,7 @@ export default function App() {
   const [pendingFollowup, setPendingFollowup] = useState(null);
   const [followupForm, setFollowupForm] = useState({ date: '', time: '', action: 'Retornar contato' });
   const [followupError, setFollowupError] = useState('');
+  const [replyAssistantSignal, setReplyAssistantSignal] = useState(0);
 
   useEffect(() => {
     localStorage.setItem('zapflow-leads', JSON.stringify(leads));
@@ -548,6 +549,18 @@ export default function App() {
     setFormError('');
   };
 
+  const openReplyAssistant = lead => {
+    const target = lead || selectedLead;
+    if (!target) {
+      openLeadsView({});
+      return;
+    }
+    setSelectedLeadId(target.id);
+    setEditingLead(null);
+    setFormError('');
+    setReplyAssistantSignal(signal => signal + 1);
+  };
+
   const startEditing = () => {
     if (!selectedLead) return;
     setFormError('');
@@ -670,7 +683,8 @@ export default function App() {
             <ArrowLeft size={18} /> Voltar
           </button>
           <div className="detail-top-actions">
-            <button type="button" className="primary-button" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
+            <button type="button" className="ai-top-button" onClick={() => openReplyAssistant(selectedLead)}><Sparkles size={17} /> Responder com IA</button>
+            <button type="button" className="secondary-button detail-top-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
           </div>
         </div>
 
@@ -689,6 +703,8 @@ export default function App() {
             <strong>{currency(selectedLead.status === 'Fechado' ? selectedLead.saleValue : selectedLead.value)}</strong>
           </div>
         </section>
+
+        <LeadReplyAssistant lead={selectedLead} openWhatsApp={openWhatsApp} openSignal={replyAssistantSignal} />
 
         {editingLead ? (
           <form className="detail-grid inline-detail-edit" onSubmit={saveLead}>
@@ -768,7 +784,6 @@ export default function App() {
                 <div className="notes-box">{selectedLead.notes || 'Nenhuma observação adicionada ainda.'}</div>
               </section>
 
-              <LeadReplyAssistant lead={selectedLead} openWhatsApp={openWhatsApp} />
 
               <LeadHistory userId={account?.id} leadId={selectedLead.id} />
             </div>
@@ -791,6 +806,7 @@ export default function App() {
                 <div className="section-heading"><div><h2>Ações</h2><p>Atalhos para avançar a negociação.</p></div></div>
                 <div className="detail-actions-stack">
                   <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
+                  <button type="button" className="detail-action ai-action" onClick={() => openReplyAssistant(selectedLead)}><Sparkles size={17} /> Responder com IA</button>
                   {selectedLead.status !== 'Fechado' && <button type="button" className="detail-action sold-action" onClick={() => setLeadStatus('Fechado')}><CheckCircle2 size={17} /> Marcar como fechado</button>}
                   {selectedLead.status !== 'Perdido' && <button type="button" className="detail-action lost-action" onClick={() => setLeadStatus('Perdido')}><XCircle size={17} /> Marcar como perdido</button>}
                   <button type="button" className="detail-action" onClick={startEditing}><Pencil size={17} /> Editar cliente</button>
@@ -866,7 +882,7 @@ export default function App() {
   const renderActivePage = () => {
     if (selectedLead) return renderLeadDetail();
     if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
-    if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} />;
+    if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
@@ -880,7 +896,7 @@ export default function App() {
       <button type="button" className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
       {renderActivePage()}
 
-      <GlobalQuickActions leads={leads} onNewLead={() => openNewLead()} onNavigate={navigate} onOpenLead={openLead} onOpenLeads={openLeadsView} />
+      <GlobalQuickActions leads={leads} onNewLead={() => openNewLead()} onNavigate={navigate} onOpenLead={openLead} onOpenLeads={openLeadsView} onReplyWithAI={openReplyAssistant} />
       {undoAction && <div className="undo-toast" role="status"><span>{undoAction.message}</span><button type="button" onClick={restoreUndo}>Desfazer</button></div>}
 
       {modalOpen && (
