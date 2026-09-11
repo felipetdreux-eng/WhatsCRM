@@ -1,0 +1,33 @@
+name: Apply usability overhaul
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-usability-overhaul.yml'
+      - 'scripts/apply_usability_overhaul.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-usability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply usability overhaul
+        run: python scripts/apply_usability_overhaul.py
+      - name: Commit usability overhaul
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx src/LeadsPage.jsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Simplify navigation and daily workflow"
+            git push
+          fi
