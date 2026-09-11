@@ -941,7 +941,7 @@ export default function App() {
             </form>
           </section>
         </div>
-
+      )}
 
       {pendingLoss && (
         <div className="modal-backdrop" onMouseDown={() => { setPendingLoss(null); setLossReason(''); }}>
@@ -953,7 +953,7 @@ export default function App() {
             </form>
           </section>
         </div>
-      )}      )}
+      )}
     </div>
   );
 }
