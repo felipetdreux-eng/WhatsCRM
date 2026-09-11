@@ -34,6 +34,7 @@ import LeadHistory from './LeadHistory';
 import Messages from './Messages';
 import SettingsPage from './SettingsPage';
 import GlobalQuickActions from './GlobalQuickActions';
+import LeadReplyAssistant from './LeadReplyAssistant';
 import { getActiveAccount, logoutAccount } from './accountStorage';
 import { loadWorkspaceContext, recordLeadActivity, syncLeads } from './backendBridge';
 import {
@@ -766,6 +767,8 @@ export default function App() {
                 <div className="section-heading"><div><h2>Observações</h2><p>Contexto importante da conversa.</p></div></div>
                 <div className="notes-box">{selectedLead.notes || 'Nenhuma observação adicionada ainda.'}</div>
               </section>
+
+              <LeadReplyAssistant lead={selectedLead} openWhatsApp={openWhatsApp} />
 
               <LeadHistory userId={account?.id} leadId={selectedLead.id} />
             </div>
