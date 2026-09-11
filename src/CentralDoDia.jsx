@@ -14,6 +14,7 @@ import {
 import { buildCoolingWatchlist } from './leadTemperature';
 import './dashboard.css';
 import './daily-pages.css';
+import './daily-pages-dark.css';
 
 const PRIORITY_STATUS = {
   'Negociação': 0,
