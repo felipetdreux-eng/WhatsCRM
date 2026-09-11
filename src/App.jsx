@@ -552,7 +552,7 @@ export default function App() {
   const openReplyAssistant = lead => {
     const target = lead || selectedLead;
     if (!target) {
-      openLeadsView({});
+      window.dispatchEvent(new CustomEvent('fuply:open-ai-selector'));
       return;
     }
     setSelectedLeadId(target.id);

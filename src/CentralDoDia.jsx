@@ -100,7 +100,6 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
     else goPipeline();
   };
 
-  const aiLead = data.queue[0]?.lead || data.active[0] || null;
 
   const typeLabel = item => {
     if (item.type === 'site') return 'Novo lead do site';
@@ -143,8 +142,8 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
           <h2>Cliente respondeu? Descubra o que dizer para avançar a venda.</h2>
           <p>Cole a mensagem recebida e o Fuply identifica objeções, sugere estratégia e cria três respostas prontas para WhatsApp.</p>
         </div>
-        <button type="button" className="home-ai-button" onClick={() => aiLead ? onReplyWithAI?.(aiLead) : goFollowUps({})}>
-          <Sparkles size={16} /> {aiLead ? `Responder ${String(aiLead.name || '').split(' ')[0]} com IA` : 'Escolher um lead'}
+        <button type="button" className="home-ai-button" onClick={() => onReplyWithAI?.()}>
+          <Sparkles size={16} /> Escolher cliente e responder com IA
         </button>
       </section>
 

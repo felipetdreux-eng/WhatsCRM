@@ -38,6 +38,16 @@ export default function GlobalQuickActions({ leads, onNewLead, onNavigate, onOpe
     window.setTimeout(() => inputRef.current?.focus(), 20);
   }, [open]);
 
+  useEffect(() => {
+    const openAISelector = () => {
+      setAiSelect(true);
+      setQuery('');
+      setOpen(true);
+    };
+    window.addEventListener('fuply:open-ai-selector', openAISelector);
+    return () => window.removeEventListener('fuply:open-ai-selector', openAISelector);
+  }, []);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return (Array.isArray(leads) ? leads : []).slice(0, 6);
