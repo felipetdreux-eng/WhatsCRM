@@ -11,6 +11,7 @@ import {
 import Autopilot, { buildAutopilotQueue } from './Autopilot';
 import './dashboard.css';
 import './daily-pages.css';
+import './daily-pages-dark.css';
 
 const currency = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
