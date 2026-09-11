@@ -1,0 +1,93 @@
+html[data-theme="dark"] body .daily-hero,
+html[data-theme="dark"] body .autopilot-page-hero {
+  background: linear-gradient(135deg, #15181e, #101319) !important;
+  border-color: #2a3039 !important;
+  box-shadow: none !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme="dark"] body .daily-priority-panel,
+html[data-theme="dark"] body .autopilot-preview-panel {
+  background: #15181e !important;
+  border-color: #2a3039 !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme="dark"] body .daily-action-card,
+html[data-theme="dark"] body .autopilot-preview-card {
+  background: #101319 !important;
+  border-color: #2a3039 !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme="dark"] body .daily-hero h2,
+html[data-theme="dark"] body .autopilot-page-copy h2,
+html[data-theme="dark"] body .daily-priority-panel h2,
+html[data-theme="dark"] body .autopilot-preview-panel h2,
+html[data-theme="dark"] body .daily-lead strong,
+html[data-theme="dark"] body .autopilot-preview-lead strong,
+html[data-theme="dark"] body .daily-due strong {
+  color: #f5f7fa !important;
+}
+
+html[data-theme="dark"] body .daily-hero p,
+html[data-theme="dark"] body .autopilot-page-copy p,
+html[data-theme="dark"] body .daily-priority-panel p,
+html[data-theme="dark"] body .autopilot-preview-panel p,
+html[data-theme="dark"] body .daily-lead span,
+html[data-theme="dark"] body .autopilot-preview-lead span,
+html[data-theme="dark"] body .daily-due span,
+html[data-theme="dark"] body .autopilot-preview-reason span {
+  color: #9da6b2 !important;
+}
+
+html[data-theme="dark"] body .daily-order,
+html[data-theme="dark"] body .autopilot-rank {
+  background: #242a33 !important;
+  color: #c7ced8 !important;
+}
+
+html[data-theme="dark"] body .daily-actions button,
+html[data-theme="dark"] body .autopilot-preview-whatsapp {
+  background: #171b21 !important;
+  border-color: #343c48 !important;
+  color: #c8ced6 !important;
+}
+
+html[data-theme="dark"] body .daily-actions .daily-whatsapp,
+html[data-theme="dark"] body .autopilot-preview-whatsapp {
+  background: #172a22 !important;
+  border-color: #315846 !important;
+  color: #68d99f !important;
+}
+
+html[data-theme="dark"] body .autopilot-page-icon,
+html[data-theme="dark"] body .autopilot-page-start {
+  background: #f5f7f9 !important;
+  color: #18202a !important;
+}
+
+html[data-theme="dark"] body .daily-health {
+  background: #0f1319 !important;
+  border: 1px solid #2a3039 !important;
+  color: #f7f9fb !important;
+}
+
+html[data-theme="dark"] body .daily-health span {
+  color: #9da6b2 !important;
+}
+
+html[data-theme="dark"] body .autopilot-priority.high {
+  background: #351b1c !important;
+  color: #ffaaa3 !important;
+}
+
+html[data-theme="dark"] body .autopilot-priority.medium {
+  background: #342a16 !important;
+  color: #f7c56e !important;
+}
+
+html[data-theme="dark"] body .autopilot-priority.normal {
+  background: #17263b !important;
+  color: #8bc5ff !important;
+}
