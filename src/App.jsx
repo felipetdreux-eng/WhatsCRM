@@ -33,6 +33,7 @@ import FollowUps from './FollowUps';
 import LeadHistory from './LeadHistory';
 import Messages from './Messages';
 import SettingsPage from './SettingsPage';
+import GlobalQuickActions from './GlobalQuickActions';
 import { getActiveAccount, logoutAccount } from './accountStorage';
 import { loadWorkspaceContext, recordLeadActivity, syncLeads } from './backendBridge';
 import {
@@ -49,6 +50,7 @@ import './detail.css';
 import './account.css';
 import './followup.css';
 import './team-leads.css';
+import './usability.css';
 
 const ACTIVE_ACCOUNT = getActiveAccount();
 const CLOSED = ['Fechado', 'Perdido'];
@@ -71,9 +73,8 @@ const STATUSES = [
 const OPEN_STATUSES = STATUSES.filter(status => !CLOSED.includes(status.id));
 const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
 const NAV_ITEMS = [
-  ['Dashboard', LayoutDashboard],
-  ['Central do Dia', CalendarClock],
-  ['Autopilot 2.0', Sparkles],
+  ['Início', CalendarClock],
+  ['Resultados', LayoutDashboard],
   ['Pipeline', ListFilter],
   ['Leads', UsersRound],
   ['Mensagens', MessagesSquare],
@@ -220,9 +221,11 @@ export default function App() {
   const [draggedId, setDraggedId] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
-  const [activePage, setActivePage] = useState('Dashboard');
+  const [activePage, setActivePage] = useState('Início');
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
+  const [leadsPreset, setLeadsPreset] = useState(null);
+  const [undoAction, setUndoAction] = useState(null);
   const [pendingSale, setPendingSale] = useState(null);
   const [saleError, setSaleError] = useState('');
   const [pendingFollowup, setPendingFollowup] = useState(null);
@@ -232,6 +235,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('zapflow-leads', JSON.stringify(leads));
   }, [leads]);
+
+  useEffect(() => {
+    if (!undoAction) return undefined;
+    const timer = window.setTimeout(() => setUndoAction(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [undoAction]);
 
   useEffect(() => {
     const handleRemoteLeads = event => {
@@ -430,6 +439,7 @@ export default function App() {
     const previous = leads.find(lead => lead.id === id);
     if (!previous || previous.status === status) return;
     const next = applyStatusTransition(previous, {}, status, saleValue);
+    setUndoAction({ id: Date.now(), message: `${previous.name}: ${previous.status} → ${status}`, lead: previous });
     setLeads(current => current.map(lead => lead.id === id ? next : lead));
 
     if (status === 'Fechado') {
@@ -572,6 +582,32 @@ export default function App() {
     setSelectedLeadId(null);
     setEditingLead(null);
     setFormError('');
+    if (label !== 'Leads') setLeadsPreset(null);
+  };
+
+  const openLeadsView = (preset = {}) => {
+    setLeadsPreset({ ...preset, nonce: Date.now() });
+    setActivePage('Leads');
+    setSelectedLeadId(null);
+    setEditingLead(null);
+    setFormError('');
+  };
+
+  const openPipelineView = (status = 'Todos') => {
+    setStatusFilter(status || 'Todos');
+    setOriginFilter('Todas');
+    setAssigneeFilter('Todos');
+    setActivePage('Pipeline');
+    setSelectedLeadId(null);
+    setEditingLead(null);
+    setFormError('');
+  };
+
+  const restoreUndo = () => {
+    if (!undoAction?.lead) return;
+    const previous = undoAction.lead;
+    setLeads(current => current.map(lead => lead.id === previous.id ? previous : lead));
+    setUndoAction(null);
   };
 
   const handleLeadActivity = (lead, kind, title, detail = '', metadata = {}) => {
@@ -580,7 +616,7 @@ export default function App() {
 
   const renderSidebar = () => (
     <aside className="sidebar">
-      <button type="button" className="logo-wrap logo-button" onClick={() => navigate('Dashboard')} aria-label="Ir para Dashboard">
+      <button type="button" className="logo-wrap logo-button" onClick={() => navigate('Início')} aria-label="Ir para Início">
         <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
         <span>Fuply</span>
       </button>
@@ -804,10 +840,10 @@ export default function App() {
 
   const renderActivePage = () => {
     if (selectedLead) return renderLeadDetail();
-    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
-    if (activePage === 'Central do Dia') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
+    if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
-    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} />;
+    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} />;
     return renderPipeline();
@@ -819,22 +855,30 @@ export default function App() {
       <button type="button" className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
       {renderActivePage()}
 
+      <GlobalQuickActions leads={leads} onNewLead={() => openNewLead()} onNavigate={navigate} onOpenLead={openLead} onOpenLeads={openLeadsView} />
+      {undoAction && <div className="undo-toast" role="status"><span>{undoAction.message}</span><button type="button" onClick={restoreUndo}>Desfazer</button></div>}
+
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
           <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-lead-title" onMouseDown={e => e.stopPropagation()}>
             <div className="modal-header"><div><h2 id="new-lead-title">Novo lead</h2><p>Adicione um novo contato ao pipeline.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
-            <form onSubmit={addLead} className="lead-form">
-              <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Studio Bella" /></label>
+            <form onSubmit={addLead} className="quick-lead-form">
+              <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: João Silva" /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
-              <label><span>Empresa</span><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Ex.: Salão de beleza" /></label>
-              <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="350,00" /></label>
-              <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{OPEN_STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
-              <label><span>Origem</span><select value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
-              <label><span>Responsável</span><select value={form.assignedTo || account?.id || ''} onChange={e => setForm({ ...form, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
-              <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={form.nextContact} onChange={e => setForm({ ...form, nextContact: e.target.value })} /></label>
-              <label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e => setForm({ ...form, nextContactTime: e.target.value })} /></label>
-              <label className="full"><span>Próxima ação</span><input value={form.nextAction} onChange={e => setForm({ ...form, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" /></label>
-              <label className="full"><span>Observações</span><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Contexto da conversa..." /></label>
+              <details className="quick-lead-details">
+                <summary>Mais detalhes (opcional)</summary>
+                <div className="quick-lead-details-grid">
+                  <label><span>Empresa</span><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Ex.: Sua Obra Engenharia" /></label>
+                  <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="10000" /></label>
+                  <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{OPEN_STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
+                  <label><span>Origem</span><select value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
+                  <label><span>Responsável</span><select value={form.assignedTo || account?.id || ''} onChange={e => setForm({ ...form, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
+                  <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={form.nextContact} onChange={e => setForm({ ...form, nextContact: e.target.value })} /></label>
+                  <label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e => setForm({ ...form, nextContactTime: e.target.value })} /></label>
+                  <label><span>Próxima ação</span><input value={form.nextAction} onChange={e => setForm({ ...form, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" /></label>
+                  <label className="full"><span>Observações</span><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Contexto da conversa..." /></label>
+                </div>
+              </details>
               {formError && <div className="auth-error full" role="alert">{formError}</div>}
               <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setModalOpen(false); setFormError(''); }}>Cancelar</button><button className="primary-button"><Plus size={16} /> Adicionar lead</button></div>
             </form>

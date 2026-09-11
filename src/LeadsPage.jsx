@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarClock,
@@ -79,7 +79,7 @@ function inScope(lead, scope, duplicateIndex) {
   return true;
 }
 
-export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity }) {
+export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Todos');
   const [scope, setScope] = useState('Todos');
@@ -87,8 +87,21 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('fuply-leads-view') || 'simple');
   const duplicateIndex = useMemo(() => buildDuplicateIndex(leads), [leads]);
   const duplicateGroups = useMemo(() => duplicateGroupCount(duplicateIndex), [duplicateIndex]);
+
+  useEffect(() => {
+    if (!preset) return;
+    setQuery('');
+    setStatus(preset.status || 'Todos');
+    setScope(preset.scope || 'Todos');
+  }, [preset?.nonce]);
+
+  const changeViewMode = mode => {
+    setViewMode(mode);
+    localStorage.setItem('fuply-leads-view', mode);
+  };
 
   const summary = useMemo(() => {
     const active = leads.filter(lead => !CLOSED.includes(lead.status));
@@ -110,6 +123,8 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     return leads
       .filter(lead => !q || `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.nextAction} ${lead.notes || ''}`.toLowerCase().includes(q))
       .filter(lead => status === 'Todos' || lead.status === status)
+      .filter(lead => !preset?.origin || lead.origin === preset.origin)
+      .filter(lead => !preset?.assignee || lead.assignedTo === preset.assignee)
       .filter(lead => inScope(lead, scope, duplicateIndex))
       .sort((a, b) => {
         if (scope === 'Duplicados') {
@@ -135,7 +150,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
           : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
       });
-  }, [leads, query, status, scope, duplicateIndex]);
+  }, [leads, query, status, scope, duplicateIndex, preset?.origin, preset?.assignee]);
 
   const flash = text => {
     setToast(text);
@@ -247,11 +262,30 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     flash(`Importação concluída: ${pieces.join(', ') || 'nenhuma alteração'}.`);
   };
 
+  const updateInlineValue = (lead, rawValue) => {
+    const value = Math.max(0, Number(rawValue || 0));
+    if (!Number.isFinite(value) || value === Number(lead.value || 0)) return;
+    const now = new Date().toISOString();
+    setLeads(current => current.map(item => item.id === lead.id ? { ...item, value, updatedAt: now } : item));
+    onActivity?.(lead, 'lead_updated', 'Valor potencial atualizado', `${money(lead.value)} → ${money(value)}.`, { from: Number(lead.value || 0), to: value });
+    flash(`${lead.name}: valor potencial atualizado.`);
+  };
+
+  const updateInlineAction = (lead, rawAction) => {
+    const action = rawAction.trim();
+    if (action === (lead.nextAction || '')) return;
+    const now = new Date().toISOString();
+    setLeads(current => current.map(item => item.id === lead.id ? { ...item, nextAction: action, updatedAt: now } : item));
+    onActivity?.(lead, 'lead_updated', 'Próxima ação atualizada', action || 'Próxima ação removida.');
+    flash(`${lead.name}: próxima ação atualizada.`);
+  };
+
   return (
-    <main className="main-content leads-page">
+    <main className={`main-content leads-page ${viewMode === 'simple' ? 'leads-simple-mode' : 'leads-complete-mode'}`}>
       <header className="leads-header">
         <div><span className="leads-kicker"><UsersRound size={14} /> Base de clientes</span><h1>Leads inteligentes</h1><p>Prioridade automática para você atacar primeiro quem tem mais chance e mais valor.</p></div>
         <div className="leads-header-actions">
+          <div className="view-mode-toggle" aria-label="Modo de visualização"><button type="button" className={viewMode === 'simple' ? 'active' : ''} onClick={() => changeViewMode('simple')}>Simples</button><button type="button" className={viewMode === 'complete' ? 'active' : ''} onClick={() => changeViewMode('complete')}>Completo</button></div>
           <button type="button" className="secondary-button leads-import-button" onClick={() => setImportOpen(true)}><FileSpreadsheet size={17} /> Importar planilha</button>
           <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
         </div>
@@ -283,10 +317,10 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
                 <td><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span><TemperatureBadge lead={lead} /><DuplicateBadge lead={lead} duplicateIndex={duplicateIndex} /></div></div></td>
                 <td onClick={event => event.stopPropagation()}><select className="leads-status-select" value={lead.status} onChange={event => changeStatus(lead, event.target.value)} aria-label={`Status de ${lead.name}`}>{STATUSES.map(item => <option key={item}>{item}</option>)}</select></td>
                 <td><span className="lead-origin">{lead.origin || 'Outro'}</span></td>
-                <td><strong className="leads-value">{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong></td>
+                <td onClick={event => event.stopPropagation()}>{lead.status === 'Fechado' ? <strong className="leads-value">{money(lead.saleValue)}</strong> : <input className="inline-value-input" type="number" min="0" step="0.01" defaultValue={Number(lead.value || 0)} onBlur={event => updateInlineValue(lead, event.target.value)} aria-label={`Valor potencial de ${lead.name}`} />}</td>
                 <td><SmartBadge lead={lead} /></td>
                 <td><span className={`leads-next ${lead.nextContact ? '' : 'muted'} ${diff(lead.nextContact) < 0 ? 'overdue' : ''}`}><CalendarClock size={14} />{pretty(lead.nextContact)}{lead.nextContactTime ? ` · ${lead.nextContactTime}` : ''}</span></td>
-                <td>{lead.nextAction || '—'}</td>
+                <td onClick={event => event.stopPropagation()}><input className="inline-next-action-input" defaultValue={lead.nextAction || ''} placeholder="Definir ação" onBlur={event => updateInlineAction(lead, event.target.value)} aria-label={`Próxima ação de ${lead.name}`} /></td>
                 <td onClick={event => event.stopPropagation()}><div className="lead-row-actions">
                   <button type="button" className="leads-whatsapp" onClick={() => openWhatsApp(lead)} title="Abrir WhatsApp" aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
                   {!CLOSED.includes(lead.status) && <select className="lead-mark-for" value="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
