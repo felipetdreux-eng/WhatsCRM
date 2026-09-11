@@ -1,0 +1,33 @@
+name: Apply lost lead reasons
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-loss-reasons.yml'
+      - 'scripts/add_loss_reasons.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-loss-reasons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply lost lead reasons
+        run: python scripts/add_loss_reasons.py
+      - name: Commit lost lead reasons
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx src/Dashboard.jsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add lost lead reasons and reporting"
+            git push
+          fi
