@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Temporary migration script. It is deleted after the fix is applied.
 
 def replace_once(text, old, new, label):
     if old not in text:
