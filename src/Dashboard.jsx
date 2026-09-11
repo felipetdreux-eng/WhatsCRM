@@ -1,328 +1,207 @@
 import React, { useMemo } from 'react';
 import {
-  AlertCircle,
   ArrowRight,
-  CalendarClock,
-  CheckCircle2,
   CircleDollarSign,
-  Clock3,
+  Gauge,
   ListFilter,
-  MessageCircle,
-  Plus,
-  Snowflake,
   Target,
+  TrendingDown,
   TrendingUp,
+  UserRound,
   UsersRound,
 } from 'lucide-react';
-import { buildCoolingWatchlist } from './leadTemperature';
 import './dashboard.css';
 
-const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
-const PRIORITY_STATUS = {
-  'Negociação': 0,
-  'Proposta enviada': 1,
-  Interessado: 2,
-  Contatado: 3,
-  'Novo lead': 4,
-};
+const OPEN = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação'];
+const FUNNEL = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado'];
+const ORIGINS = ['Site', 'Indicação', 'WhatsApp', 'Google Maps', 'Instagram', 'Outro'];
 
-const currency = value => new Intl.NumberFormat('pt-BR', {
+const money = value => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 }).format(Number(value || 0));
 
-function dateKey(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+function monthStart(offset = 0) {
+  const date = new Date();
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
 }
 
-function prettyDate(value) {
-  if (!value) return 'Sem data';
-  const today = dateKey();
-  const tomorrowDate = new Date();
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = dateKey(tomorrowDate);
-  if (value === today) return 'Hoje';
-  if (value === tomorrow) return 'Amanhã';
-  return new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+function inRange(value, start, end) {
+  if (!value) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date >= start && date < end;
+}
+
+function pct(current, previous) {
+  if (!previous) return current ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 function statusClass(status = '') {
   return status.toLowerCase().replaceAll(' ', '-');
 }
 
-function overdueLabel(value) {
-  if (!value) return 'Sem data';
-  const target = new Date(`${value}T12:00:00`);
-  const today = new Date(`${dateKey()}T12:00:00`);
-  const days = Math.max(1, Math.round((today - target) / 86400000));
-  return `${days} dia${days === 1 ? '' : 's'} atrasado${days === 1 ? '' : 's'}`;
-}
-
-export default function Dashboard({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps }) {
-
+export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
   const data = useMemo(() => {
-    const active = leads.filter(lead => !['Fechado', 'Perdido'].includes(lead.status));
-    const sold = leads.filter(lead => lead.status === 'Fechado');
-    const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || 0), 0);
-    const potentialValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
-    const conversion = leads.length ? Math.round((sold.length / leads.length) * 100) : 0;
-    const today = dateKey();
-    const nextWeekDate = new Date();
-    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
-    const nextWeek = dateKey(nextWeekDate);
+    const list = Array.isArray(leads) ? leads : [];
+    const active = list.filter(lead => OPEN.includes(lead.status));
+    const sold = list.filter(lead => lead.status === 'Fechado');
+    const lost = list.filter(lead => lead.status === 'Perdido');
+    const pipelineValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
+    const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || lead.value || 0), 0);
+    const avgTicket = sold.length ? soldValue / sold.length : 0;
+    const conversion = list.length ? Math.round((sold.length / list.length) * 100) : 0;
 
-    const followups = active
-      .filter(lead => lead.nextContact)
-      .sort((a, b) => `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`));
+    const thisStart = monthStart(0);
+    const nextStart = monthStart(1);
+    const prevStart = monthStart(-1);
+    const newThis = list.filter(lead => inRange(lead.createdAt, thisStart, nextStart));
+    const newPrev = list.filter(lead => inRange(lead.createdAt, prevStart, thisStart));
+    const soldThis = sold.filter(lead => inRange(lead.soldAt || lead.updatedAt, thisStart, nextStart));
+    const soldPrev = sold.filter(lead => inRange(lead.soldAt || lead.updatedAt, prevStart, thisStart));
+    const soldThisValue = soldThis.reduce((sum, lead) => sum + Number(lead.saleValue || lead.value || 0), 0);
+    const soldPrevValue = soldPrev.reduce((sum, lead) => sum + Number(lead.saleValue || lead.value || 0), 0);
 
-    const overdue = followups.filter(lead => lead.nextContact < today);
-    const todayFollowups = followups.filter(lead => lead.nextContact === today);
-    const weekFollowups = followups.filter(lead => lead.nextContact > today && lead.nextContact <= nextWeek);
-    const withoutNextContact = active
-      .filter(lead => !lead.nextContact)
-      .sort((a, b) => {
-        const statusDiff = (PRIORITY_STATUS[a.status] ?? 9) - (PRIORITY_STATUS[b.status] ?? 9);
-        if (statusDiff) return statusDiff;
-        return Number(b.value || 0) - Number(a.value || 0);
-      });
-
-    const cooling = buildCoolingWatchlist(active, { limit: Math.max(1, active.length) });
-    const cold = cooling.filter(item => item.temperature.level === 'cooling');
-
-    const queue = [];
-    const seen = new Set();
-    const pushQueue = (items, priority, unwrap = false) => {
-      items.forEach(item => {
-        const lead = unwrap ? item.lead : item;
-        if (seen.has(lead.id)) return;
-        seen.add(lead.id);
-        queue.push({ lead, priority, days: unwrap ? (item.temperature?.days ?? item.days ?? null) : null });
-      });
-    };
-    pushQueue(overdue, 'overdue');
-    pushQueue(todayFollowups, 'today');
-    pushQueue(withoutNextContact, 'unscheduled');
-    pushQueue(cold, 'cold', true);
-    pushQueue(cooling, 'cooling', true);
-    pushQueue(weekFollowups, 'upcoming');
-
-    const statusCounts = STATUSES.map(status => ({
+    const funnel = FUNNEL.map(status => ({
       status,
-      count: leads.filter(lead => lead.status === status).length,
+      count: list.filter(lead => lead.status === status).length,
+      value: list.filter(lead => lead.status === status).reduce((sum, lead) => sum + Number(status === 'Fechado' ? (lead.saleValue || lead.value || 0) : (lead.value || 0)), 0),
     }));
-    const maxStatusCount = Math.max(1, ...statusCounts.map(item => item.count));
+    const maxFunnel = Math.max(1, ...funnel.map(item => item.count));
 
-    const recent = [...leads]
-      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-      .slice(0, 5);
+    const origins = ORIGINS.map(origin => {
+      const items = list.filter(lead => (lead.origin || 'Outro') === origin);
+      const wins = items.filter(lead => lead.status === 'Fechado');
+      return {
+        origin,
+        count: items.length,
+        wins: wins.length,
+        value: wins.reduce((sum, lead) => sum + Number(lead.saleValue || lead.value || 0), 0),
+        conversion: items.length ? Math.round((wins.length / items.length) * 100) : 0,
+      };
+    }).filter(item => item.count).sort((a, b) => b.value - a.value || b.count - a.count);
+
+    const openStages = funnel.filter(item => OPEN.includes(item.status));
+    const bottleneck = [...openStages].sort((a, b) => b.count - a.count)[0] || { status: 'Novo lead', count: 0 };
+
+    const teamMap = new Map();
+    list.forEach(lead => {
+      const key = lead.assignedTo || 'unassigned';
+      const current = teamMap.get(key) || { id: key, count: 0, wins: 0, value: 0 };
+      current.count += 1;
+      if (lead.status === 'Fechado') {
+        current.wins += 1;
+        current.value += Number(lead.saleValue || lead.value || 0);
+      }
+      teamMap.set(key, current);
+    });
+    const team = [...teamMap.values()].sort((a, b) => b.value - a.value || b.wins - a.wins).slice(0, 5);
 
     return {
       active,
       sold,
+      lost,
+      pipelineValue,
       soldValue,
-      potentialValue,
+      avgTicket,
       conversion,
-      overdue,
-      todayFollowups,
-      weekFollowups,
-      withoutNextContact,
-      cooling,
-      cold,
-      coolingWatchlist: cooling.slice(0, 4),
-      statusCounts,
-      maxStatusCount,
-      queue: queue.slice(0, 7),
-      recent,
+      newThis,
+      newPrev,
+      soldThis,
+      soldThisValue,
+      newDelta: pct(newThis.length, newPrev.length),
+      soldDelta: pct(soldThisValue, soldPrevValue),
+      funnel,
+      maxFunnel,
+      origins,
+      bottleneck,
+      team,
     };
   }, [leads]);
 
   const cards = [
-    {
-      label: 'Em negociação',
-      value: data.active.length,
-      detail: `${data.cooling.length} pedem atenção agora`,
-      icon: UsersRound,
-      tone: 'neutral',
-    },
-    {
-      label: 'Pipeline potencial',
-      value: currency(data.potentialValue),
-      detail: 'oportunidades abertas',
-      icon: CircleDollarSign,
-      tone: 'blue',
-    },
-    {
-      label: 'Fechado',
-      value: currency(data.soldValue),
-      detail: `${data.sold.length} venda${data.sold.length === 1 ? '' : 's'} fechada${data.sold.length === 1 ? '' : 's'}`,
-      icon: TrendingUp,
-      tone: 'green',
-    },
-    {
-      label: 'Conversão',
-      value: `${data.conversion}%`,
-      detail: `${data.sold.length} de ${leads.length} leads`,
-      icon: Target,
-      tone: 'purple',
-    },
+    { label: 'Pipeline aberto', value: money(data.pipelineValue), detail: `${data.active.length} oportunidades`, icon: CircleDollarSign, tone: 'blue', action: () => goPipeline() },
+    { label: 'Fechado no mês', value: money(data.soldThisValue), detail: `${data.soldThis.length} vendas · ${data.soldDelta >= 0 ? '+' : ''}${data.soldDelta}% vs mês anterior`, icon: TrendingUp, tone: 'green', action: () => goPipeline('Fechado') },
+    { label: 'Leads novos', value: data.newThis.length, detail: `${data.newDelta >= 0 ? '+' : ''}${data.newDelta}% vs mês anterior`, icon: UsersRound, tone: 'neutral', action: () => goLeads({ status: 'Novo lead' }) },
+    { label: 'Conversão', value: `${data.conversion}%`, detail: `${data.sold.length} fechados de ${leads.length}`, icon: Target, tone: 'purple', action: () => goPipeline('Fechado') },
   ];
-
-  const queueLabel = item => {
-    if (item.priority === 'overdue') return overdueLabel(item.lead.nextContact);
-    if (item.priority === 'today') return 'Hoje';
-    if (item.priority === 'unscheduled') return 'Sem próximo contato';
-    if (item.priority === 'cold' || item.priority === 'cooling') return `${item.days} dias sem interação`;
-    return prettyDate(item.lead.nextContact);
-  };
 
   return (
     <main className="main-content dashboard-page">
       <header className="dashboard-header">
         <div>
-          <span className="dashboard-kicker">Central de vendas</span>
-          <h1>Dashboard</h1>
-          <p>Abra, veja quem precisa de resposta e avance suas negociações.</p>
+          <span className="dashboard-kicker">Visão de gestão</span>
+          <h1>Resultados</h1>
+          <p>Aqui você analisa o negócio. Para saber o que fazer agora, o Início resolve essa parte chata.</p>
         </div>
         <div className="dashboard-header-actions">
-          <button type="button" className="secondary-button" onClick={goPipeline}><ListFilter size={17} /> Ver pipeline</button>
-          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
+          <button type="button" className="secondary-button" onClick={() => goPipeline()}><ListFilter size={17} /> Abrir pipeline</button>
         </div>
       </header>
 
-
-      <section className="dashboard-metrics" aria-label="Resumo comercial">
+      <section className="dashboard-metrics" aria-label="Resultados comerciais">
         {cards.map(card => {
           const Icon = card.icon;
-          return (
-            <article className="dashboard-metric-card" key={card.label}>
-              <div className={`dashboard-metric-icon ${card.tone}`}><Icon size={18} /></div>
-              <div><span>{card.label}</span><strong>{card.value}</strong><small>{card.detail}</small></div>
-            </article>
-          );
+          return <button type="button" className="dashboard-metric-card results-card-button" key={card.label} onClick={card.action}><div className={`dashboard-metric-icon ${card.tone}`}><Icon size={18} /></div><div><span>{card.label}</span><strong>{card.value}</strong><small>{card.detail}</small></div></button>;
         })}
       </section>
 
-      <section className="focus-shell">
-        <div className="focus-main">
-          <div className="focus-heading">
-            <div>
-              <span className="focus-kicker"><AlertCircle size={14} /> Prioridades</span>
-              <h2>Seu foco agora</h2>
-              <p>Atrasos primeiro. Depois, contatos sem próximo passo e negociações que estão esfriando.</p>
-            </div>
-            <button type="button" onClick={goFollowUps}>Ver todos <ArrowRight size={15} /></button>
-          </div>
-
-          <div className="focus-tabs" aria-label="Resumo de prioridades">
-            <div className={data.overdue.length ? 'danger' : ''}><strong>{data.overdue.length}</strong><span>Atrasados</span></div>
-            <div className={data.todayFollowups.length ? 'warning' : ''}><strong>{data.todayFollowups.length}</strong><span>Hoje</span></div>
-            <div><strong>{data.withoutNextContact.length}</strong><span>Sem próximo contato</span></div>
-            <div className={data.cooling.length ? 'cooling' : ''}><strong>{data.cooling.length}</strong><span>Em risco</span></div>
-          </div>
-
-          <div className="focus-list">
-            {data.queue.length ? data.queue.map(item => {
-              const { lead, priority } = item;
-              return (
-                <article className="focus-item" key={lead.id}>
-                  <button type="button" className="focus-lead" onClick={() => openLead(lead)} aria-label={`Abrir ${lead.name}`}>
-                    <div className="dashboard-avatar">{lead.name.slice(0, 2).toUpperCase()}</div>
-                    <div className="focus-lead-copy">
-                      <div className="focus-name-line"><strong>{lead.name}</strong><span className={`focus-status status-${statusClass(lead.status)}`}>{lead.status}</span></div>
-                      <span>{lead.nextAction || (priority === 'unscheduled' ? 'Definir próximo contato' : 'Retornar contato')}</span>
-                    </div>
-                  </button>
-                  <div className="focus-value"><span>Potencial</span><strong>{currency(lead.value)}</strong></div>
-                  <span className={`focus-due ${priority}`}><Clock3 size={13} /> {queueLabel(item)}{lead.nextContactTime && !['unscheduled', 'cold', 'cooling'].includes(priority) ? `, ${lead.nextContactTime}` : ''}</span>
-                  <div className="focus-actions">
-                    <button type="button" className="focus-open" onClick={() => openLead(lead)}>Abrir</button>
-                    <button type="button" className="focus-whatsapp" title="Abrir WhatsApp" aria-label={`Abrir WhatsApp de ${lead.name}`} onClick={() => openWhatsApp(lead)}><MessageCircle size={17} /></button>
-                  </div>
-                </article>
-              );
-            }) : (
-              <div className="dashboard-empty focus-empty"><CheckCircle2 size={25} /><strong>Nada urgente agora</strong><span>Seus follow-ups estão em dia. Hora de criar novas oportunidades.</span></div>
-            )}
+      <section className="results-grid-two">
+        <div className="dashboard-panel">
+          <div className="dashboard-panel-head"><div><h2>Funil de vendas</h2><p>Clique em qualquer etapa para abrir exatamente aqueles leads.</p></div></div>
+          <div className="pipeline-bars">
+            {data.funnel.map(item => (
+              <button type="button" className="pipeline-bar-row" key={item.status} onClick={() => item.status === 'Fechado' ? goPipeline('Fechado') : goLeads({ status: item.status })}>
+                <div className="pipeline-bar-label"><span className={`status-mini-dot status-${statusClass(item.status)}`} />{item.status}</div>
+                <div className="pipeline-bar-track"><div className={`pipeline-bar-fill fill-${statusClass(item.status)}`} style={{ width: `${(item.count / data.maxFunnel) * 100}%` }} /></div>
+                <strong>{item.count}</strong>
+              </button>
+            ))}
           </div>
         </div>
 
-        <aside className="health-panel">
-          <div className="health-head">
-            <div className="health-icon"><CalendarClock size={20} /></div>
-            <div><span>Saúde da carteira</span><strong>{data.active.length ? Math.max(0, Math.round(((data.active.length - data.overdue.length - data.withoutNextContact.length) / data.active.length) * 100)) : 100}% organizada</strong></div>
-          </div>
-          <p>Negociações com próximo passo definido e sem atraso.</p>
-          <div className="health-progress"><span style={{ width: `${data.active.length ? Math.max(0, Math.round(((data.active.length - data.overdue.length - data.withoutNextContact.length) / data.active.length) * 100)) : 100}%` }} /></div>
-          <div className="health-grid">
-            <div><span>Em negociação</span><strong>{data.active.length}</strong></div>
-            <div><span>Sem próximo passo</span><strong>{data.withoutNextContact.length}</strong></div>
-            <div><span>Atrasados</span><strong>{data.overdue.length}</strong></div>
-            <div><span>Esfriando</span><strong>{data.cold.length}</strong></div>
-          </div>
-          <button type="button" onClick={goFollowUps}>Organizar follow-ups <ArrowRight size={15} /></button>
+        <aside className="results-insight">
+          <Gauge size={21} />
+          <h3>Gargalo principal</h3>
+          <p><strong>{data.bottleneck.status}</strong> concentra {data.bottleneck.count} lead{data.bottleneck.count === 1 ? '' : 's'} aberto{data.bottleneck.count === 1 ? '' : 's'}. Se muita gente estaciona aqui, vale revisar abordagem e próximo passo.</p>
+          <button type="button" className="secondary-button" onClick={() => goLeads({ status: data.bottleneck.status })}>Ver esses leads <ArrowRight size={14} /></button>
         </aside>
       </section>
 
-      <section className="cooling-watch" aria-label="Negociações esfriando">
-        <div className="cooling-watch-head">
-          <div className="cooling-watch-title"><span><Snowflake size={16} /></span><div><strong>Negociações esfriando</strong><p>O Fuply detecta quando uma oportunidade está ficando tempo demais sem contato.</p></div></div>
-          <button type="button" onClick={goFollowUps}>Ver todos os leads <ArrowRight size={15} /></button>
-        </div>
-        {data.coolingWatchlist.length ? (
-          <div className="cooling-watch-grid">
-            {data.coolingWatchlist.map(({ lead, temperature }) => (
-              <article className={`cooling-watch-card ${temperature.level}`} key={lead.id}>
-                <div className="cooling-watch-card-top">
-                  <button type="button" onClick={() => openLead(lead)}><div className="dashboard-avatar small">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.status} · {currency(lead.value)}</span></div></button>
-                  <span className={`cooling-badge ${temperature.level}`}>{temperature.label}</span>
-                </div>
-                <strong className="cooling-reason">{temperature.reason}</strong>
-                <p>{temperature.detail}</p>
-                <div className="cooling-watch-actions">
-                  <button type="button" className="cooling-open" onClick={() => openLead(lead)}>Ver negociação</button>
-                  <button type="button" className="cooling-recover" onClick={() => openWhatsApp(lead)}><MessageCircle size={15} /> Retomar agora</button>
-                </div>
-              </article>
-            ))}
+      <section className="results-grid-two">
+        <div className="dashboard-panel">
+          <div className="dashboard-panel-head"><div><h2>Origem dos leads</h2><p>Descubra de onde vêm os contatos que realmente fecham.</p></div></div>
+          <div className="results-list">
+            {data.origins.length ? data.origins.map(item => <button type="button" key={item.origin} onClick={() => goLeads({ origin: item.origin })}><div><strong>{item.origin}</strong><span>{item.count} leads · {item.wins} vendas · {item.conversion}% conversão</span></div><b>{money(item.value)}</b></button>) : <div className="dashboard-empty">Ainda não há dados de origem suficientes.</div>}
           </div>
-        ) : (
-          <div className="cooling-watch-empty"><CheckCircle2 size={20} /><div><strong>Nenhuma negociação esfriando</strong><span>Seu ritmo de follow-up está saudável agora.</span></div></div>
-        )}
+        </div>
+
+        <div className="dashboard-panel">
+          <div className="dashboard-panel-head"><div><h2>Resumo financeiro</h2><p>Sem gráfico decorativo fingindo produtividade.</p></div></div>
+          <div className="results-list">
+            <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Total fechado</strong><span>{data.sold.length} vendas</span></div><b>{money(data.soldValue)}</b></button>
+            <button type="button" onClick={() => goPipeline()}><div><strong>Valor em aberto</strong><span>{data.active.length} oportunidades</span></div><b>{money(data.pipelineValue)}</b></button>
+            <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Ticket médio</strong><span>média das vendas fechadas</span></div><b>{money(data.avgTicket)}</b></button>
+            <button type="button" onClick={() => goLeads({ status: 'Perdido' })}><div><strong>Leads perdidos</strong><span>revise padrões de perda</span></div><b>{data.lost.length}</b></button>
+          </div>
+        </div>
       </section>
 
-      <div className="dashboard-grid">
-        <section className="dashboard-panel pipeline-overview">
-          <div className="dashboard-panel-head"><div><h2>Pipeline</h2><p>Onde suas oportunidades estão agora.</p></div><button type="button" onClick={goPipeline}>Abrir pipeline <ArrowRight size={15} /></button></div>
-          <div className="pipeline-bars">
-            {data.statusCounts.map(item => (
-              <div className="pipeline-bar-row" key={item.status}>
-                <div className="pipeline-bar-label"><span className={`status-mini-dot status-${statusClass(item.status)}`} />{item.status}</div>
-                <div className="pipeline-bar-track"><div className={`pipeline-bar-fill fill-${statusClass(item.status)}`} style={{ width: `${(item.count / data.maxStatusCount) * 100}%` }} /></div>
-                <strong>{item.count}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="conversion-row"><div className="conversion-number"><span>Taxa de conversão</span><strong>{data.conversion}%</strong></div><div className="conversion-copy">{data.sold.length} venda{data.sold.length !== 1 ? 's' : ''} em {leads.length} lead{leads.length !== 1 ? 's' : ''}</div></div>
-        </section>
-
-        <section className="dashboard-panel recent-panel">
-          <div className="dashboard-panel-head"><div><h2>Leads recentes</h2><p>Contatos adicionados por último.</p></div><button type="button" onClick={goFollowUps}>Ver todos <ArrowRight size={15} /></button></div>
-          <div className="recent-list">
-            {data.recent.length ? data.recent.map(lead => (
-              <article className="recent-card" key={lead.id}>
-                <button type="button" className="recent-main" onClick={() => openLead(lead)}><div className="dashboard-avatar small">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || lead.origin || 'Sem empresa'}</span></div></button>
-                <div className="recent-meta"><span className={`recent-status status-${statusClass(lead.status)}`}>{lead.status}</span><strong>{currency(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong></div>
-                <button type="button" className="recent-whatsapp" aria-label={`Abrir WhatsApp de ${lead.name}`} onClick={() => openWhatsApp(lead)}><MessageCircle size={16} /></button>
-              </article>
-            )) : (
-              <div className="dashboard-empty"><UsersRound size={23} /><strong>Nenhum lead ainda</strong><span>Adicione seu primeiro contato para começar.</span></div>
-            )}
+      {data.team.length > 1 && (
+        <section className="dashboard-panel" style={{ marginTop: 14 }}>
+          <div className="dashboard-panel-head"><div><h2>Equipe</h2><p>Desempenho por responsável.</p></div></div>
+          <div className="results-list">
+            {data.team.map((member, index) => <button type="button" key={member.id} onClick={() => goLeads({ assignee: member.id })}><div><strong>#{index + 1} · {member.id === 'unassigned' ? 'Sem responsável' : memberName(member.id)}</strong><span>{member.count} leads · {member.wins} vendas</span></div><b>{money(member.value)}</b></button>)}
           </div>
         </section>
-      </div>
+      )}
 
+      <section className="results-insight" style={{ marginTop: 14 }}>
+        {data.soldDelta >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+        <h3>Leitura rápida</h3>
+        <p>Entraram <strong>{data.newThis.length}</strong> leads neste mês e foram fechados <strong>{money(data.soldThisValue)}</strong>. O Dashboard agora serve para entender o que está acontecendo, não para duplicar a Central do Dia.</p>
+      </section>
     </main>
   );
 }
