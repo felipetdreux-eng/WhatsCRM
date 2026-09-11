@@ -18,6 +18,7 @@ import {
   Plus,
   Save,
   Search,
+  Sparkles,
   Settings,
   Target,
   UserRound,
@@ -26,6 +27,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import Dashboard from './Dashboard';
+import CentralDoDia from './CentralDoDia';
+import AutopilotPage from './AutopilotPage';
 import FollowUps from './FollowUps';
 import LeadHistory from './LeadHistory';
 import Messages from './Messages';
@@ -69,6 +72,8 @@ const OPEN_STATUSES = STATUSES.filter(status => !CLOSED.includes(status.id));
 const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
 const NAV_ITEMS = [
   ['Dashboard', LayoutDashboard],
+  ['Central do Dia', CalendarClock],
+  ['Autopilot 2.0', Sparkles],
   ['Pipeline', ListFilter],
   ['Leads', UsersRound],
   ['Mensagens', MessagesSquare],
@@ -799,7 +804,9 @@ export default function App() {
 
   const renderActivePage = () => {
     if (selectedLead) return renderLeadDetail();
-    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Dashboard') return <Dashboard leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Central do Dia') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => setActivePage('Pipeline')} goFollowUps={() => setActivePage('Leads')} />;
+    if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} />;
