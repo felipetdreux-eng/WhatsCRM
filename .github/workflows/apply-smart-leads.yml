@@ -1,0 +1,33 @@
+name: Apply smart leads
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-smart-leads.yml'
+      - 'scripts/add_smart_leads.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-smart-leads:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply smart leads UI
+        run: python scripts/add_smart_leads.py
+      - name: Commit smart leads
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/LeadsPage.jsx src/leads-integrated.css
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add smart lead prioritization UI"
+            git push
+          fi
