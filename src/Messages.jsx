@@ -79,6 +79,8 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
   const [leadOptions, setLeadOptions] = useState(Array.isArray(leads) ? leads : []);
   const [query, setQuery] = useState('');
+  const [leadQuery, setLeadQuery] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('Todos');
   const [editing, setEditing] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState('');
   const [copiedId, setCopiedId] = useState(null);
@@ -131,6 +133,27 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
   const filtered = useMemo(() => templates.filter(template => (
     `${template.title} ${template.category} ${template.text}`.toLowerCase().includes(query.trim().toLowerCase())
   )), [templates, query]);
+
+  const activeLeadOptions = useMemo(
+    () => leadOptions.filter(lead => !['Fechado', 'Perdido'].includes(lead.status)),
+    [leadOptions],
+  );
+
+  const leadStatuses = useMemo(() => (
+    ['Todos', ...Array.from(new Set(activeLeadOptions.map(lead => lead.status).filter(Boolean)))]
+  ), [activeLeadOptions]);
+
+  const filteredLeadOptions = useMemo(() => {
+    const term = leadQuery.trim().toLowerCase();
+    const numericTerm = term.replace(/\D/g, '');
+    return activeLeadOptions.filter(lead => {
+      const text = `${lead.name || ''} ${lead.company || ''} ${lead.phone || ''}`.toLowerCase();
+      const phone = String(lead.phone || '').replace(/\D/g, '');
+      const matchesQuery = !term || text.includes(term) || (numericTerm && phone.includes(numericTerm));
+      const matchesStatus = leadStatusFilter === 'Todos' || lead.status === leadStatusFilter;
+      return matchesQuery && matchesStatus;
+    });
+  }, [activeLeadOptions, leadQuery, leadStatusFilter]);
 
   const templateNeedsValue = template => template.text.includes('{valor}');
   const selectedLeadHasValue = leadValue(selectedLead) > 0;
@@ -213,15 +236,43 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
           <Search size={17} />
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar mensagem" aria-label="Buscar mensagens" />
         </label>
-        <label className="messages-lead-picker">
-          <span>Personalizar para</span>
-          <select value={selectedLeadId} onChange={event => { setSelectedLeadId(event.target.value); setError(''); }}>
-            <option value="">Nenhum lead selecionado</option>
-            {leadOptions.filter(lead => !['Fechado', 'Perdido'].includes(lead.status)).map(lead => (
-              <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>
-            ))}
-          </select>
-        </label>
+
+        <div className="messages-lead-finder">
+          <span className="messages-control-label">Encontrar contato</span>
+          <div className="messages-lead-tools">
+            <label className="messages-contact-search">
+              <Search size={16} />
+              <input
+                value={leadQuery}
+                onChange={event => setLeadQuery(event.target.value)}
+                placeholder="Nome, empresa ou telefone"
+                aria-label="Pesquisar contatos"
+              />
+            </label>
+            <select
+              className="messages-status-filter"
+              value={leadStatusFilter}
+              onChange={event => setLeadStatusFilter(event.target.value)}
+              aria-label="Filtrar contatos por status"
+            >
+              {leadStatuses.map(status => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </div>
+
+          <label className="messages-lead-picker">
+            <span>Personalizar para</span>
+            <select value={selectedLeadId} onChange={event => { setSelectedLeadId(event.target.value); setError(''); }}>
+              <option value="">Nenhum lead selecionado</option>
+              {selectedLead && !filteredLeadOptions.some(lead => lead.id === selectedLead.id) && (
+                <option value={selectedLead.id}>{selectedLead.name} · {selectedLead.status} · selecionado</option>
+              )}
+              {filteredLeadOptions.map(lead => (
+                <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>
+              ))}
+            </select>
+          </label>
+          <small className="messages-lead-count">{filteredLeadOptions.length} de {activeLeadOptions.length} contatos encontrados</small>
+        </div>
       </section>
 
       <div className="messages-hint">
