@@ -1,0 +1,43 @@
+name: Direct WhatsApp Web
+
+on:
+  push:
+    paths:
+      - '.github/workflows/direct-whatsapp-web.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+      - name: Patch WhatsApp URL
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/App.jsx')
+          text = path.read_text()
+          old = "const text = message ? `?text=${encodeURIComponent(message)}` : '';\n    window.open(`https://wa.me/${phone}${text}`, '_blank', 'noopener,noreferrer');"
+          new = "const params = new URLSearchParams({ phone });\n    if (message) params.set('text', message);\n    window.open(`https://web.whatsapp.com/send?${params.toString()}`, '_blank', 'noopener,noreferrer');"
+          if old not in text:
+              raise SystemExit('WhatsApp opener pattern not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - run: npm ci
+      - run: npm run check
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Open WhatsApp Web directly from Fuply"
+          git push
