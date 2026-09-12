@@ -236,3 +236,18 @@ html[data-theme="dark"] .status-perdido{background:#3a1e20!important;color:#f39a
 @media(max-width:560px){
   html[data-theme="dark"] .sidebar{border-color:#2a3039}
 }
+
+
+/* Messages contact finder dark fix */
+html[data-theme="dark"] .messages-lead-finder{background:#15181e;border-color:#2a3039;box-shadow:none}
+html[data-theme="dark"] .messages-contact-search,
+html[data-theme="dark"] .messages-status-filter,
+html[data-theme="dark"] .messages-lead-picker select{background:#101319;border-color:#343c48;color:#dfe4ea}
+html[data-theme="dark"] .messages-contact-search{color:#8893a1}
+html[data-theme="dark"] .messages-contact-search input{background:transparent;border:0;color:#f0f3f6}
+html[data-theme="dark"] .messages-contact-search input::placeholder{color:#737d8b}
+html[data-theme="dark"] .messages-control-label{color:#b7bec7}
+html[data-theme="dark"] .messages-lead-count{color:#87919e}
+html[data-theme="dark"] .messages-contact-search:focus-within,
+html[data-theme="dark"] .messages-status-filter:focus,
+html[data-theme="dark"] .messages-lead-picker select:focus{border-color:#3d8f6b;box-shadow:0 0 0 3px rgba(44,196,126,.10)}
