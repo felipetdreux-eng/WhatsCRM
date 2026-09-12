@@ -324,8 +324,9 @@ export default function App() {
     const phone = whatsappPhone(lead?.phone);
     if (!phone) return false;
     const currentLead = leads.find(item => item.id === lead.id) || lead;
-    const text = message ? `?text=${encodeURIComponent(message)}` : '';
-    window.open(`https://wa.me/${phone}${text}`, '_blank', 'noopener,noreferrer');
+    const params = new URLSearchParams({ phone });
+    if (message) params.set('text', message);
+    window.open(`https://web.whatsapp.com/send?${params.toString()}`, '_blank', 'noopener,noreferrer');
 
     const now = new Date().toISOString();
     setLeads(current => current.map(item => item.id === currentLead.id
