@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/fuply-audit-fixes.yml'
+      - '.github/scripts/fuply_audit_fixes.py'
 
 permissions:
   contents: write
@@ -25,6 +26,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/backendBridge.js src/App.jsx src/LeadImporter.jsx src/AuthFlow.jsx src/Tutorial.jsx src/jacobDemoData.js
-          git commit -m "Fix audited Fuply data and demo bugs"
+          git add src/AuthFlow.jsx
+          git commit -m "Keep transient auth errors out of onboarding"
           git push
