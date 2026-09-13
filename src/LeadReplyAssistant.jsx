@@ -120,7 +120,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
     }
     if (data?.error) throw new Error(data.error);
     if (!data?.replies?.direct) throw new Error('A IA retornou uma resposta inválida.');
-    if (data?.source !== 'openai') throw new Error('A análise não veio do motor de IA esperado. Tente novamente.');
+    if (!['openai', 'safe-procedure'].includes(data?.source)) throw new Error('O Copiloto retornou uma resposta inválida. Tente novamente.');
     return data;
   };
 
@@ -322,12 +322,16 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
       {result && (
         <div className="reply-assistant-result">
           <div className="reply-result-meta">
-            <div className="reply-engine-badge active"><Sparkles size={12} /> IA ativa · {result?.model || 'OpenAI'}</div>
+            <div className={`reply-engine-badge ${result?.source === 'openai' ? 'active' : ''}`}><Sparkles size={12} /> {result?.source === 'openai' ? `IA ativa · ${result?.model || 'OpenAI'}` : 'Modo seguro · procedimento Fuply'}</div>
             <span className="reply-confidence-badge">Confiança: {Math.max(0, Math.min(100, Number(result?.confidence || 0)))}%</span>
             {Number.isFinite(Number(result?.historyItemsUsed)) && (
               <span className="reply-history-badge">{result.historyItemsUsed} registros do Fuply considerados</span>
             )}
           </div>
+
+          {result?.source === 'safe-procedure' && (
+            <div className="reply-context-note"><AlertTriangle size={14} /><span>A OpenAI não respondeu nesta tentativa. O Fuply usou o procedimento de mensagens por etapa para não travar nem inventar contexto.</span></div>
+          )}
 
           <div className="reply-message-type">
             <span>{messageTypeLabels[result?.messageType] || messageTypeLabels.unknown}</span>
