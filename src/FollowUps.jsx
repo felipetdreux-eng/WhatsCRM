@@ -7,7 +7,7 @@ export default function FollowUps(props) {
   return (
     <>
       <LeadsPage {...props} />
-      <LeadDeletionManager leads={props.leads} setLeads={props.setLeads} />
+      <LeadDeletionManager leads={props.leads} setLeads={props.setLeads} demoMode={props.demoMode} />
     </>
   );
 }
