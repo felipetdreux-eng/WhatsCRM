@@ -101,7 +101,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
     const conversation = message.trim();
     if (!conversation || !lead?.id) return null;
 
-    const { data, error: invokeError } = await supabase.functions.invoke('sales-assistant', {
+    const { data, error: invokeError } = await supabase.functions.invoke('sales-copilot', {
       body: {
         leadId: lead.id,
         mode,
