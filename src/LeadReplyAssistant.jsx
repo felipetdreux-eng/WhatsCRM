@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 import './lead-reply-assistant.css';
 
 const SELLER_CONTEXT_KEY = 'fuply-sales-context';
+const OFFER_MODE_KEY = 'fuply-sales-offer-mode';
 
 const replyLabels = {
   direct: 'Direta',
@@ -39,9 +40,18 @@ function readSellerContext() {
   }
 }
 
+function readOfferMode() {
+  try {
+    return localStorage.getItem(OFFER_MODE_KEY) === 'custom' ? 'custom' : 'fuply';
+  } catch {
+    return 'fuply';
+  }
+}
+
 export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('quick');
+  const [offerMode, setOfferMode] = useState(readOfferMode);
   const [message, setMessage] = useState('');
   const [sellerMessage, setSellerMessage] = useState('');
   const [sellerContext, setSellerContext] = useState(readSellerContext);
@@ -72,9 +82,17 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
     try {
       localStorage.setItem(SELLER_CONTEXT_KEY, sellerContext);
     } catch {
-      // Local storage can be unavailable in private/restricted browsing. The assistant still works.
+      // Restricted storage is harmless; the assistant still works.
     }
   }, [sellerContext]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OFFER_MODE_KEY, offerMode);
+    } catch {
+      // Restricted storage is harmless; the assistant still works.
+    }
+  }, [offerMode]);
 
   const reply = useMemo(() => result?.replies?.[activeReply] || '', [result, activeReply]);
   const needsMoreContext = Boolean(result?.needsMoreContext);
@@ -87,9 +105,10 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
       body: {
         leadId: lead.id,
         mode,
+        offerMode,
         conversation,
         sellerMessage: sellerMessage.trim(),
-        sellerContext: sellerContext.trim(),
+        sellerContext: offerMode === 'custom' ? sellerContext.trim() : '',
         extraContext: extraContext.trim(),
         goal,
       },
@@ -97,11 +116,11 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
 
     if (invokeError) {
       console.error('Sales assistant function error:', invokeError);
-      throw new Error('A IA real não respondeu. O Fuply não vai inventar uma resposta no lugar dela.');
+      throw new Error('O Copiloto não conseguiu concluir a análise agora. Tente novamente em alguns segundos.');
     }
     if (data?.error) throw new Error(data.error);
     if (!data?.replies?.direct) throw new Error('A IA retornou uma resposta inválida.');
-    if (data?.source !== 'openai') throw new Error('A resposta não veio da IA real. Tente novamente.');
+    if (data?.source !== 'openai') throw new Error('A análise não veio do motor de IA esperado. Tente novamente.');
     return data;
   };
 
@@ -181,7 +200,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
       <div className="section-heading reply-assistant-heading">
         <div>
           <h2><Sparkles size={17} /> Copiloto de Vendas IA</h2>
-          <p>O Fuply só sugere uma resposta quando entende contexto suficiente para não chutar.</p>
+          <p>O Copiloto já conhece o Fuply e o playbook de abordagem. Você só precisa passar a conversa.</p>
         </div>
         <button type="button" className="reply-assistant-close" onClick={() => { setOpen(false); setResult(null); setError(''); }}>Fechar</button>
       </div>
@@ -196,18 +215,33 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
       </div>
 
       <form className="reply-assistant-form" onSubmit={analyze}>
-        <label className="reply-seller-context">
-          <span>O que você vende? <b>fica salvo neste dispositivo</b></span>
-          <textarea
-            value={sellerContext}
-            onChange={event => setSellerContext(event.target.value)}
-            placeholder="Ex.: Vendo o Fuply, um CRM para pequenas empresas organizar leads, follow-ups e respostas comerciais com IA."
-            rows={2}
-            maxLength={1800}
-            disabled={loading}
-          />
-          <small className="reply-field-hint">Esse contexto evita que a IA invente o que você está oferecendo.</small>
-        </label>
+        <div className="reply-offer-mode">
+          <label>
+            <span>O que você está vendendo?</span>
+            <select value={offerMode} onChange={event => { setOfferMode(event.target.value); setResult(null); setError(''); }} disabled={loading}>
+              <option value="fuply">Fuply</option>
+              <option value="custom">Outro produto ou serviço</option>
+            </select>
+          </label>
+          {offerMode === 'fuply' && (
+            <div className="reply-fuply-knowledge"><Sparkles size={14} /><span>A IA já conhece funcionalidades, limites, público ideal e o jeito certo de vender o Fuply. Não precisa explicar o produto toda vez.</span></div>
+          )}
+        </div>
+
+        {offerMode === 'custom' && (
+          <label className="reply-seller-context">
+            <span>Explique o que você vende <b>fica salvo neste dispositivo</b></span>
+            <textarea
+              value={sellerContext}
+              onChange={event => setSellerContext(event.target.value)}
+              placeholder="Ex.: Vendemos projetos de energia solar residencial, com visita técnica e proposta personalizada."
+              rows={2}
+              maxLength={1800}
+              disabled={loading}
+            />
+            <small className="reply-field-hint">Esse contexto evita que a IA invente o que você está oferecendo.</small>
+          </label>
+        )}
 
         {mode === 'quick' ? (
           <div className="reply-quick-context">
@@ -272,11 +306,11 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
 
         <div className="reply-context-note">
           <Sparkles size={14} />
-          <span>Além do que você cola aqui, a IA recebe os dados do lead, observações, próxima ação e o histórico recente registrado no Fuply.</span>
+          <span>Além da conversa, a IA recebe os dados do lead, observações, próxima ação e histórico recente registrado no Fuply.</span>
         </div>
 
         <div className="reply-assistant-form-footer">
-          <small>Se faltar contexto, a IA deve pedir informação em vez de fabricar uma resposta.</small>
+          <small>Preço e condições nunca são inventados. Se faltarem, o Copiloto pergunta.</small>
           <button type="submit" disabled={!message.trim() || loading}>
             {loading ? <LoaderCircle className="reply-assistant-spinner" size={15} /> : <Sparkles size={15} />}
             {loading ? 'Entendendo a conversa...' : 'Analisar conversa'}
@@ -288,7 +322,7 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
       {result && (
         <div className="reply-assistant-result">
           <div className="reply-result-meta">
-            <div className="reply-engine-badge active"><Sparkles size={12} /> IA real · {result?.model || 'OpenAI'}</div>
+            <div className="reply-engine-badge active"><Sparkles size={12} /> IA ativa · {result?.model || 'OpenAI'}</div>
             <span className="reply-confidence-badge">Confiança: {Math.max(0, Math.min(100, Number(result?.confidence || 0)))}%</span>
             {Number.isFinite(Number(result?.historyItemsUsed)) && (
               <span className="reply-history-badge">{result.historyItemsUsed} registros do Fuply considerados</span>
@@ -313,9 +347,9 @@ export default function LeadReplyAssistant({ lead, openWhatsApp, openSignal = 0 
             <div className="reply-missing-context">
               <AlertTriangle size={18} />
               <div>
-                <strong>Falta contexto para responder sem inventar.</strong>
-                <span>{result.contextQuestion || 'Adicione mais contexto da conversa e analise novamente.'}</span>
-                <small>O Fuply escondeu as respostas prontas de propósito. Melhor pedir contexto do que mandar merda para o cliente.</small>
+                <strong>Falta uma informação importante.</strong>
+                <span>{result.contextQuestion || 'Adicione o dado que falta e analise novamente.'}</span>
+                <small>Se você marcou Fuply, não precisa explicar as funcionalidades: o Copiloto já conhece o produto.</small>
               </div>
             </div>
           ) : (
