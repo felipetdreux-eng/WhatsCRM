@@ -32,12 +32,21 @@ function formatActivityDate(value) {
     : date.toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace('.', '');
 }
 
-export default function LeadHistory({ userId, leadId }) {
+export default function LeadHistory({ userId, leadId, demoMode = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const refresh = async () => {
+    if (demoMode) {
+      const now = new Date().toISOString();
+      setItems([
+        { id: `demo-${leadId}-3`, kind: 'followup_scheduled', title: 'Próximo contato agendado', detail: 'Retorno comercial programado para esta oportunidade.', createdAt: now },
+        { id: `demo-${leadId}-2`, kind: 'whatsapp_opened', title: 'WhatsApp aberto', detail: 'Conversa aberta pelo Fuply.', createdAt: now },
+        { id: `demo-${leadId}-1`, kind: 'lead_created', title: 'Lead criado', detail: 'Oportunidade adicionada ao pipeline da demonstração.', createdAt: now },
+      ]);
+      setError(''); setLoading(false); return;
+    }
     if (!userId || !leadId) {
       setItems([]);
       setLoading(false);
@@ -62,7 +71,7 @@ export default function LeadHistory({ userId, leadId }) {
     };
     window.addEventListener('zapflow:activity-recorded', onRecorded);
     return () => window.removeEventListener('zapflow:activity-recorded', onRecorded);
-  }, [userId, leadId]);
+  }, [userId, leadId, demoMode]);
 
   return (
     <section className="detail-card activity-card" aria-labelledby="lead-history-title">

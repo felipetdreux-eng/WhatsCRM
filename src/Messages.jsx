@@ -75,7 +75,7 @@ function mergeRemoteTemplates(remote) {
   return [...defaults, ...extras];
 }
 
-export default function Messages({ leads = [], openWhatsApp, userId }) {
+export default function Messages({ leads = [], openWhatsApp, userId, demoMode = false }) {
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
   const [leadOptions, setLeadOptions] = useState(Array.isArray(leads) ? leads : []);
   const [query, setQuery] = useState('');
@@ -92,6 +92,10 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
     let active = true;
 
     const hydrate = async () => {
+      if (demoMode) {
+        if (active) { setTemplates(DEFAULT_TEMPLATES); setLeadOptions(Array.isArray(leads) ? leads : []); setError(''); setLoading(false); }
+        return;
+      }
       if (!userId) {
         if (active) {
           setError('Não foi possível identificar sua conta. Entre novamente.');
@@ -127,7 +131,9 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
 
     hydrate();
     return () => { active = false; };
-  }, [userId]);
+  }, [userId, demoMode]);
+
+  useEffect(() => { if (demoMode) setLeadOptions(Array.isArray(leads) ? leads : []); }, [leads, demoMode]);
 
   const selectedLead = leadOptions.find(lead => lead.id === selectedLeadId) || null;
   const filtered = useMemo(() => templates.filter(template => (
@@ -177,7 +183,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
 
   const saveEdit = async event => {
     event.preventDefault();
-    if (!editing?.title?.trim() || !editing?.text?.trim() || !userId) return;
+    if (!editing?.title?.trim() || !editing?.text?.trim() || (!userId && !demoMode)) return;
 
     const next = {
       ...editing,
@@ -189,7 +195,7 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
     setSaving(true);
     setError('');
     try {
-      await syncMessages([next], userId);
+      if (!demoMode) await syncMessages([next], userId);
       setTemplates(current => current.map(item => item.id === next.id ? next : item));
       setEditing(null);
     } catch (saveError) {
@@ -201,11 +207,11 @@ export default function Messages({ leads = [], openWhatsApp, userId }) {
   };
 
   const restoreDefaults = async () => {
-    if (!userId || saving) return;
+    if ((!userId && !demoMode) || saving) return;
     setSaving(true);
     setError('');
     try {
-      await syncMessages(DEFAULT_TEMPLATES, userId);
+      if (!demoMode) await syncMessages(DEFAULT_TEMPLATES, userId);
       setTemplates(DEFAULT_TEMPLATES);
       setEditing(null);
     } catch (restoreError) {

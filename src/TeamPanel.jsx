@@ -20,7 +20,7 @@ function initials(name) {
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'ME').toUpperCase();
 }
 
-export default function TeamPanel({ account }) {
+export default function TeamPanel({ account, demoMode = false }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -41,6 +41,15 @@ export default function TeamPanel({ account }) {
   }), [members]);
 
   const refresh = async () => {
+    if (demoMode) {
+      const workspace = { id: 'demo-workspace', name: 'Jacob Engenharia' };
+      setContext({ activeWorkspace: workspace, workspaces: [workspace], myRole: 'owner', members: [
+        { user_id: account?.id || 'demo-jacob', name: account?.name || 'Comercial Jacob', role: 'owner' },
+        { user_id: 'demo-eng', name: 'Engenharia', role: 'member' },
+        { user_id: 'demo-dir', name: 'Diretoria', role: 'admin' },
+      ] });
+      setWorkspaceName(workspace.name); setLoading(false); setError(''); return;
+    }
     if (!account?.id) return;
     setLoading(true);
     setError('');
@@ -56,7 +65,7 @@ export default function TeamPanel({ account }) {
     }
   };
 
-  useEffect(() => { refresh(); }, [account?.id]);
+  useEffect(() => { refresh(); }, [account?.id, demoMode]);
 
   const createInvite = async () => {
     if (!activeWorkspace?.id || busy) return;
@@ -64,7 +73,7 @@ export default function TeamPanel({ account }) {
     setError('');
     setNotice('');
     try {
-      const code = await createWorkspaceInvite(activeWorkspace.id);
+      const code = demoMode ? 'JACOB2026' : await createWorkspaceInvite(activeWorkspace.id);
       setInviteCode(String(code || '').toUpperCase());
       setNotice('Convite criado. O código vale por 7 dias.');
     } catch (inviteError) {
@@ -97,6 +106,7 @@ export default function TeamPanel({ account }) {
     setError('');
     setNotice('');
     try {
+      if (demoMode) { setNotice('Demonstração: código aceito localmente.'); setJoinCode(''); return; }
       await joinWorkspaceByCode(account.id, code);
       setNotice('Você entrou na equipe. Atualizando o Fuply...');
       window.setTimeout(() => window.location.reload(), 300);
@@ -131,7 +141,7 @@ export default function TeamPanel({ account }) {
     setError('');
     setNotice('');
     try {
-      const updated = await renameWorkspace(activeWorkspace.id, cleanName);
+      const updated = demoMode ? { ...activeWorkspace, name: cleanName } : await renameWorkspace(activeWorkspace.id, cleanName);
       setContext(current => ({ ...current, activeWorkspace: updated, workspaces: current.workspaces.map(item => item.id === updated.id ? updated : item) }));
       setWorkspaceName(updated.name);
       setNotice('Nome da equipe atualizado.');

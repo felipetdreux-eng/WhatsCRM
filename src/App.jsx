@@ -203,9 +203,10 @@ function interactionTemperature(lead) {
   return { tone: 'cold', text: `${days} dias sem interação` };
 }
 
-export default function App() {
-  const [account, setAccount] = useState(ACTIVE_ACCOUNT);
+export default function App({ demoMode = false, demoAccount = null, demoLeads = null, demoTeamMembers = [], demoWhatsAppPhone = '' }) {
+  const [account, setAccount] = useState(demoMode && demoAccount ? demoAccount : ACTIVE_ACCOUNT);
   const [leads, setLeads] = useState(() => {
+    if (demoMode && Array.isArray(demoLeads)) return migrateLeads(demoLeads);
     try {
       const saved = JSON.parse(localStorage.getItem('zapflow-leads'));
       return migrateLeads(Array.isArray(saved) ? saved : buildDemoLeads());
@@ -213,7 +214,7 @@ export default function App() {
       return migrateLeads(buildDemoLeads());
     }
   });
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamMembers, setTeamMembers] = useState(demoMode ? demoTeamMembers : []);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [originFilter, setOriginFilter] = useState('Todas');
@@ -237,8 +238,9 @@ export default function App() {
   const [replyAssistantSignal, setReplyAssistantSignal] = useState(0);
 
   useEffect(() => {
+    if (demoMode) return;
     localStorage.setItem('zapflow-leads', JSON.stringify(leads));
-  }, [leads]);
+  }, [leads, demoMode]);
 
   useEffect(() => {
     if (!undoAction) return undefined;
@@ -247,6 +249,7 @@ export default function App() {
   }, [undoAction]);
 
   useEffect(() => {
+    if (demoMode) return undefined;
     const handleRemoteLeads = event => {
       const freshLeads = event?.detail?.leads;
       if (!Array.isArray(freshLeads)) return;
@@ -254,10 +257,11 @@ export default function App() {
     };
     window.addEventListener('zapflow:remote-leads', handleRemoteLeads);
     return () => window.removeEventListener('zapflow:remote-leads', handleRemoteLeads);
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     let active = true;
+    if (demoMode) { setTeamMembers(demoTeamMembers); return undefined; }
     if (!account?.id) return undefined;
     loadWorkspaceContext(account.id)
       .then(context => {
@@ -266,7 +270,7 @@ export default function App() {
       })
       .catch(error => console.error('Team members load failed:', error));
     return () => { active = false; };
-  }, [account?.id]);
+  }, [account?.id, demoMode]);
 
   const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
   const accountName = account?.name || 'Usuário';
@@ -300,6 +304,7 @@ export default function App() {
   };
 
   const logActivity = async (lead, kind, title, detail = '', metadata = {}) => {
+    if (demoMode) { emitActivityRefresh(lead?.id); return; }
     if (!account?.id || !lead?.id) return;
     try {
       const item = await recordLeadActivity({ userId: account.id, leadId: lead.id, kind, title, detail, metadata });
@@ -321,7 +326,7 @@ export default function App() {
   };
 
   const openWhatsApp = (lead, message = '', options = {}) => {
-    const phone = whatsappPhone(lead?.phone);
+    const phone = whatsappPhone(demoMode && demoWhatsAppPhone ? demoWhatsAppPhone : lead?.phone);
     if (!phone) return false;
     const currentLead = leads.find(item => item.id === lead.id) || lead;
     const params = new URLSearchParams({ phone });
@@ -435,6 +440,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (demoMode) { window.location.reload(); return; }
     if (!account?.id) return;
     logoutAccount(account.id);
     window.location.reload();
@@ -537,7 +543,7 @@ export default function App() {
     setFormError('');
     setModalOpen(false);
 
-    if (account?.id) {
+    if (account?.id && !demoMode) {
       syncLeads([next], account.id)
         .then(() => logActivity(next, 'lead_created', 'Lead criado', `${next.status} · ${next.origin || 'Outro'} · Responsável: ${memberName(next.assignedTo)}.`, { status: next.status, origin: next.origin, assignedTo: next.assignedTo }))
         .catch(error => console.error('New lead initial sync failed:', error));
@@ -736,7 +742,7 @@ export default function App() {
                 <textarea className="inline-notes-editor" value={editingLead.notes || ''} onChange={e => setEditingLead({ ...editingLead, notes: e.target.value })} placeholder="Adicione observações sobre este lead..." />
               </section>
 
-              <LeadHistory userId={account?.id} leadId={selectedLead.id} />
+              <LeadHistory userId={account?.id} leadId={selectedLead.id} demoMode={demoMode} />
             </div>
 
             <aside className="detail-side-column">
@@ -886,8 +892,8 @@ export default function App() {
     if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} />;
-    if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} />;
-    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} />;
+    if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} demoMode={demoMode} />;
+    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
     return renderPipeline();
   };
 

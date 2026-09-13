@@ -18,7 +18,7 @@ const SELLING_LABELS = {
   both: 'Produtos e serviços',
 };
 
-export default function SettingsPage({ account, onAccountChange, onLogout }) {
+export default function SettingsPage({ account, onAccountChange, onLogout, demoMode = false }) {
   const [name, setName] = useState(account?.name || '');
   const [theme, setTheme] = useState(account?.theme === 'dark' ? 'dark' : 'light');
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
     setError('');
     setNotice('');
     try {
-      await updateProfileName(account?.id, cleanName);
+      if (!demoMode) await updateProfileName(account?.id, cleanName);
       onAccountChange?.({ ...account, name: cleanName, theme });
       setName(cleanName);
       setNotice('Nome atualizado com sucesso.');
@@ -60,7 +60,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
     setNotice('');
     document.documentElement.dataset.theme = nextTheme;
     try {
-      await updateProfileTheme(account?.id, nextTheme);
+      if (!demoMode) await updateProfileTheme(account?.id, nextTheme);
       onAccountChange?.({ ...account, theme: nextTheme });
       setNotice(nextTheme === 'dark' ? 'Modo escuro ativado.' : 'Modo claro ativado.');
     } catch (themeError) {
@@ -129,7 +129,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout }) {
           </dl>
         </section>
 
-        <TeamPanel account={account} />
+        <TeamPanel account={account} demoMode={demoMode} />
 
         <section className="settings-card" aria-labelledby="appearance-settings-title">
           <div className="settings-card-heading">
