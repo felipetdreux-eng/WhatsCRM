@@ -350,7 +350,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       'whatsapp_opened',
       'WhatsApp aberto',
       message ? 'Conversa aberta com uma mensagem preparada pelo sistema.' : 'Conversa aberta pelo sistema. O envio da mensagem não é confirmado pelo WhatsApp.',
-      { hasMessage: Boolean(message), source: options?.source || 'app' },
+      { hasMessage: Boolean(message), source: options?.source || 'app', preparedMessage: message ? String(message).slice(0, 1800) : '' },
     );
 
     if (!options?.skipFollowupPrompt && !CLOSED.includes(currentLead.status)) {
