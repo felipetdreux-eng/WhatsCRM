@@ -5,7 +5,7 @@ import { getActiveAccount } from './accountStorage';
 import { supabase } from './supabaseClient';
 import './lead-delete.css';
 
-export default function LeadDeletionManager({ leads, setLeads }) {
+export default function LeadDeletionManager({ leads, setLeads, demoMode = false }) {
   const [headerTarget, setHeaderTarget] = useState(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -27,12 +27,23 @@ export default function LeadDeletionManager({ leads, setLeads }) {
   }, [leads, query]);
 
   const keepEmptyState = async userId => {
-    if (!userId) return;
+    if (!userId || demoMode) return;
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ start_mode: 'empty' })
       .eq('id', userId);
     if (profileError) console.error('Could not persist empty lead state:', profileError);
+  };
+
+  const activeWorkspaceId = async userId => {
+    if (!userId) return null;
+    const { data, error: profileError } = await supabase
+      .from('profiles')
+      .select('active_workspace_id')
+      .eq('id', userId)
+      .single();
+    if (profileError) throw profileError;
+    return data?.active_workspace_id || null;
   };
 
   const deleteOne = async () => {
@@ -41,12 +52,21 @@ export default function LeadDeletionManager({ leads, setLeads }) {
     setError('');
     try {
       const account = getActiveAccount();
-      const { error: deleteError } = await supabase.from('leads').delete().eq('id', target.id);
-      if (deleteError) throw deleteError;
+      if (!demoMode) {
+        if (!account?.id) throw new Error('Conta não encontrada.');
+        const workspaceId = await activeWorkspaceId(account.id);
+        if (!workspaceId) throw new Error('Equipe ativa não encontrada.');
+        const { error: deleteError } = await supabase
+          .from('leads')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .eq('id', target.id);
+        if (deleteError) throw deleteError;
+      }
 
       const remaining = leads.filter(lead => lead.id !== target.id);
       setLeads(remaining);
-      if (remaining.length === 0) await keepEmptyState(account?.id);
+      if (!demoMode && remaining.length === 0) await keepEmptyState(account?.id);
       setTarget(null);
     } catch (deleteError) {
       console.error('Lead deletion failed:', deleteError);
@@ -62,16 +82,19 @@ export default function LeadDeletionManager({ leads, setLeads }) {
     setError('');
     try {
       const account = getActiveAccount();
-      if (!account?.id) throw new Error('Conta não encontrada.');
-
-      const { error: deleteError } = await supabase
-        .from('leads')
-        .delete()
-        .eq('user_id', account.id);
-      if (deleteError) throw deleteError;
+      if (!demoMode) {
+        if (!account?.id) throw new Error('Conta não encontrada.');
+        const workspaceId = await activeWorkspaceId(account.id);
+        if (!workspaceId) throw new Error('Equipe ativa não encontrada.');
+        const { error: deleteError } = await supabase
+          .from('leads')
+          .delete()
+          .eq('workspace_id', workspaceId);
+        if (deleteError) throw deleteError;
+        await keepEmptyState(account.id);
+      }
 
       setLeads([]);
-      await keepEmptyState(account.id);
       setDeleteAllOpen(false);
       setConfirmation('');
       setOpen(false);
