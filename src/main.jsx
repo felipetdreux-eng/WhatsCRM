@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import GlobalImportDrop from './GlobalImportDrop';
 import { JACOB_DEMO_ACCOUNT, JACOB_DEMO_LEADS, JACOB_DEMO_TEAM, JACOB_DEMO_WHATSAPP } from './jacobDemoData';
+import { ABLE_DEMO_ACCOUNT, ABLE_DEMO_LEADS, ABLE_DEMO_TEAM, ABLE_DEMO_WHATSAPP } from './ableLiveDemoData';
 import { getActiveAccount } from './accountStorage';
 import './pipelineDragScroll';
 import './dark.css';
@@ -14,8 +15,15 @@ const params = new URLSearchParams(window.location.search);
 const demo = params.get('demo');
 const demoToken = params.get('token');
 const isJacobDemo = demo === 'jacob';
+const isAbleDemo = demo === 'able' || demo === 'able-live';
 
-document.documentElement.dataset.theme = isJacobDemo ? JACOB_DEMO_ACCOUNT.theme : (activeAccount?.theme === 'dark' ? 'dark' : 'light');
+const demoTheme = isJacobDemo
+  ? JACOB_DEMO_ACCOUNT.theme
+  : isAbleDemo
+    ? ABLE_DEMO_ACCOUNT.theme
+    : null;
+
+document.documentElement.dataset.theme = demoTheme || (activeAccount?.theme === 'dark' ? 'dark' : 'light');
 
 function DemoStatus({ title, text }) {
   return (
@@ -26,6 +34,21 @@ function DemoStatus({ title, text }) {
         <p style={{ margin: '10px 0 0', color: '#66756d', lineHeight: 1.6 }}>{text}</p>
       </section>
     </main>
+  );
+}
+
+function renderAbleDemo() {
+  if (!rootHost) return;
+  createRoot(rootHost).render(
+    <React.StrictMode>
+      <App
+        demoMode
+        demoAccount={ABLE_DEMO_ACCOUNT}
+        demoLeads={ABLE_DEMO_LEADS}
+        demoTeamMembers={ABLE_DEMO_TEAM}
+        demoWhatsAppPhone={ABLE_DEMO_WHATSAPP}
+      />
+    </React.StrictMode>,
   );
 }
 
@@ -63,7 +86,9 @@ async function renderJacobDemo() {
   }
 }
 
-if (rootHost && isJacobDemo) {
+if (rootHost && isAbleDemo) {
+  renderAbleDemo();
+} else if (rootHost && isJacobDemo) {
   renderJacobDemo();
 } else if (rootHost && activeAccount?.onboardingCompleted) {
   createRoot(rootHost).render(
