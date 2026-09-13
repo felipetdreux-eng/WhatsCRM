@@ -1,0 +1,31 @@
+name: Fix realtime delete
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-realtime-delete.yml'
+      - '.github/scripts/fix_realtime_delete.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+      - name: Apply realtime delete fix
+        run: python3 .github/scripts/fix_realtime_delete.py
+      - run: npm ci
+      - run: npm run check
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/backendBridge.js
+          git commit -m "Fix shared-workspace realtime deletes"
+          git push
