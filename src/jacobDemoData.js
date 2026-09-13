@@ -38,7 +38,3 @@ export const JACOB_DEMO_LEADS = [
 
 export const JACOB_DEMO_WHATSAPP = '11932318724';
 
-export const JACOB_DEMO_ACCESS = {
-  token: 'DR06Fe9IRsebUfJk892O1ihX',
-  expiresAt: '2026-09-14T21:23:44.305612-03:00',
-};

@@ -1,5 +1,4 @@
 import { supabase } from './supabaseClient';
-import { buildDemoLeads } from './domain';
 
 const ACCOUNTS_KEY = 'zapflow-accounts';
 const SESSION_KEY = 'zapflow-session';
@@ -405,12 +404,10 @@ export async function hydrateBackend(user, profile) {
     if (Array.isArray(oldLeads) && oldLeads.length) {
       const migrated = await syncLeads(oldLeads, user.id);
       localStorage.setItem('zapflow-leads', JSON.stringify(migrated.length ? migrated : oldLeads));
-    } else if (profile?.start_mode === 'empty') {
-      localStorage.setItem('zapflow-leads', '[]');
     } else {
-      const demo = buildDemoLeads();
-      const syncedDemo = await syncLeads(demo, user.id);
-      localStorage.setItem('zapflow-leads', JSON.stringify(syncedDemo.length ? syncedDemo : demo));
+      // Demo data is created during onboarding. Never resurrect it on login,
+      // especially in a shared workspace that was intentionally emptied.
+      localStorage.setItem('zapflow-leads', '[]');
     }
   }
 

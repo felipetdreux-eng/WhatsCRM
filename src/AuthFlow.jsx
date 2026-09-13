@@ -508,4 +508,5 @@ function AuthFlow() {
 }
 
 const host = document.getElementById('auth-root');
-if (host) createRoot(host).render(<AuthFlow />);
+const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'jacob';
+if (host && !isPublicDemo) createRoot(host).render(<AuthFlow />);

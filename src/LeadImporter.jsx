@@ -12,6 +12,7 @@ import {
   IMPORT_FIELDS,
   analyzeImport,
   detectMapping,
+  normalizeStatus,
   parseDelimitedText,
 } from './importUtils';
 import './import.css';
@@ -20,7 +21,7 @@ const ACCEPT = '.csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf';
 const SHEET_FORMATS = new Set(['xlsx', 'xls', 'xlsm', 'ods']);
 const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs';
 const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs';
-const FUPLY_STATUSES = new Set(['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Fechado', 'Perdido']);
+const FUPLY_STATUSES = new Set(['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido']);
 
 function cleanMatrix(matrix) {
   return (Array.isArray(matrix) ? matrix : [])
@@ -41,13 +42,7 @@ function plainText(value) {
 function normalizeNegotiationStatus(value) {
   const text = plainText(value);
   if (!text || /^(vazio|sem status|sem etapa|n\/a|-)$/.test(text)) return '';
-  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Fechado';
-  if (/(descartado|perdido|cancelado|recusado|desistiu|sem interesse|nao interessado|sem retorno)/.test(text)) return 'Perdido';
-  if (/(trabalhando|proposta|orcamento|cotacao|enviado)/.test(text)) return 'Proposta enviada';
-  if (/(em andamento|interessado|negociacao|negociando|quente)/.test(text)) return 'Interessado';
-  if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
-  if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo lead';
-  return String(value ?? '').trim();
+  return normalizeStatus(value) || String(value ?? '').trim();
 }
 
 function hasMapped(mapping, key) {

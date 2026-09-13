@@ -6,7 +6,7 @@ import './tutorial.css';
 
 const STEPS = [
   {
-    page: 'Dashboard',
+    page: 'Início',
     selector: '.dashboard-header-actions .primary-button',
     side: 'left',
     title: 'Adicione seu primeiro lead',
@@ -48,18 +48,18 @@ const STEPS = [
     text: 'Escolha um lead e o Fuply personaliza os modelos com nome, empresa e valor. Você também tem mensagens para primeiro contato, follow-up, proposta, última tentativa e para pedir atendimento de uma pessoa responsável.',
   },
   {
-    page: 'Dashboard',
-    selector: '.autopilot-dashboard-button',
+    page: 'Início',
+    selector: '.daily-secondary-actions .secondary-button',
     side: 'left',
     title: 'Deixe o Autopilot montar sua fila de vendas',
     text: 'O Autopilot analisa seus leads e ordena quem merece atenção primeiro usando atraso, etapa da negociação, valor e tempo sem interação. Abra a fila e avance pelas oportunidades sem precisar decidir manualmente por onde começar.',
   },
   {
-    page: 'Dashboard',
-    selector: '.team-metric-card',
+    page: 'Resultados',
+    selector: '.dashboard-metrics',
     side: 'right',
-    title: 'Acompanhe o desempenho da equipe',
-    text: 'Veja leads, vendas, conversão, faturamento e follow-ups por responsável. Use o filtro para comparar a equipe inteira ou analisar cada membro separadamente.',
+    title: 'Acompanhe seus resultados',
+    text: 'Veja pipeline aberto, vendas fechadas, novos leads, conversão, funil, origens e desempenho comercial em uma tela de gestão.',
   },
   {
     page: 'Configurações',
@@ -69,8 +69,8 @@ const STEPS = [
     text: 'Em Configurações → Equipe, gere um código de convite para novos membros ou entre em outro workspace. Cada pessoa usa a própria conta, mas todos compartilham os leads, o Pipeline e o histórico da equipe.',
   },
   {
-    page: 'Dashboard',
-    selector: '.focus-tabs > div',
+    page: 'Início',
+    selector: '.daily-priority-panel',
     side: 'right',
     title: 'Comece o dia pelas prioridades',
     text: 'O Dashboard coloca atrasados, contatos de hoje, leads sem próximo passo e negociações esfriando na sua frente. Assim você abre o Fuply e já sabe o que precisa fazer primeiro.',
@@ -350,4 +350,5 @@ function Tutorial() {
 }
 
 const host = document.getElementById('tutorial-root');
-if (host) createRoot(host).render(<Tutorial />);
+const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'jacob';
+if (host && !isPublicDemo) createRoot(host).render(<Tutorial />);

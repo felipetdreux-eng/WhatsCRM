@@ -899,7 +899,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
     if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
-    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} />;
+    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} demoMode={demoMode} />;
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
     return renderPipeline();
