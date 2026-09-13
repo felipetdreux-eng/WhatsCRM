@@ -29,17 +29,23 @@ async function boot(sessionUser = null) {
   return bootPromise;
 }
 
-boot().catch(bootError => console.error('Fuply initial boot failed:', bootError));
+const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'jacob';
 
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') {
-    bootedUserId = null;
-    return;
-  }
+if (isPublicDemo) {
+  import('./main.jsx').catch(error => console.error('Fuply demo boot failed:', error));
+} else {
+  boot().catch(bootError => console.error('Fuply initial boot failed:', bootError));
 
-  if (session?.user && ['SIGNED_IN', 'INITIAL_SESSION', 'USER_UPDATED'].includes(event)) {
-    window.setTimeout(() => {
-      boot(session.user).catch(bootError => console.error('Fuply auth boot failed:', bootError));
-    }, 0);
-  }
-});
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      bootedUserId = null;
+      return;
+    }
+
+    if (session?.user && ['SIGNED_IN', 'INITIAL_SESSION', 'USER_UPDATED'].includes(event)) {
+      window.setTimeout(() => {
+        boot(session.user).catch(bootError => console.error('Fuply auth boot failed:', bootError));
+      }, 0);
+    }
+  });
+}
