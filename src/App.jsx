@@ -236,6 +236,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   const [followupForm, setFollowupForm] = useState({ date: '', time: '', action: 'Retornar contato' });
   const [followupError, setFollowupError] = useState('');
   const [replyAssistantSignal, setReplyAssistantSignal] = useState(0);
+  const [demoNotice, setDemoNotice] = useState('');
 
   useEffect(() => {
     if (demoMode) return;
@@ -326,12 +327,19 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   };
 
   const openWhatsApp = (lead, message = '', options = {}) => {
+    const currentLead = leads.find(item => item.id === lead.id) || lead;
+    if (!currentLead) return false;
     const phone = whatsappPhone(demoMode && demoWhatsAppPhone ? demoWhatsAppPhone : lead?.phone);
     if (!phone) return false;
-    const currentLead = leads.find(item => item.id === lead.id) || lead;
-    const params = new URLSearchParams({ phone });
-    if (message) params.set('text', message);
-    window.open(`https://web.whatsapp.com/send?${params.toString()}`, '_blank', 'noopener,noreferrer');
+
+    if (demoMode) {
+      setDemoNotice('Modo demonstração: o WhatsApp real está bloqueado. A ação foi simulada dentro do Fuply.');
+      window.setTimeout(() => setDemoNotice(''), 4500);
+    } else {
+      const params = new URLSearchParams({ phone });
+      if (message) params.set('text', message);
+      window.open(`https://web.whatsapp.com/send?${params.toString()}`, '_blank', 'noopener,noreferrer');
+    }
 
     const now = new Date().toISOString();
     setLeads(current => current.map(item => item.id === currentLead.id
@@ -905,6 +913,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
 
       <GlobalQuickActions leads={leads} onNewLead={() => openNewLead()} onNavigate={navigate} onOpenLead={openLead} onOpenLeads={openLeadsView} onReplyWithAI={openReplyAssistant} />
       {undoAction && <div className="undo-toast" role="status"><span>{undoAction.message}</span><button type="button" onClick={restoreUndo}>Desfazer</button></div>}
+      {demoNotice && <div className="undo-toast" role="status"><span>{demoNotice}</span></div>}
 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
