@@ -8,6 +8,7 @@ import { getActiveAccount } from './accountStorage';
 import './pipelineDragScroll';
 import './dark.css';
 import './dark-integrated.css';
+import './dark-command-fix.css';
 
 const rootHost = document.getElementById('root');
 const activeAccount = getActiveAccount();
