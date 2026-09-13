@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: retain the exact message Fuply prepared so the sales copilot has real context later.
 path = Path('src/App.jsx')
 text = path.read_text(encoding='utf-8')
 old = "{ hasMessage: Boolean(message), source: options?.source || 'app' },"
