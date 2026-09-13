@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: enforce the staged Fuply outreach procedure in the sales copilot.
 path = Path('supabase/functions/sales-assistant/index.ts')
 text = path.read_text(encoding='utf-8')
 
