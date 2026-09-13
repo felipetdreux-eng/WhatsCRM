@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: point the UI at the staged sales-copilot backend.
 path = Path('src/LeadReplyAssistant.jsx')
 text = path.read_text(encoding='utf-8')
 old = "supabase.functions.invoke('sales-assistant', {"
