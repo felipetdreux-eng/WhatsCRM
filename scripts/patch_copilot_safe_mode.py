@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: allow the frontend to use the staged safe procedure when OpenAI is unavailable.
 path = Path('src/LeadReplyAssistant.jsx')
 text = path.read_text(encoding='utf-8')
 
