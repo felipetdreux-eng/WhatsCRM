@@ -1,0 +1,16 @@
+html[data-theme="dark"] .command-row:hover {
+  background: #252b33;
+  color: #8ee0b6;
+}
+
+html[data-theme="dark"] .command-row:hover strong {
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .command-row:hover span {
+  color: #c6ced8;
+}
+
+html[data-theme="dark"] .command-row:hover svg {
+  color: #8ee0b6;
+}
