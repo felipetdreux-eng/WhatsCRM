@@ -26,6 +26,7 @@ import './leads.css';
 const CLOSED = ['Fechado', 'Perdido'];
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
 const SCOPES = ['Todos', 'Inteligentes', 'Duplicados', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
+const LEADS_FILTERS_STORAGE_KEY = 'fuply-leads-filters';
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const noon = value => new Date(`${value}T12:00:00`);
@@ -41,6 +42,19 @@ const pretty = value => {
 };
 const full = value => noon(value).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '');
 const statusClass = status => status.toLowerCase().replaceAll(' ', '-');
+
+function readPersistedFilters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LEADS_FILTERS_STORAGE_KEY) || '{}');
+    return {
+      query: typeof saved.query === 'string' ? saved.query : '',
+      status: saved.status === 'Todos' || STATUSES.includes(saved.status) ? saved.status : 'Todos',
+      scope: SCOPES.includes(saved.scope) ? saved.scope : 'Todos',
+    };
+  } catch {
+    return { query: '', status: 'Todos', scope: 'Todos' };
+  }
+}
 
 function TemperatureBadge({ lead }) {
   const temperature = getLeadTemperature(lead);
@@ -80,9 +94,9 @@ function inScope(lead, scope, duplicateIndex) {
 }
 
 export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset }) {
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('Todos');
-  const [scope, setScope] = useState('Todos');
+  const [query, setQuery] = useState(() => readPersistedFilters().query);
+  const [status, setStatus] = useState(() => readPersistedFilters().status);
+  const [scope, setScope] = useState(() => readPersistedFilters().scope);
   const [rescheduling, setRescheduling] = useState(null);
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
@@ -90,6 +104,10 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fuply-leads-view') || 'simple');
   const duplicateIndex = useMemo(() => buildDuplicateIndex(leads), [leads]);
   const duplicateGroups = useMemo(() => duplicateGroupCount(duplicateIndex), [duplicateIndex]);
+
+  useEffect(() => {
+    localStorage.setItem(LEADS_FILTERS_STORAGE_KEY, JSON.stringify({ query, status, scope }));
+  }, [query, status, scope]);
 
   useEffect(() => {
     if (!preset) return;
