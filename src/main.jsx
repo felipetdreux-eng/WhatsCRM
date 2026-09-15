@@ -57,47 +57,32 @@ function renderAbleDemo() {
   );
 }
 
-function renderInnovaDemo() {
-  if (!rootHost) return;
-  createRoot(rootHost).render(
-    <React.StrictMode>
-      <App
-        demoMode
-        demoAccount={INNOVA_DEMO_ACCOUNT}
-        demoLeads={INNOVA_DEMO_LEADS}
-        demoTeamMembers={INNOVA_DEMO_TEAM}
-        demoWhatsAppPhone={INNOVA_DEMO_WHATSAPP}
-      />
-    </React.StrictMode>,
-  );
-}
-
-async function renderJacobDemo() {
+async function renderProtectedDemo({ demoKey, account, leads, team, whatsapp }) {
   if (!rootHost) return;
   const root = createRoot(rootHost);
-  root.render(<DemoStatus title="Carregando demonstração" text="Validando este acesso ao Fuply…" />);
+  root.render(<DemoStatus title="Carregando demonstração" text="Validando este acesso temporário ao Fuply…" />);
 
   try {
-    const response = await fetch(`/api/demo-access?token=${encodeURIComponent(demoToken || '')}`, { cache: 'no-store' });
+    const response = await fetch(`/api/demo-access?demo=${encodeURIComponent(demoKey)}&token=${encodeURIComponent(demoToken || '')}`, { cache: 'no-store' });
     const access = response.ok ? await response.json() : null;
 
     if (!access?.allowed) {
       root.render(access?.expired
-        ? <DemoStatus title="Demonstração encerrada" text="O período de teste deste acesso terminou. Para continuar usando o Fuply, é necessário ativar uma conta." />
+        ? <DemoStatus title="Demonstração encerrada" text="O período de acesso desta demonstração terminou. Para continuar usando o Fuply, é necessário solicitar um novo acesso." />
         : <DemoStatus title="Link de demonstração inválido" text="Este acesso não possui um token válido. Solicite um novo link de demonstração." />);
       return;
     }
 
     root.render(
       <React.StrictMode>
-        <App demoMode demoAccount={JACOB_DEMO_ACCOUNT} demoLeads={JACOB_DEMO_LEADS} demoTeamMembers={JACOB_DEMO_TEAM} demoWhatsAppPhone={JACOB_DEMO_WHATSAPP} />
+        <App demoMode demoAccount={account} demoLeads={leads} demoTeamMembers={team} demoWhatsAppPhone={whatsapp} />
       </React.StrictMode>,
     );
 
     const expiresInMs = Math.max(0, Number(access.expiresInMs || 0));
     if (expiresInMs > 0) {
       window.setTimeout(() => {
-        root.render(<DemoStatus title="Demonstração encerrada" text="O período de teste deste acesso terminou. Para continuar usando o Fuply, é necessário ativar uma conta." />);
+        root.render(<DemoStatus title="Demonstração encerrada" text="O período de acesso desta demonstração terminou. Para continuar usando o Fuply, é necessário solicitar um novo acesso." />);
       }, Math.min(expiresInMs, 2147483647));
     }
   } catch (error) {
@@ -107,11 +92,23 @@ async function renderJacobDemo() {
 }
 
 if (rootHost && isInnovaDemo) {
-  renderInnovaDemo();
+  renderProtectedDemo({
+    demoKey: 'innova',
+    account: INNOVA_DEMO_ACCOUNT,
+    leads: INNOVA_DEMO_LEADS,
+    team: INNOVA_DEMO_TEAM,
+    whatsapp: INNOVA_DEMO_WHATSAPP,
+  });
 } else if (rootHost && isAbleDemo) {
   renderAbleDemo();
 } else if (rootHost && isJacobDemo) {
-  renderJacobDemo();
+  renderProtectedDemo({
+    demoKey: 'jacob',
+    account: JACOB_DEMO_ACCOUNT,
+    leads: JACOB_DEMO_LEADS,
+    team: JACOB_DEMO_TEAM,
+    whatsapp: JACOB_DEMO_WHATSAPP,
+  });
 } else if (rootHost && activeAccount?.onboardingCompleted) {
   createRoot(rootHost).render(
     <React.StrictMode>
