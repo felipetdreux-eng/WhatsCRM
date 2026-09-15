@@ -4,6 +4,7 @@ import App from './App';
 import GlobalImportDrop from './GlobalImportDrop';
 import { JACOB_DEMO_ACCOUNT, JACOB_DEMO_LEADS, JACOB_DEMO_TEAM, JACOB_DEMO_WHATSAPP } from './jacobDemoData';
 import { ABLE_DEMO_ACCOUNT, ABLE_DEMO_LEADS, ABLE_DEMO_TEAM, ABLE_DEMO_WHATSAPP } from './ableLiveDemoData';
+import { INNOVA_DEMO_ACCOUNT, INNOVA_DEMO_LEADS, INNOVA_DEMO_TEAM, INNOVA_DEMO_WHATSAPP } from './innovaDemoData';
 import { getActiveAccount } from './accountStorage';
 import './pipelineDragScroll';
 import './dark.css';
@@ -17,12 +18,15 @@ const demo = params.get('demo');
 const demoToken = params.get('token');
 const isJacobDemo = demo === 'jacob';
 const isAbleDemo = demo === 'able' || demo === 'able-live';
+const isInnovaDemo = demo === 'innova' || demo === 'innova-automation';
 
 const demoTheme = isJacobDemo
   ? JACOB_DEMO_ACCOUNT.theme
   : isAbleDemo
     ? ABLE_DEMO_ACCOUNT.theme
-    : null;
+    : isInnovaDemo
+      ? INNOVA_DEMO_ACCOUNT.theme
+      : null;
 
 document.documentElement.dataset.theme = demoTheme || (activeAccount?.theme === 'dark' ? 'dark' : 'light');
 
@@ -48,6 +52,21 @@ function renderAbleDemo() {
         demoLeads={ABLE_DEMO_LEADS}
         demoTeamMembers={ABLE_DEMO_TEAM}
         demoWhatsAppPhone={ABLE_DEMO_WHATSAPP}
+      />
+    </React.StrictMode>,
+  );
+}
+
+function renderInnovaDemo() {
+  if (!rootHost) return;
+  createRoot(rootHost).render(
+    <React.StrictMode>
+      <App
+        demoMode
+        demoAccount={INNOVA_DEMO_ACCOUNT}
+        demoLeads={INNOVA_DEMO_LEADS}
+        demoTeamMembers={INNOVA_DEMO_TEAM}
+        demoWhatsAppPhone={INNOVA_DEMO_WHATSAPP}
       />
     </React.StrictMode>,
   );
@@ -87,7 +106,9 @@ async function renderJacobDemo() {
   }
 }
 
-if (rootHost && isAbleDemo) {
+if (rootHost && isInnovaDemo) {
+  renderInnovaDemo();
+} else if (rootHost && isAbleDemo) {
   renderAbleDemo();
 } else if (rootHost && isJacobDemo) {
   renderJacobDemo();
