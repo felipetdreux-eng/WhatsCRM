@@ -28,7 +28,9 @@ const demoTheme = isJacobDemo
       ? INNOVA_DEMO_ACCOUNT.theme
       : null;
 
-document.documentElement.dataset.theme = demoTheme || (activeAccount?.theme === 'dark' ? 'dark' : 'light');
+const initialTheme = demoTheme || (activeAccount?.theme === 'dark' ? 'dark' : 'light');
+document.documentElement.dataset.theme = initialTheme;
+document.querySelector('meta[name="theme-color"]')?.setAttribute('content', initialTheme === 'dark' ? '#101318' : '#16A36A');
 
 function DemoStatus({ title, text }) {
   return (

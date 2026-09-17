@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { BriefcaseBusiness, Check, CircleHelp, LogOut, Mail, Moon, Play, Save, ShieldCheck, Sun, Target, UserRound } from 'lucide-react';
-import { updateProfileName, updateProfileTheme } from './backendBridge';
+import { applyAppTheme, updateProfileName, updateProfileTheme } from './backendBridge';
 import TeamPanel from './TeamPanel';
 import './settings.css';
-import './dark.css';
-import './dark-integrated.css';
 
 const GOAL_LABELS = {
   organize: 'Organizar leads',
@@ -58,7 +56,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout, onTea
     setSavingTheme(true);
     setError('');
     setNotice('');
-    document.documentElement.dataset.theme = nextTheme;
+    applyAppTheme(nextTheme);
     try {
       if (!demoMode) await updateProfileTheme(account?.id, nextTheme);
       onAccountChange?.({ ...account, theme: nextTheme });
@@ -66,7 +64,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout, onTea
     } catch (themeError) {
       console.error('Fuply theme update failed:', themeError);
       setTheme(previousTheme);
-      document.documentElement.dataset.theme = previousTheme;
+      applyAppTheme(previousTheme);
       setError('Não foi possível salvar a aparência agora.');
     } finally {
       setSavingTheme(false);

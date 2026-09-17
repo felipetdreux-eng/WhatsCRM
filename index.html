@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#16A36A" />
+    <script>
+      (() => {
+        try {
+          const hasActiveSession = Boolean(localStorage.getItem('zapflow-session'));
+          const savedTheme = localStorage.getItem('zapflow-theme');
+          const initialTheme = hasActiveSession && savedTheme === 'dark' ? 'dark' : 'light';
+          document.documentElement.dataset.theme = initialTheme;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', initialTheme === 'dark' ? '#101318' : '#16A36A');
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
     <meta name="description" content="Fuply: organize seus clientes, acompanhe follow-ups e pare de perder vendas no WhatsApp." />
     <title>Fuply</title>
   </head>
