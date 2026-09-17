@@ -18,7 +18,7 @@ const SELLING_LABELS = {
   both: 'Produtos e serviços',
 };
 
-export default function SettingsPage({ account, onAccountChange, onLogout, demoMode = false }) {
+export default function SettingsPage({ account, onAccountChange, onLogout, onTeamMembersChange, demoMode = false }) {
   const [name, setName] = useState(account?.name || '');
   const [theme, setTheme] = useState(account?.theme === 'dark' ? 'dark' : 'light');
   const [saving, setSaving] = useState(false);
@@ -129,7 +129,7 @@ export default function SettingsPage({ account, onAccountChange, onLogout, demoM
           </dl>
         </section>
 
-        <TeamPanel account={account} demoMode={demoMode} />
+        <TeamPanel account={account} demoMode={demoMode} onMembersChange={onTeamMembersChange} />
 
         <section className="settings-card" aria-labelledby="appearance-settings-title">
           <div className="settings-card-heading">
