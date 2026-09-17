@@ -50,9 +50,10 @@ function readPersistedFilters() {
       query: typeof saved.query === 'string' ? saved.query : '',
       status: saved.status === 'Todos' || STATUSES.includes(saved.status) ? saved.status : 'Todos',
       scope: SCOPES.includes(saved.scope) ? saved.scope : 'Todos',
+      assignee: typeof saved.assignee === 'string' && saved.assignee ? saved.assignee : 'Todos',
     };
   } catch {
-    return { query: '', status: 'Todos', scope: 'Todos' };
+    return { query: '', status: 'Todos', scope: 'Todos', assignee: 'Todos' };
   }
 }
 
@@ -93,10 +94,11 @@ function inScope(lead, scope, duplicateIndex) {
   return true;
 }
 
-export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset, memberName }) {
+export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset, memberName, teamMembers = [] }) {
   const [query, setQuery] = useState(() => readPersistedFilters().query);
   const [status, setStatus] = useState(() => readPersistedFilters().status);
   const [scope, setScope] = useState(() => readPersistedFilters().scope);
+  const [assigneeFilter, setAssigneeFilter] = useState(() => readPersistedFilters().assignee || 'Todos');
   const [rescheduling, setRescheduling] = useState(null);
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
@@ -107,14 +109,15 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const assigneeName = lead => memberName?.(lead.assignedTo) || (lead.assignedTo ? 'Responsável' : 'Sem responsável');
 
   useEffect(() => {
-    localStorage.setItem(LEADS_FILTERS_STORAGE_KEY, JSON.stringify({ query, status, scope }));
-  }, [query, status, scope]);
+    localStorage.setItem(LEADS_FILTERS_STORAGE_KEY, JSON.stringify({ query, status, scope, assignee: assigneeFilter }));
+  }, [query, status, scope, assigneeFilter]);
 
   useEffect(() => {
     if (!preset) return;
     setQuery('');
     setStatus(preset.status || 'Todos');
     setScope(preset.scope || 'Todos');
+    setAssigneeFilter(preset.assignee || 'Todos');
   }, [preset?.nonce]);
 
   const changeViewMode = mode => {
@@ -142,6 +145,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     return leads
       .filter(lead => !q || `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.nextAction} ${lead.notes || ''} ${assigneeName(lead)}`.toLowerCase().includes(q))
       .filter(lead => status === 'Todos' || lead.status === status)
+      .filter(lead => assigneeFilter === 'Todos' || (assigneeFilter === 'Sem responsável' ? !lead.assignedTo : lead.assignedTo === assigneeFilter))
       .filter(lead => !preset?.origin || lead.origin === preset.origin)
       .filter(lead => !preset?.assignee || lead.assignedTo === preset.assignee)
       .filter(lead => inScope(lead, scope, duplicateIndex))
@@ -169,7 +173,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
           : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
       });
-  }, [leads, query, status, scope, duplicateIndex, preset?.origin, preset?.assignee, memberName]);
+  }, [leads, query, status, scope, assigneeFilter, duplicateIndex, preset?.origin, preset?.assignee, memberName]);
 
   const flash = text => {
     setToast(text);
@@ -323,6 +327,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       <section className="leads-directory">
         <div className="leads-directory-top">
           <label className="leads-search"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar nome, empresa, WhatsApp, observação ou ação" aria-label="Buscar leads" /></label>
+          <label className={`leads-assignee-filter ${assigneeFilter !== 'Todos' ? 'active' : ''}`}><UsersRound size={16} /><select value={assigneeFilter} onChange={event => setAssigneeFilter(event.target.value)} aria-label="Filtrar por responsável"><option value="Todos">Todos os responsáveis</option>{teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}</option>)}<option value="Sem responsável">Sem responsável</option></select></label>
           <span className="leads-result-count">{filtered.length} de {leads.length} leads</span>
         </div>
         <div className="leads-scope-tabs">{SCOPES.map(item => <button type="button" key={item} className={scope === item ? 'active' : ''} onClick={() => setScope(item)}>{item}</button>)}</div>
