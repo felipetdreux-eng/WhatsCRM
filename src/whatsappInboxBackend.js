@@ -7,6 +7,20 @@ function formatTime(value) {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+async function getActiveWorkspaceId() {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData?.user) return null;
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('active_workspace_id')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  return profile?.active_workspace_id || null;
+}
+
 export function mapWhatsAppMessage(row) {
   return {
     id: row.id,
@@ -19,9 +33,13 @@ export function mapWhatsAppMessage(row) {
 }
 
 export async function loadWhatsAppConnectionStatus() {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+
   const { data, error } = await supabase
     .from('whatsapp_integrations')
     .select('workspace_id,provider,session_name,enabled,last_event_at,last_event_id,updated_at')
+    .eq('workspace_id', workspaceId)
     .maybeSingle();
 
   if (error) throw error;
