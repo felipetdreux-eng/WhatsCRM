@@ -22,6 +22,11 @@ import {
 import { currency } from './domain';
 import { getLeadIntelligence } from './leadIntelligence';
 import { getLeadTemperature } from './leadTemperature';
+import {
+  loadLeadWhatsAppMessages,
+  loadWhatsAppConnectionStatus,
+  subscribeToLeadWhatsAppMessages,
+} from './whatsappInboxBackend';
 import './inbox.css';
 
 const CLOSED = new Set(['Fechado', 'Perdido']);
@@ -80,24 +85,40 @@ function demoConversation(lead) {
   ];
 }
 
-function realConversation(lead) {
+function realConversation(lead, connection, loading, error) {
   const context = String(lead?.notes || '').trim();
-  return [
-    {
+  const rows = [];
+
+  if (context) {
+    rows.push({
       id: 'system-context',
       side: 'system',
       time: '',
-      text: context
-        ? 'Contexto cadastrado no Fuply: ' + context
-        : 'O histórico de WhatsApp ainda não está sincronizado neste workspace.',
-    },
-    {
-      id: 'system-next',
+      text: 'Contexto cadastrado no Fuply: ' + context,
+    });
+  }
+
+  if (loading) {
+    rows.push({ id: 'system-sync-loading', side: 'system', time: '', text: 'Carregando mensagens sincronizadas do WhatsApp…' });
+  } else if (error) {
+    rows.push({ id: 'system-sync-error', side: 'system', time: '', text: 'Não foi possível carregar as mensagens do WhatsApp agora.' });
+  } else if (connection?.enabled) {
+    rows.push({
+      id: 'system-sync-empty',
       side: 'system',
       time: '',
-      text: 'Abra o WhatsApp para continuar. O Fuply não afirma que uma mensagem foi enviada ou lida sem confirmação do canal.',
-    },
-  ];
+      text: 'WhatsApp conectado em modo leitura. As novas mensagens deste contato aparecerão aqui automaticamente.',
+    });
+  } else {
+    rows.push({
+      id: 'system-sync-off',
+      side: 'system',
+      time: '',
+      text: 'O WhatsApp ainda não está conectado a este workspace. O envio continua disponível pelo botão do WhatsApp.',
+    });
+  }
+
+  return rows;
 }
 
 export default function InboxPage({
@@ -115,6 +136,10 @@ export default function InboxPage({
   const [outbox, setOutbox] = useState({});
   const [ownership, setOwnership] = useState({});
   const [toast, setToast] = useState('');
+  const [syncedMessages, setSyncedMessages] = useState([]);
+  const [whatsAppConnection, setWhatsAppConnection] = useState(null);
+  const [whatsAppLoading, setWhatsAppLoading] = useState(!demoMode);
+  const [whatsAppError, setWhatsAppError] = useState('');
 
   const rankedLeads = useMemo(() => (Array.isArray(leads) ? leads : [])
     .filter(lead => !CLOSED.has(lead.status))
@@ -150,6 +175,64 @@ export default function InboxPage({
     }
   }, [selectedLeadId, visibleLeads]);
 
+  useEffect(() => {
+    if (demoMode) {
+      setWhatsAppConnection(null);
+      return undefined;
+    }
+
+    let active = true;
+    loadWhatsAppConnectionStatus()
+      .then(connection => {
+        if (active) setWhatsAppConnection(connection);
+      })
+      .catch(error => {
+        console.error('WhatsApp connection status failed:', error);
+      });
+
+    return () => { active = false; };
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (demoMode || !selectedLeadId) {
+      setSyncedMessages([]);
+      setWhatsAppLoading(false);
+      setWhatsAppError('');
+      return undefined;
+    }
+
+    let active = true;
+    setSyncedMessages([]);
+    setWhatsAppLoading(true);
+    setWhatsAppError('');
+
+    loadLeadWhatsAppMessages(selectedLeadId)
+      .then(messages => {
+        if (active) setSyncedMessages(messages);
+      })
+      .catch(error => {
+        console.error('WhatsApp message sync failed:', error);
+        if (active) setWhatsAppError(error?.message || 'Falha ao carregar mensagens.');
+      })
+      .finally(() => {
+        if (active) setWhatsAppLoading(false);
+      });
+
+    const unsubscribe = subscribeToLeadWhatsAppMessages(selectedLeadId, message => {
+      if (!active) return;
+      setSyncedMessages(current => {
+        if (current.some(item => item.id === message.id)) return current;
+        return [...current, message].sort((a, b) => String(a.occurredAt || '').localeCompare(String(b.occurredAt || '')));
+      });
+      setWhatsAppConnection(current => current ? { ...current, enabled: true, last_event_at: new Date().toISOString() } : current);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [demoMode, selectedLeadId]);
+
   const selectedItem = visibleLeads.find(item => item.lead.id === selectedLeadId) || visibleLeads[0] || null;
   const selectedLead = selectedItem?.lead || null;
   const intelligence = selectedItem?.intelligence;
@@ -158,14 +241,24 @@ export default function InboxPage({
   const suggestion = selectedLead ? messageSuggestion(selectedLead) : '';
   const messages = useMemo(() => {
     if (!selectedLead) return [];
-    const base = demoMode ? demoConversation(selectedLead) : realConversation(selectedLead);
+    const base = demoMode
+      ? demoConversation(selectedLead)
+      : (syncedMessages.length
+          ? syncedMessages
+          : realConversation(selectedLead, whatsAppConnection, whatsAppLoading, whatsAppError));
     return base.concat(outbox[selectedLead.id] || []);
-  }, [demoMode, outbox, selectedLead]);
+  }, [demoMode, outbox, selectedLead, syncedMessages, whatsAppConnection, whatsAppError, whatsAppLoading]);
 
   const activeLeads = rankedLeads.length;
   const radarCount = rankedLeads.filter(item => item.temperature?.atRisk).length;
   const highPriorityCount = rankedLeads.filter(item => (item.intelligence?.score || 0) >= 60).length;
   const dueTodayCount = rankedLeads.filter(item => item.lead.nextContact && item.lead.nextContact <= new Date().toISOString().slice(0, 10)).length;
+  const channelStatus = demoMode
+    ? 'Demonstração local'
+    : whatsAppConnection?.enabled
+      ? (whatsAppConnection.last_event_at ? 'WhatsApp em leitura' : 'WhatsApp conectado · aguardando mensagens')
+      : 'WhatsApp não conectado';
+  const liveLabel = demoMode ? 'prévia' : whatsAppConnection?.enabled ? 'leitura ao vivo' : 'sem sync';
 
   const showToast = value => {
     setToast(value);
@@ -210,7 +303,7 @@ export default function InboxPage({
           <p>Converse, entenda a intenção e avance o lead sem perder o contexto.</p>
         </div>
         <div className="inbox-header-actions">
-          <span className="inbox-channel-status"><span /> {demoMode ? 'Demonstração local' : 'Canal pronto para conectar'}</span>
+          <span className="inbox-channel-status"><span /> {channelStatus}</span>
           <button type="button" className="secondary-button" onClick={() => selectedLead && openLead?.(selectedLead)} disabled={!selectedLead}><UserRound size={16} /> Ver ficha</button>
         </div>
       </header>
@@ -226,7 +319,7 @@ export default function InboxPage({
         <aside className="inbox-panel inbox-conversations">
           <div className="inbox-panel-heading">
             <div><h2>Conversas</h2><span>{visibleLeads.length} na fila atual</span></div>
-            <span className="inbox-live-dot"><span /> ao vivo</span>
+            <span className="inbox-live-dot"><span /> {liveLabel}</span>
           </div>
           <label className="inbox-search"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar contato" aria-label="Buscar contato no Inbox" /></label>
           <div className="inbox-filter-tabs" role="tablist" aria-label="Filtros de conversas">
@@ -271,7 +364,7 @@ export default function InboxPage({
                 <span className={'inbox-ownership-pill ' + mode}>{mode === 'ia' ? <><Bot size={13} /> Agente Fuply</> : <><Hand size={13} /> Humano assumiu</>}</span>
               </div>
               <div className="inbox-thread-surface">
-                <div className="inbox-day-divider"><span>{demoMode ? 'Prévia de demonstração' : 'Histórico do atendimento'}</span></div>
+                <div className="inbox-day-divider"><span>{demoMode ? 'Prévia de demonstração' : (whatsAppConnection?.enabled ? 'Mensagens sincronizadas' : 'Histórico do atendimento')}</span></div>
                 {messages.map(message => (
                   <div className={'inbox-message-line ' + message.side} key={message.id}>
                     <div className="inbox-message-bubble">
@@ -281,7 +374,7 @@ export default function InboxPage({
                     </div>
                   </div>
                 ))}
-                <div className="inbox-channel-note"><ShieldCheck size={15} /><span>Proteção ativa: o Fuply só registra o que sabe. Envio e leitura dependem do WhatsApp.</span></div>
+                <div className="inbox-channel-note"><ShieldCheck size={15} /><span>{whatsAppConnection?.enabled && !demoMode ? 'Modo leitura: mensagens novas entram no Fuply; responder continua manual pelo WhatsApp.' : 'Proteção ativa: o Fuply só registra o que sabe. Envio e leitura dependem do WhatsApp.'}</span></div>
               </div>
               <div className="inbox-composer">
                 <div className="inbox-quick-replies">
@@ -326,7 +419,7 @@ export default function InboxPage({
               <section className="inbox-guardrail-card">
                 <div><ShieldCheck size={16} /><strong>Guardrails do atendimento</strong></div>
                 <p>Opt-out, horário e revisão humana ficam previstos antes de qualquer automação real.</p>
-                <small>O canal ainda precisa ser conectado para o envio automático.</small>
+                <small>{whatsAppConnection?.enabled && !demoMode ? 'Leitura do WhatsApp ativa; envio continua manual.' : 'O canal ainda precisa ser conectado para sincronizar mensagens.'}</small>
               </section>
             </>
           ) : <div className="inbox-panel inbox-empty-context"><Sparkles size={25} /><span>Selecione um lead para ver o contexto e a recomendação da IA.</span></div>}
