@@ -275,6 +275,16 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     return () => { active = false; };
   }, [account?.id, demoMode]);
 
+  const handleTeamMembersChange = nextMembers => {
+    const safeMembers = Array.isArray(nextMembers) ? nextMembers : [];
+    setTeamMembers(safeMembers);
+    setAssigneeFilter(current => (
+      current === 'Todos' || safeMembers.some(member => member.user_id === current)
+        ? current
+        : 'Todos'
+    ));
+  };
+
   const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
   const accountName = account?.name || 'Usuário';
   const accountGoal = GOAL_LABELS[account?.onboarding?.goal] || 'Plano gratuito';
@@ -904,7 +914,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} memberName={memberName} teamMembers={teamMembers} />;
     if (activePage === 'Inbox') return <InboxPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onReplyWithAI={openReplyAssistant} onStatusChange={requestStatusChange} demoMode={demoMode} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} demoMode={demoMode} />;
-    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
+    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} onTeamMembersChange={handleTeamMembersChange} demoMode={demoMode} />;
     return renderPipeline();
   };
 
