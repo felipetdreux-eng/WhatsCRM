@@ -133,8 +133,45 @@
 
 .team-member-copy {
   min-width: 0;
+  flex: 1 1 auto;
   display: grid;
   gap: 2px;
+}
+
+.team-remove-member {
+  min-height: 34px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 9px;
+  background: rgba(220, 38, 38, 0.06);
+  color: #c62828;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.team-remove-member:hover:not(:disabled) {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.12);
+  transform: translateY(-1px);
+}
+
+.team-remove-member:focus-visible {
+  outline: 3px solid rgba(220, 38, 38, 0.18);
+  outline-offset: 2px;
+}
+
+.team-remove-member:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .team-member-copy strong {
@@ -253,6 +290,12 @@
   color: #adb5bf;
 }
 
+[data-theme='dark'] .team-remove-member {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+}
+
 @media (max-width: 760px) {
   .team-workspace-box,
   .team-rename {
@@ -268,5 +311,14 @@
 
   .team-member-count {
     margin-left: 0;
+  }
+
+  .team-remove-member span {
+    display: none;
+  }
+
+  .team-remove-member {
+    width: 36px;
+    padding: 0;
   }
 }

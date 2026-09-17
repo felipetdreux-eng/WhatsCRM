@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Clipboard, Crown, LogIn, RefreshCw, Save, ShieldCheck, UserPlus, UsersRound } from 'lucide-react';
+import { Check, Clipboard, Crown, LogIn, RefreshCw, Save, ShieldCheck, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import {
   createWorkspaceInvite,
   joinWorkspaceByCode,
   loadWorkspaceContext,
+  removeWorkspaceMember,
   renameWorkspace,
   setActiveWorkspace,
 } from './backendBridge';
@@ -24,6 +25,7 @@ export default function TeamPanel({ account, demoMode = false }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState(null);
   const [inviteCode, setInviteCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
@@ -153,6 +155,30 @@ export default function TeamPanel({ account, demoMode = false }) {
     }
   };
 
+  const removeMember = async member => {
+    if (!activeWorkspace?.id || !isOwner || member.role === 'owner' || member.user_id === account?.id || removingMemberId) return;
+
+    const confirmed = window.confirm(`Remover ${member.name} do workspace "${activeWorkspace.name}"? Essa pessoa perderá o acesso aos leads e ao histórico compartilhado.`);
+    if (!confirmed) return;
+
+    setRemovingMemberId(member.user_id);
+    setError('');
+    setNotice('');
+    try {
+      if (!demoMode) await removeWorkspaceMember(activeWorkspace.id, member.user_id);
+      setContext(current => ({
+        ...current,
+        members: current.members.filter(item => item.user_id !== member.user_id),
+      }));
+      setNotice(`${member.name} foi removido da equipe.`);
+    } catch (removeError) {
+      console.error('Workspace member removal failed:', removeError);
+      setError('Não foi possível remover essa pessoa. Apenas o proprietário do workspace pode fazer isso.');
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
   if (loading) {
     return (
       <section className="settings-card team-card team-loading">
@@ -205,6 +231,19 @@ export default function TeamPanel({ account, demoMode = false }) {
               <span>{ROLE_LABELS[member.role] || 'Membro'}</span>
             </div>
             {member.role === 'owner' && <Crown size={17} className="team-owner-icon" aria-label="Proprietário" />}
+            {isOwner && member.role !== 'owner' && member.user_id !== account?.id && (
+              <button
+                type="button"
+                className="team-remove-member"
+                onClick={() => removeMember(member)}
+                disabled={Boolean(removingMemberId)}
+                aria-label={`Remover ${member.name} da equipe`}
+                title={`Remover ${member.name}`}
+              >
+                {removingMemberId === member.user_id ? <RefreshCw size={16} className="team-spin" /> : <Trash2 size={16} />}
+                <span>Remover</span>
+              </button>
+            )}
           </div>
         ))}
       </div>
