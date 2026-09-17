@@ -21,7 +21,7 @@ function initials(name) {
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'ME').toUpperCase();
 }
 
-export default function TeamPanel({ account, demoMode = false }) {
+export default function TeamPanel({ account, demoMode = false, onMembersChange }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -45,11 +45,13 @@ export default function TeamPanel({ account, demoMode = false }) {
   const refresh = async () => {
     if (demoMode) {
       const workspace = { id: 'demo-workspace', name: 'Jacob Engenharia' };
-      setContext({ activeWorkspace: workspace, workspaces: [workspace], myRole: 'owner', members: [
+      const demoMembers = [
         { user_id: account?.id || 'demo-jacob', name: account?.name || 'Comercial Jacob', role: 'owner' },
         { user_id: 'demo-eng', name: 'Engenharia', role: 'member' },
         { user_id: 'demo-dir', name: 'Diretoria', role: 'admin' },
-      ] });
+      ];
+      setContext({ activeWorkspace: workspace, workspaces: [workspace], myRole: 'owner', members: demoMembers });
+      onMembersChange?.(demoMembers);
       setWorkspaceName(workspace.name); setLoading(false); setError(''); return;
     }
     if (!account?.id) return;
@@ -58,6 +60,7 @@ export default function TeamPanel({ account, demoMode = false }) {
     try {
       const next = await loadWorkspaceContext(account.id);
       setContext(next);
+      onMembersChange?.(next.members || []);
       setWorkspaceName(next.activeWorkspace?.name || '');
     } catch (loadError) {
       console.error('Team workspace load failed:', loadError);
@@ -166,10 +169,9 @@ export default function TeamPanel({ account, demoMode = false }) {
     setNotice('');
     try {
       if (!demoMode) await removeWorkspaceMember(activeWorkspace.id, member.user_id);
-      setContext(current => ({
-        ...current,
-        members: current.members.filter(item => item.user_id !== member.user_id),
-      }));
+      const nextMembers = members.filter(item => item.user_id !== member.user_id);
+      setContext(current => ({ ...current, members: nextMembers }));
+      onMembersChange?.(nextMembers);
       setNotice(`${member.name} foi removido da equipe.`);
     } catch (removeError) {
       console.error('Workspace member removal failed:', removeError);
