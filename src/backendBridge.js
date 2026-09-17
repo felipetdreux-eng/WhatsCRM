@@ -315,6 +315,17 @@ export async function renameWorkspace(workspaceId, name) {
   return data;
 }
 
+export async function removeWorkspaceMember(workspaceId, memberUserId) {
+  if (!workspaceId || !memberUserId) throw new Error('Membro inválido.');
+  const { data, error } = await supabase.rpc('remove_workspace_member', {
+    _workspace_id: workspaceId,
+    _user_id: memberUserId,
+  });
+  if (error) throw error;
+  if (data !== true) throw new Error('A pessoa não foi removida.');
+  return true;
+}
+
 export async function loadLeads(userId) {
   if (!userId) return [];
   const workspaceId = await resolveActiveWorkspaceId(userId);
