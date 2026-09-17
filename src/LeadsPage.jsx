@@ -93,7 +93,7 @@ function inScope(lead, scope, duplicateIndex) {
   return true;
 }
 
-export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset }) {
+export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset, memberName }) {
   const [query, setQuery] = useState(() => readPersistedFilters().query);
   const [status, setStatus] = useState(() => readPersistedFilters().status);
   const [scope, setScope] = useState(() => readPersistedFilters().scope);
@@ -104,6 +104,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fuply-leads-view') || 'simple');
   const duplicateIndex = useMemo(() => buildDuplicateIndex(leads), [leads]);
   const duplicateGroups = useMemo(() => duplicateGroupCount(duplicateIndex), [duplicateIndex]);
+  const assigneeName = lead => memberName?.(lead.assignedTo) || (lead.assignedTo ? 'Responsável' : 'Sem responsável');
 
   useEffect(() => {
     localStorage.setItem(LEADS_FILTERS_STORAGE_KEY, JSON.stringify({ query, status, scope }));
@@ -139,7 +140,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads
-      .filter(lead => !q || `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.nextAction} ${lead.notes || ''}`.toLowerCase().includes(q))
+      .filter(lead => !q || `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.nextAction} ${lead.notes || ''} ${assigneeName(lead)}`.toLowerCase().includes(q))
       .filter(lead => status === 'Todos' || lead.status === status)
       .filter(lead => !preset?.origin || lead.origin === preset.origin)
       .filter(lead => !preset?.assignee || lead.assignedTo === preset.assignee)
@@ -168,7 +169,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
           : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
       });
-  }, [leads, query, status, scope, duplicateIndex, preset?.origin, preset?.assignee]);
+  }, [leads, query, status, scope, duplicateIndex, preset?.origin, preset?.assignee, memberName]);
 
   const flash = text => {
     setToast(text);
@@ -329,12 +330,13 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
 
         <div className="leads-desktop-table-wrap">
           <table className="leads-table">
-            <thead><tr><th>Lead</th><th>Status</th><th>Origem</th><th>Valor</th><th>Inteligência</th><th>Próximo contato</th><th>Próxima ação</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Lead</th><th>Status</th><th>Origem</th><th>Responsável</th><th>Valor</th><th>Inteligência</th><th>Próximo contato</th><th>Próxima ação</th><th>Ações</th></tr></thead>
             <tbody>{filtered.map(lead => (
               <tr key={lead.id} tabIndex={0} onClick={() => openLead(lead)} onKeyDown={event => { if (event.key === 'Enter') openLead(lead); }}>
                 <td><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span><TemperatureBadge lead={lead} /><DuplicateBadge lead={lead} duplicateIndex={duplicateIndex} /></div></div></td>
                 <td onClick={event => event.stopPropagation()}><select className="leads-status-select" value={lead.status} onChange={event => changeStatus(lead, event.target.value)} aria-label={`Status de ${lead.name}`}>{STATUSES.map(item => <option key={item}>{item}</option>)}</select></td>
                 <td><span className="lead-origin">{lead.origin || 'Outro'}</span></td>
+                <td><span className="leads-next"><UsersRound size={14} />{assigneeName(lead)}</span></td>
                 <td onClick={event => event.stopPropagation()}>{lead.status === 'Fechado' ? <strong className="leads-value">{money(lead.saleValue)}</strong> : <input className="inline-value-input" type="number" min="0" step="0.01" defaultValue={Number(lead.value || 0)} onBlur={event => updateInlineValue(lead, event.target.value)} aria-label={`Valor potencial de ${lead.name}`} />}</td>
                 <td><SmartBadge lead={lead} /></td>
                 <td><span className={`leads-next ${lead.nextContact ? '' : 'muted'} ${diff(lead.nextContact) < 0 ? 'overdue' : ''}`}><CalendarClock size={14} />{pretty(lead.nextContact)}{lead.nextContactTime ? ` · ${lead.nextContactTime}` : ''}</span></td>
@@ -360,7 +362,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
         <div className="leads-mobile-list">{filtered.map(lead => (
           <article className="lead-directory-card" key={lead.id}>
             <div className="lead-directory-card-top"><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div><div className="lead-mobile-badges"><span className={`leads-status status-${statusClass(lead.status)}`}>{lead.status}</span><TemperatureBadge lead={lead} /><SmartBadge lead={lead} /><DuplicateBadge lead={lead} duplicateIndex={duplicateIndex} /></div></div>
-            <div className="lead-directory-card-meta"><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
+            <div className="lead-directory-card-meta"><span><UsersRound size={14} />{assigneeName(lead)}</span><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
             <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
               {!CLOSED.includes(lead.status) && <select className="lead-mark-for mobile-mark-for" value="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
