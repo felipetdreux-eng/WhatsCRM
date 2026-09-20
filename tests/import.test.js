@@ -82,3 +82,16 @@ test('reconstrói PDF sem cabeçalho com nome, telefone e status misturados', ()
     'Novo lead',
   ]);
 });
+
+test('atribui o responsável atual aos novos leads importados', () => {
+  const headers = ['Nome', 'WhatsApp'];
+  const result = analyzeImport({
+    headers,
+    rows: [['Felipe', '21999999999']],
+    mapping: detectMapping(headers),
+    existingLeads: [],
+    defaultAssigneeId: 'usuario-atual',
+  });
+
+  assert.equal(result.records[0].lead.assignedTo, 'usuario-atual');
+});

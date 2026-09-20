@@ -43,9 +43,9 @@ const pretty = value => {
 const full = value => noon(value).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '');
 const statusClass = status => status.toLowerCase().replaceAll(' ', '-');
 
-function readPersistedFilters() {
+function readPersistedFilters(storageKey = LEADS_FILTERS_STORAGE_KEY) {
   try {
-    const saved = JSON.parse(localStorage.getItem(LEADS_FILTERS_STORAGE_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
     return {
       query: typeof saved.query === 'string' ? saved.query : '',
       status: saved.status === 'Todos' || STATUSES.includes(saved.status) ? saved.status : 'Todos',
@@ -94,11 +94,12 @@ function inScope(lead, scope, duplicateIndex) {
   return true;
 }
 
-export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset, memberName, teamMembers = [] }) {
-  const [query, setQuery] = useState(() => readPersistedFilters().query);
-  const [status, setStatus] = useState(() => readPersistedFilters().status);
-  const [scope, setScope] = useState(() => readPersistedFilters().scope);
-  const [assigneeFilter, setAssigneeFilter] = useState(() => readPersistedFilters().assignee || 'Todos');
+export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onNewLead, updateLeadStatus, onActivity, preset, memberName, teamMembers = [], defaultAssigneeId = '', filterStorageScope = '' }) {
+  const filterStorageKey = filterStorageScope ? `${LEADS_FILTERS_STORAGE_KEY}:${filterStorageScope}` : LEADS_FILTERS_STORAGE_KEY;
+  const [query, setQuery] = useState(() => readPersistedFilters(filterStorageKey).query);
+  const [status, setStatus] = useState(() => readPersistedFilters(filterStorageKey).status);
+  const [scope, setScope] = useState(() => readPersistedFilters(filterStorageKey).scope);
+  const [assigneeFilter, setAssigneeFilter] = useState(() => readPersistedFilters(filterStorageKey).assignee || 'Todos');
   const [rescheduling, setRescheduling] = useState(null);
   const [schedule, setSchedule] = useState({ date: '', time: '', action: '' });
   const [toast, setToast] = useState('');
@@ -109,8 +110,13 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const assigneeName = lead => memberName?.(lead.assignedTo) || (lead.assignedTo ? 'Responsável' : 'Sem responsável');
 
   useEffect(() => {
-    localStorage.setItem(LEADS_FILTERS_STORAGE_KEY, JSON.stringify({ query, status, scope, assignee: assigneeFilter }));
-  }, [query, status, scope, assigneeFilter]);
+    localStorage.setItem(filterStorageKey, JSON.stringify({ query, status, scope, assignee: assigneeFilter }));
+  }, [query, status, scope, assigneeFilter, filterStorageKey]);
+
+  useEffect(() => {
+    if (!teamMembers.length || assigneeFilter === 'Todos' || assigneeFilter === 'Sem responsável') return;
+    if (!teamMembers.some(member => member.user_id === assigneeFilter)) setAssigneeFilter('Todos');
+  }, [assigneeFilter, teamMembers]);
 
   useEffect(() => {
     if (!preset) return;
@@ -402,7 +408,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
         </div>
       )}
 
-      {importOpen && <LeadImporter leads={leads} setLeads={setLeads} onClose={() => setImportOpen(false)} onActivity={onActivity} onDone={importDone} />}
+      {importOpen && <LeadImporter leads={leads} setLeads={setLeads} defaultAssigneeId={defaultAssigneeId} onClose={() => setImportOpen(false)} onActivity={onActivity} onDone={importDone} />}
       {toast && <div className="leads-toast" role="status"><Check size={16} />{toast}</div>}
     </main>
   );

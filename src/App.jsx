@@ -812,7 +812,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
               </section>
 
 
-              <LeadHistory userId={account?.id} leadId={selectedLead.id} />
+              <LeadHistory userId={account?.id} leadId={selectedLead.id} demoMode={demoMode} />
             </div>
 
             <aside className="detail-side-column">
@@ -911,10 +911,10 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
     if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
-    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} memberName={memberName} teamMembers={teamMembers} />;
+    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} memberName={memberName} teamMembers={teamMembers} defaultAssigneeId={account?.id || ''} filterStorageScope={account?.activeWorkspaceId || account?.id || 'demo'} />;
     if (activePage === 'Inbox') return <InboxPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onReplyWithAI={openReplyAssistant} onStatusChange={requestStatusChange} demoMode={demoMode} />;
     if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} demoMode={demoMode} />;
-    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} onTeamMembersChange={handleTeamMembersChange} demoMode={demoMode} />;
+    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} onTeamMembersChange={handleTeamMembersChange} demoMode={demoMode} demoTeamMembers={demoTeamMembers} />;
     return renderPipeline();
   };
 

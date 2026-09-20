@@ -44,21 +44,6 @@ function DemoStatus({ title, text }) {
   );
 }
 
-function renderAbleDemo() {
-  if (!rootHost) return;
-  createRoot(rootHost).render(
-    <React.StrictMode>
-      <App
-        demoMode
-        demoAccount={ABLE_DEMO_ACCOUNT}
-        demoLeads={ABLE_DEMO_LEADS}
-        demoTeamMembers={ABLE_DEMO_TEAM}
-        demoWhatsAppPhone={ABLE_DEMO_WHATSAPP}
-      />
-    </React.StrictMode>,
-  );
-}
-
 async function renderProtectedDemo({ demoKey, account, leads, team, whatsapp }) {
   if (!rootHost) return;
   const root = createRoot(rootHost);
@@ -66,9 +51,13 @@ async function renderProtectedDemo({ demoKey, account, leads, team, whatsapp }) 
 
   try {
     const response = await fetch(`/api/demo-access?demo=${encodeURIComponent(demoKey)}&token=${encodeURIComponent(demoToken || '')}`, { cache: 'no-store' });
-    const access = response.ok ? await response.json() : null;
+    const access = await response.json().catch(() => null);
 
     if (!access?.allowed) {
+      if (access?.error === 'demo_not_configured') {
+        root.render(<DemoStatus title="Demonstração indisponível" text="Este ambiente ainda não foi configurado. Solicite um novo link de demonstração." />);
+        return;
+      }
       root.render(access?.expired
         ? <DemoStatus title="Demonstração encerrada" text="O período de acesso desta demonstração terminou. Para continuar usando o Fuply, é necessário solicitar um novo acesso." />
         : <DemoStatus title="Link de demonstração inválido" text="Este acesso não possui um token válido. Solicite um novo link de demonstração." />);
@@ -102,7 +91,13 @@ if (rootHost && isInnovaDemo) {
     whatsapp: INNOVA_DEMO_WHATSAPP,
   });
 } else if (rootHost && isAbleDemo) {
-  renderAbleDemo();
+  renderProtectedDemo({
+    demoKey: 'able',
+    account: ABLE_DEMO_ACCOUNT,
+    leads: ABLE_DEMO_LEADS,
+    team: ABLE_DEMO_TEAM,
+    whatsapp: ABLE_DEMO_WHATSAPP,
+  });
 } else if (rootHost && isJacobDemo) {
   renderProtectedDemo({
     demoKey: 'jacob',

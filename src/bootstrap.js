@@ -29,7 +29,8 @@ async function boot(sessionUser = null) {
   return bootPromise;
 }
 
-const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'jacob';
+const demoKey = new URLSearchParams(window.location.search).get('demo');
+const isPublicDemo = ['jacob', 'able', 'able-live', 'innova', 'innova-automation'].includes(demoKey);
 
 if (isPublicDemo) {
   import('./main.jsx').catch(error => console.error('Fuply demo boot failed:', error));

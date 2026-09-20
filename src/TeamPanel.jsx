@@ -16,12 +16,14 @@ const ROLE_LABELS = {
   member: 'Membro',
 };
 
+const EMPTY_DEMO_MEMBERS = [];
+
 function initials(name) {
   const parts = String(name || 'Membro').trim().split(/\s+/).filter(Boolean);
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'ME').toUpperCase();
 }
 
-export default function TeamPanel({ account, demoMode = false, onMembersChange }) {
+export default function TeamPanel({ account, demoMode = false, demoMembers = EMPTY_DEMO_MEMBERS, onMembersChange }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -44,14 +46,15 @@ export default function TeamPanel({ account, demoMode = false, onMembersChange }
 
   const refresh = async () => {
     if (demoMode) {
-      const workspace = { id: 'demo-workspace', name: 'Jacob Engenharia' };
-      const demoMembers = [
-        { user_id: account?.id || 'demo-jacob', name: account?.name || 'Comercial Jacob', role: 'owner' },
+      const accountLabel = String(account?.name || 'Demonstração Fuply').replace(/\s*·\s*Demonstração\s*$/i, '').trim();
+      const workspace = { id: `demo-workspace-${account?.id || 'fuply'}`, name: accountLabel || 'Demonstração Fuply' };
+      const members = demoMembers.length ? demoMembers : [
+        { user_id: account?.id || 'demo-owner', name: account?.name || 'Comercial', role: 'owner' },
         { user_id: 'demo-eng', name: 'Engenharia', role: 'member' },
         { user_id: 'demo-dir', name: 'Diretoria', role: 'admin' },
       ];
-      setContext({ activeWorkspace: workspace, workspaces: [workspace], myRole: 'owner', members: demoMembers });
-      onMembersChange?.(demoMembers);
+      setContext({ activeWorkspace: workspace, workspaces: [workspace], myRole: 'owner', members });
+      onMembersChange?.(members);
       setWorkspaceName(workspace.name); setLoading(false); setError(''); return;
     }
     if (!account?.id) return;
@@ -70,7 +73,7 @@ export default function TeamPanel({ account, demoMode = false, onMembersChange }
     }
   };
 
-  useEffect(() => { refresh(); }, [account?.id, demoMode]);
+  useEffect(() => { refresh(); }, [account?.id, demoMode, demoMembers]);
 
   const createInvite = async () => {
     if (!activeWorkspace?.id || busy) return;
@@ -78,7 +81,7 @@ export default function TeamPanel({ account, demoMode = false, onMembersChange }
     setError('');
     setNotice('');
     try {
-      const code = demoMode ? 'JACOB2026' : await createWorkspaceInvite(activeWorkspace.id);
+      const code = demoMode ? 'DEMO2026' : await createWorkspaceInvite(activeWorkspace.id);
       setInviteCode(String(code || '').toUpperCase());
       setNotice('Convite criado. O código vale por 7 dias.');
     } catch (inviteError) {
