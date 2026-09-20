@@ -27,6 +27,7 @@ const CLOSED = ['Fechado', 'Perdido'];
 const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
 const SCOPES = ['Todos', 'Inteligentes', 'Duplicados', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const LEADS_FILTERS_STORAGE_KEY = 'fuply-leads-filters';
+const normalizeAssigneeFilter = value => value === 'unassigned' ? 'Sem responsável' : (typeof value === 'string' && value ? value : 'Todos');
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
 const noon = value => new Date(`${value}T12:00:00`);
@@ -50,7 +51,7 @@ function readPersistedFilters() {
       query: typeof saved.query === 'string' ? saved.query : '',
       status: saved.status === 'Todos' || STATUSES.includes(saved.status) ? saved.status : 'Todos',
       scope: SCOPES.includes(saved.scope) ? saved.scope : 'Todos',
-      assignee: typeof saved.assignee === 'string' && saved.assignee ? saved.assignee : 'Todos',
+      assignee: normalizeAssigneeFilter(saved.assignee),
     };
   } catch {
     return { query: '', status: 'Todos', scope: 'Todos', assignee: 'Todos' };
@@ -117,8 +118,18 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
     setQuery('');
     setStatus(preset.status || 'Todos');
     setScope(preset.scope || 'Todos');
-    setAssigneeFilter(preset.assignee || 'Todos');
+    setAssigneeFilter(normalizeAssigneeFilter(preset.assignee));
   }, [preset?.nonce]);
+
+  useEffect(() => {
+    if (!teamMembers.length) return;
+    const validAssigneeIds = new Set(teamMembers.map(member => member.user_id));
+    setAssigneeFilter(current => (
+      current === 'Todos' || current === 'Sem responsável' || validAssigneeIds.has(current)
+        ? current
+        : 'Todos'
+    ));
+  }, [teamMembers]);
 
   const changeViewMode = mode => {
     setViewMode(mode);
@@ -147,7 +158,6 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
       .filter(lead => status === 'Todos' || lead.status === status)
       .filter(lead => assigneeFilter === 'Todos' || (assigneeFilter === 'Sem responsável' ? !lead.assignedTo : lead.assignedTo === assigneeFilter))
       .filter(lead => !preset?.origin || lead.origin === preset.origin)
-      .filter(lead => !preset?.assignee || lead.assignedTo === preset.assignee)
       .filter(lead => inScope(lead, scope, duplicateIndex))
       .sort((a, b) => {
         if (scope === 'Duplicados') {
@@ -173,7 +183,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           ? `${a.nextContact}${a.nextContactTime || ''}`.localeCompare(`${b.nextContact}${b.nextContactTime || ''}`)
           : a.nextContact ? -1 : b.nextContact ? 1 : String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
       });
-  }, [leads, query, status, scope, assigneeFilter, duplicateIndex, preset?.origin, preset?.assignee, memberName]);
+  }, [leads, query, status, scope, assigneeFilter, duplicateIndex, preset?.origin, memberName]);
 
   const flash = text => {
     setToast(text);
