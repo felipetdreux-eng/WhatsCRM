@@ -434,10 +434,14 @@ function leadFingerprint(lead) {
 }
 
 export function installSyncBridge(userId) {
-  if (window.__zapflowSyncBridgeInstalled) return;
-  window.__zapflowSyncBridgeInstalled = true;
-  const originalSetItem = Storage.prototype.setItem;
+  if (window.__zapflowSyncBridgeUserId === userId) return;
+  window.__zapflowSyncBridgeCleanup?.();
+
+  const originalSetItem = window.__zapflowOriginalStorageSetItem || Storage.prototype.setItem;
+  window.__zapflowOriginalStorageSetItem = originalSetItem;
+  window.__zapflowSyncBridgeUserId = userId;
   let leadTimer;
+  let active = true;
   let lastSnapshot = new Map((readJSON('zapflow-leads', []) || []).map(lead => [lead.id, leadFingerprint(lead)]));
 
   Storage.prototype.setItem = function(key, value) {
@@ -460,7 +464,7 @@ export function installSyncBridge(userId) {
 
   resolveActiveWorkspaceId(userId)
     .then(workspaceId => {
-      if (!workspaceId) return;
+      if (!active || !workspaceId) return;
       const refreshWorkspace = payload => {
         const actorId = payload?.new?.last_modified_by || null;
         if (payload?.eventType !== 'DELETE' && actorId && actorId === userId) return;
@@ -490,5 +494,19 @@ export function installSyncBridge(userId) {
     })
     .catch(error => console.error('Workspace realtime setup failed:', error));
 
-  window.__zapflowSupabaseSignOut = () => supabase.auth.signOut({ scope: 'local' });
+  const cleanup = () => {
+    active = false;
+    window.clearTimeout(leadTimer);
+    window.clearTimeout(window.__zapflowRemoteRefreshTimer);
+    if (window.__zapflowRealtimeChannel) supabase.removeChannel(window.__zapflowRealtimeChannel);
+    window.__zapflowRealtimeChannel = null;
+    if (Storage.prototype.setItem !== originalSetItem) Storage.prototype.setItem = originalSetItem;
+    if (window.__zapflowSyncBridgeUserId === userId) window.__zapflowSyncBridgeUserId = null;
+  };
+
+  window.__zapflowSyncBridgeCleanup = cleanup;
+  window.__zapflowSupabaseSignOut = () => {
+    cleanup();
+    return supabase.auth.signOut({ scope: 'local' });
+  };
 }

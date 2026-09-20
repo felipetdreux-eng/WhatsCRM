@@ -333,7 +333,7 @@ async function readSpreadsheet(file) {
   throw new Error('Formato não suportado. Use CSV, TSV, XLSX, XLS, XLSM, ODS ou PDF.');
 }
 
-export default function LeadImporter({ leads = [], setLeads, onClose, onActivity, onDone }) {
+export default function LeadImporter({ leads = [], setLeads, defaultAssigneeId = '', onClose, onActivity, onDone }) {
   const inputRef = useRef(null);
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState([]);
@@ -344,7 +344,10 @@ export default function LeadImporter({ leads = [], setLeads, onClose, onActivity
   const [error, setError] = useState('');
   const [dragging, setDragging] = useState(false);
 
-  const analysis = useMemo(() => analyzeImport({ headers, rows, mapping, existingLeads: leads }), [headers, rows, mapping, leads]);
+  const analysis = useMemo(
+    () => analyzeImport({ headers, rows, mapping, existingLeads: leads, defaultAssigneeId }),
+    [headers, rows, mapping, leads, defaultAssigneeId],
+  );
   const mappedPhone = mapping.phone !== '' && mapping.phone != null;
   const mappedIdentity = (mapping.name !== '' && mapping.name != null) || (mapping.company !== '' && mapping.company != null);
   const ready = rows.length > 0 && mappedPhone && mappedIdentity && analysis.records.length > 0;

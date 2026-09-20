@@ -27,7 +27,8 @@ export function temperatureIdleDays(lead, now = new Date()) {
   if (!source) return 0;
   const date = new Date(source);
   if (Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.floor((now.getTime() - date.getTime()) / 86400000));
+  const calendarDiff = temperatureDayDiff(temperatureDateKey(date), now);
+  return calendarDiff == null ? 0 : Math.max(0, -calendarDiff);
 }
 
 function result(level, days, reason, detail) {

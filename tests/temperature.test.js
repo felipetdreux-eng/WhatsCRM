@@ -53,3 +53,12 @@ test('vendidos e perdidos não recebem temperatura operacional', () => {
   assert.equal(getLeadTemperature(lead({ status: 'Fechado' }), NOW), null);
   assert.equal(getLeadTemperature(lead({ status: 'Perdido' }), NOW), null);
 });
+
+test('mudança de dia conta pelo calendário mesmo sem completar 24 horas', () => {
+  const temperature = getLeadTemperature(lead({
+    updatedAt: '2030-01-14T23:50:00',
+  }), new Date('2030-01-15T00:10:00'));
+
+  assert.equal(temperature.days, 1);
+  assert.equal(temperature.reason, 'Interação ontem');
+});

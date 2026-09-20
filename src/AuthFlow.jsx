@@ -525,5 +525,6 @@ function AuthFlow() {
 }
 
 const host = document.getElementById('auth-root');
-const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'jacob';
+const demoKey = new URLSearchParams(window.location.search).get('demo');
+const isPublicDemo = ['jacob', 'able', 'able-live', 'innova', 'innova-automation'].includes(demoKey);
 if (host && !isPublicDemo) createRoot(host).render(<AuthFlow />);

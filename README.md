@@ -1,34 +1,38 @@
 # Fuply
 
-CRM simples para quem vende serviços pelo WhatsApp.
+CRM para pequenos negócios organizarem leads, follow-ups, equipe e conversas comerciais do WhatsApp.
 
-> Organize seus clientes, saiba quem precisa de resposta e pare de perder vendas no WhatsApp.
+## Desenvolvimento
 
-## Estado atual
+Requer Node.js 22.12 ou superior.
 
-A interface principal do pipeline já segue a identidade visual definida para o produto: SaaS limpo, claro, profissional e responsivo.
+```bash
+npm install
+npm run dev
+```
 
-## Recursos já presentes
+Validação completa:
 
-- Pipeline com as etapas Novo lead, Contatado, Interessado, Proposta enviada, Vendido e Perdido
-- Cards de métricas do funil
-- Cadastro rápido de leads
-- Nome, empresa, WhatsApp, valor potencial, status, origem, próximo contato e observações
-- Busca e filtros
-- Abertura direta da conversa no WhatsApp
-- Arrastar cards entre as colunas do pipeline
-- Layout responsivo para desktop, tablet e celular
-- Persistência local temporária no navegador
-- Dados demonstrativos para validar a interface
+```bash
+npm run check
+```
 
-## MVP vendável planejado
+## Backend
 
-Login + Leads + Pipeline + WhatsApp + Follow-ups + Dashboard.
+O frontend usa Supabase Auth, Postgres, RLS e Realtime. O schema versionado está em `supabase/migrations`. Leads e atividades são isolados por workspace; `user_id` registra o criador e `assigned_to` registra o responsável atual.
 
-## Fora do MVP
+## Demonstrações protegidas
 
-IA, chatbot, WhatsApp API, envio automático, app nativo, financeiro completo, integrações externas e automações complexas ficam para depois.
+As rotas `?demo=jacob`, `?demo=able` e `?demo=innova` exigem token temporário validado por `api/demo-access.js`. Os hashes e as datas de expiração são variáveis server-only da Vercel, listadas em `.env.example`; não coloque tokens ou hashes diretamente no código.
 
-## Próxima fundação técnica
+Para gerar um hash SHA-256 sem salvar o token no repositório:
 
-Substituir a persistência local por autenticação e banco de dados real antes de tratar o produto como versão utilizável por clientes.
+```bash
+node -e "const c=require('node:crypto'); process.stdout.write(c.createHash('sha256').update(process.argv[1]).digest('hex'))" "TOKEN_TEMPORARIO"
+```
+
+Configure cada hash e expiração nos ambientes necessários da Vercel. Sem configuração válida, a demonstração é negada por padrão.
+
+## Fluxo de publicação
+
+O repositório `felipetdreux-eng/WhatsCRM` publica no Vercel. Antes de integrar mudanças ao `main`, execute os testes, o build e confirme que as migrations do Git correspondem ao histórico do Supabase.

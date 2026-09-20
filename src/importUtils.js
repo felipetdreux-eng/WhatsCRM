@@ -237,7 +237,7 @@ function extractHeaderlessPdfRows(headers, rows, mapping) {
   return extracted.length ? extracted : null;
 }
 
-export function analyzeImport({ headers = [], rows = [], mapping = {}, existingLeads = [] }) {
+export function analyzeImport({ headers = [], rows = [], mapping = {}, existingLeads = [], defaultAssigneeId = '' }) {
   const errors = [];
   const warnings = [];
   const grouped = new Map();
@@ -328,6 +328,7 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       value,
       status,
       origin: entry.origin || existing?.origin || 'Outro',
+      assignedTo: existing?.assignedTo || defaultAssigneeId || null,
       nextContact,
       nextContactTime,
       nextAction,
