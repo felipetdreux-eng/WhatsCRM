@@ -641,6 +641,12 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   };
 
   const navigate = label => {
+    if (label === 'Pipeline') {
+      setQuery('');
+      setStatusFilter('Todos');
+      setOriginFilter('Todas');
+      setAssigneeFilter('Todos');
+    }
     setActivePage(label);
     setSelectedLeadId(null);
     setEditingLead(null);
@@ -657,6 +663,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   };
 
   const openPipelineView = (status = 'Todos') => {
+    setQuery('');
     setStatusFilter(status || 'Todos');
     setOriginFilter('Todas');
     setAssigneeFilter('Todos');

@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { createPendingLeadWrites } from './pendingLeadWrites';
 
 const ACCOUNTS_KEY = 'zapflow-accounts';
 const SESSION_KEY = 'zapflow-session';
@@ -439,6 +440,7 @@ export function installSyncBridge(userId) {
   const originalSetItem = Storage.prototype.setItem;
   let leadTimer;
   let lastSnapshot = new Map((readJSON('zapflow-leads', []) || []).map(lead => [lead.id, leadFingerprint(lead)]));
+  const pendingLeadWrites = createPendingLeadWrites();
 
   Storage.prototype.setItem = function(key, value) {
     originalSetItem.call(this, key, value);
@@ -452,7 +454,15 @@ export function installSyncBridge(userId) {
           const nextSnapshot = new Map(nextLeads.map(lead => [lead.id, leadFingerprint(lead)]));
           const changed = nextLeads.filter(lead => lastSnapshot.get(lead.id) !== nextSnapshot.get(lead.id));
           lastSnapshot = nextSnapshot;
-          if (changed.length) syncLeads(changed, userId).catch(console.error);
+          if (changed.length) {
+            const idMap = loadIdMap(userId);
+            const databaseIds = changed.map(lead => stableLeadId(lead.id, userId, idMap));
+            pendingLeadWrites.mark(databaseIds);
+            syncLeads(changed, userId).catch(error => {
+              pendingLeadWrites.release(databaseIds);
+              console.error(error);
+            });
+          }
         } catch {}
       }, 180);
     }
@@ -463,7 +473,12 @@ export function installSyncBridge(userId) {
       if (!workspaceId) return;
       const refreshWorkspace = payload => {
         const actorId = payload?.new?.last_modified_by || null;
-        if (payload?.eventType !== 'DELETE' && actorId && actorId === userId) return;
+        const changedLeadId = payload?.new?.id || payload?.old?.id || null;
+        const isThisTabWrite = payload?.eventType !== 'DELETE'
+          && actorId === userId
+          && changedLeadId
+          && pendingLeadWrites.consume(changedLeadId);
+        if (isThisTabWrite) return;
         window.clearTimeout(window.__zapflowRemoteRefreshTimer);
         window.__zapflowRemoteRefreshTimer = window.setTimeout(async () => {
           try {
