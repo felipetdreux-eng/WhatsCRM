@@ -27,3 +27,30 @@ test('não bloqueia atualizações remotas depois que a gravação local expira'
 
   assert.equal(pending.consume('lead-1', 1101), false);
 });
+
+test('release desfaz a marcação quando a gravação falha', () => {
+  const pending = createPendingLeadWrites();
+  pending.mark(['lead-1', 'lead-2'], 1000);
+  pending.release(['lead-1'], 1001);
+  assert.equal(pending.consume('lead-1', 1002), false);
+  assert.equal(pending.consume('lead-2', 1002), true);
+});
+
+test('aceita id único, ignora vazios e duplicados na mesma chamada', () => {
+  const pending = createPendingLeadWrites();
+  pending.mark('lead-1', 1000);
+  pending.mark(['', null, undefined], 1000);
+  pending.mark(['lead-2', 'lead-2'], 1000);
+  assert.equal(pending.consume('lead-1', 1001), true);
+  assert.equal(pending.consume('lead-2', 1001), true);
+  assert.equal(pending.consume('lead-2', 1001), false, 'duplicado na mesma chamada conta uma vez só');
+  assert.equal(pending.consume('', 1001), false);
+  assert.equal(pending.consume(null, 1001), false);
+});
+
+test('nova marcação renova o prazo de expiração', () => {
+  const pending = createPendingLeadWrites(100);
+  pending.mark(['lead-1'], 1000);
+  pending.mark(['lead-1'], 1090);
+  assert.equal(pending.consume('lead-1', 1150), true);
+});
