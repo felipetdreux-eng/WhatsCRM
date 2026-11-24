@@ -132,6 +132,7 @@ export function parseMoney(value) {
   if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
   else if (text.includes(',')) text = text.replace(',', '.');
   text = text.replace(/[^0-9.-]/g, '');
+  if (!/\d/.test(text)) return null;
   const number = Number(text);
   return Number.isFinite(number) ? number : null;
 }
