@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
-import { createPendingLeadWrites } from './pendingLeadWrites';
+import { supabase } from './supabaseClient.js';
+import { createPendingLeadWrites } from './pendingLeadWrites.js';
 
 const ACCOUNTS_KEY = 'zapflow-accounts';
 const SESSION_KEY = 'zapflow-session';

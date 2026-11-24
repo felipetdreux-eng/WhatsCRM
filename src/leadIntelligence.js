@@ -1,4 +1,4 @@
-import { temperatureDayDiff, temperatureIdleDays } from './leadTemperature';
+import { temperatureDayDiff, temperatureIdleDays } from './leadTemperature.js';
 
 const CLOSED = new Set(['Fechado', 'Perdido']);
 
