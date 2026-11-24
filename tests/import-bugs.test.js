@@ -30,3 +30,19 @@ test('bug: ponto como separador de milhar sem centavos ("R$ 1.250", "1.500.000")
   assert.equal(parseMoney('1.5'), 1.5);
   assert.equal(parseMoney('1250.75'), 1250.75);
 });
+
+test('bug: data impossível não pode passar como próximo contato', () => {
+  // Antes: "31/02/2026" virava "2026-02-31" e "13/25/2026" virava "2026-25-13".
+  // A coluna next_contact é DATE no Postgres, então o upsert do lote inteiro falharia.
+  assert.equal(normalizeDate('31/02/2026'), '');
+  assert.equal(normalizeDate('13/25/2026'), '');
+  assert.equal(normalizeDate('2026-02-30'), '');
+  assert.equal(normalizeDate('00/01/2026'), '');
+  assert.equal(normalizeDate('29/02/2028'), '2028-02-29');
+  assert.equal(normalizeDate('29/02/2027'), '');
+
+  const mapping = detectMapping(HEADERS);
+  const result = analyzeImport({ headers: HEADERS, rows: [['Ana', '21999999999', '', '31/02/2026']], mapping });
+  assert.equal(result.records[0].lead.nextContact, '');
+  assert.equal(result.warnings.length, 1);
+});

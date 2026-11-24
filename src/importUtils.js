@@ -138,6 +138,15 @@ export function parseMoney(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function validDateKey(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 export function normalizeDate(value) {
   if (value == null || String(value).trim() === '') return '';
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -149,11 +158,11 @@ export function normalizeDate(value) {
   }
   const text = String(value).trim();
   const iso = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  if (iso) return validDateKey(iso[1], iso[2], iso[3]);
   const br = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
   if (br) {
     const year = br[3].length === 2 ? `20${br[3]}` : br[3];
-    return `${year}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+    return validDateKey(year, br[2], br[1]);
   }
   return '';
 }
