@@ -131,6 +131,7 @@ export function parseMoney(value) {
   let text = String(value).trim().replace(/R\$/gi, '').replace(/\s/g, '');
   if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
   else if (text.includes(',')) text = text.replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
   text = text.replace(/[^0-9.-]/g, '');
   if (!/\d/.test(text)) return null;
   const number = Number(text);
