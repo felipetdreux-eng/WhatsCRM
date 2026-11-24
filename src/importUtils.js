@@ -100,7 +100,7 @@ export function detectMapping(headers) {
   for (const field of IMPORT_FIELDS) {
     let index = normalizedHeaders.findIndex((header, candidate) => !used.has(candidate) && field.aliases.some(alias => header === normalizeText(alias)));
     if (index < 0) {
-      index = normalizedHeaders.findIndex((header, candidate) => !used.has(candidate) && field.aliases.some(alias => {
+      index = normalizedHeaders.findIndex((header, candidate) => header && !used.has(candidate) && field.aliases.some(alias => {
         const normalizedAlias = normalizeText(alias);
         return header.includes(normalizedAlias) || normalizedAlias.includes(header);
       }));

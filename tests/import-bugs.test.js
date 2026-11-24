@@ -46,3 +46,16 @@ test('bug: data impossível não pode passar como próximo contato', () => {
   assert.equal(result.records[0].lead.nextContact, '');
   assert.equal(result.warnings.length, 1);
 });
+
+test('bug: coluna com cabeçalho vazio não pode ser mapeada como nome', () => {
+  // Antes: '' casava com qualquer alias no match parcial e roubava o campo nome
+  // (planilhas exportadas com coluna de índice vazia na frente).
+  const mapping = detectMapping(['', 'Nome completo', 'WhatsApp']);
+  assert.equal(mapping.name, 1);
+  assert.equal(mapping.phone, 2);
+  assert.equal(mapping.company, '');
+
+  const trailing = detectMapping(['Nome', 'Telefone', '', '  ']);
+  assert.equal(trailing.company, '');
+  assert.equal(trailing.value, '');
+});
