@@ -23,7 +23,7 @@ const STATUSES = [
   { id: STATUS_ENVIADO, className: 'sold', title: 'Enviados' },
 ];
 const NAV_ITEMS = [
-  ['Pedidos', ClipboardList],
+  ['Leads', ClipboardList],
   ['Por bairro', MapPin],
   ['Clientes', UsersRound],
   ['Configurações', Settings],
@@ -106,7 +106,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       return [];
     }
   });
-  const [activePage, setActivePage] = useState('Pedidos');
+  const [activePage, setActivePage] = useState('Leads');
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -223,7 +223,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   const renderOrders = () => (
     <main className="main-content">
       <header className="page-header">
-        <div><h1>Pedidos</h1><p>Marque como enviado quando o pedido sair.</p></div>
+        <div><h1>Leads</h1><p>Marque como enviado quando o pedido sair.</p></div>
         <div className="header-actions">
           <label className="search-box"><Search size={17} /><span className="sr-only">Buscar pedidos</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar pedido" aria-label="Buscar pedidos" /></label>
           <button type="button" className="primary-button" onClick={() => setCreating(true)}><Plus size={18} /> Novo pedido</button>
@@ -305,7 +305,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button type="button" className="logo-wrap logo-button" onClick={() => setActivePage('Pedidos')} aria-label="Ir para Pedidos">
+        <button type="button" className="logo-wrap logo-button" onClick={() => setActivePage('Leads')} aria-label="Ir para Leads">
           <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
           <span>Fuply</span>
         </button>
