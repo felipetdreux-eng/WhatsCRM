@@ -66,13 +66,13 @@ const GOAL_OPTIONS = [
 function BrandPanel() {
   return (
     <aside className="auth-brand-panel">
-      <div className="auth-brand"><div className="auth-brand-mark"><MessageCircle size={25} strokeWidth={2.4} /></div><span>Fuply</span></div>
+      <div className="auth-brand"><div className="auth-brand-mark"><MessageCircle size={25} strokeWidth={2.4} /></div><span>Fuply Chef</span></div>
       <div className="auth-brand-copy">
-        <span className="auth-eyebrow">Venda pelo WhatsApp sem perder o fio</span>
-        <h1>Seus clientes estão no WhatsApp. Suas vendas não precisam estar perdidas nele.</h1>
-        <p>Organize contatos, acompanhe negociações e saiba exatamente quem precisa de resposta.</p>
+        <span className="auth-eyebrow">Pedidos da ceia, sem perder nenhum</span>
+        <h1>Cada pedido no bairro certo, na hora de entregar.</h1>
+        <p>Anote o que cada cliente pediu, o frete sai sozinho e você vê tudo por bairro.</p>
       </div>
-      <div className="auth-brand-points"><span><Check size={15} /> Pipeline simples</span><span><Check size={15} /> Follow-ups no lugar certo</span><span><Check size={15} /> WhatsApp em um clique</span></div>
+      <div className="auth-brand-points"><span><Check size={15} /> Frete por bairro</span><span><Check size={15} /> Pedidos por bairro</span><span><Check size={15} /> WhatsApp em um clique</span></div>
     </aside>
   );
 }
