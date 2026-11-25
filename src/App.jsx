@@ -36,6 +36,9 @@ import SettingsPage from './SettingsPage';
 import GlobalQuickActions from './GlobalQuickActions';
 import LeadReplyAssistant from './LeadReplyAssistant';
 import InboxPage from './InboxPage';
+import OrderBuilder from './OrderBuilder';
+import OrdersByNeighborhood from './OrdersByNeighborhood';
+import { cleanItems, neighborhoodInfo, orderTotals } from './chefData';
 import { getActiveAccount, logoutAccount } from './accountStorage';
 import { loadWorkspaceContext, recordLeadActivity, syncLeads } from './backendBridge';
 import {
@@ -78,6 +81,7 @@ const NAV_ITEMS = [
   ['Início', CalendarClock],
   ['Resultados', LayoutDashboard],
   ['Pipeline', ListFilter],
+  ['Pedidos por bairro', MapPin],
   ['Leads', UsersRound],
   ['Inbox', MessageCircle],
   ['Mensagens', MessagesSquare],
@@ -87,6 +91,7 @@ const NAV_ITEMS = [
 const EMPTY_FORM = {
   name: '', company: '', phone: '', value: '', status: 'Novo pedido', origin: 'WhatsApp', assignedTo: '',
   nextContact: '', nextContactTime: '', nextAction: '', notes: '',
+  items: [], neighborhood: '', deliveryFee: 0,
 };
 
 function initials(name) {
@@ -140,6 +145,9 @@ function migrateLead(rawLead) {
     nextContactTime: lead.nextContactTime || '',
     nextAction: lead.nextAction || '',
     notes: lead.notes || '',
+    items: cleanItems(lead.items),
+    neighborhood: lead.neighborhood || '',
+    deliveryFee: Number.isFinite(Number(lead.deliveryFee)) ? Number(lead.deliveryFee) : 0,
     lastFollowupAt: lead.lastFollowupAt || null,
     createdAt: lead.createdAt || null,
     updatedAt: lead.updatedAt || lead.soldAt || lead.lostAt || lead.createdAt || null,
@@ -541,15 +549,18 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (Number(form.value || 0) < 0) return setFormError('O valor potencial não pode ser negativo.');
 
     const now = new Date().toISOString();
+    const order = orderTotals(form.items, form.neighborhood);
     const next = {
       id: crypto.randomUUID(),
       ...form,
+      items: cleanItems(form.items),
+      deliveryFee: order.fee,
       assignedTo: form.assignedTo || account?.id || null,
       name: form.name.trim(),
       company: form.company.trim(),
       status: CLOSED.includes(form.status) ? 'Novo pedido' : form.status,
       phone: canonicalPhone(form.phone),
-      value: Number(form.value || 0),
+      value: order.itemCount ? order.total : Number(form.value || 0),
       createdAt: now,
       updatedAt: now,
       lastFollowupAt: null,
@@ -605,13 +616,16 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (editingLead.status === 'Confirmado' && Number(editingLead.saleValue) <= 0) return setFormError('Informe o valor final da venda.');
 
     const previous = selectedLead;
+    const order = orderTotals(editingLead.items, editingLead.neighborhood);
     const draft = {
       ...editingLead,
+      items: cleanItems(editingLead.items),
+      deliveryFee: order.fee,
       assignedTo: editingLead.assignedTo || account?.id || null,
       name: editingLead.name.trim(),
       company: String(editingLead.company || '').trim(),
       phone: canonicalPhone(editingLead.phone),
-      value: Number(editingLead.value || 0),
+      value: order.itemCount ? order.total : Number(editingLead.value || 0),
     };
     const next = applyStatusTransition(previous, draft, draft.status, draft.saleValue);
     setLeads(current => current.map(lead => lead.id === editingLead.id ? next : lead));
@@ -760,6 +774,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   {editingLead.status === 'Confirmado' && <label className="info-item info-edit-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></div></label>}
                   <label className="info-item info-edit-item"><MapPin size={18} /><div><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></div></label>
                   <label className="info-item info-edit-item"><UsersRound size={18} /><div><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></div></label>
+                  <OrderBuilder items={editingLead.items} neighborhood={editingLead.neighborhood} onChange={order => setEditingLead({ ...editingLead, ...order })} />
                 </div>
                 {formError && <div className="auth-error inline-edit-error" role="alert">{formError}</div>}
               </section>
@@ -810,8 +825,24 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   <div className="info-item"><Target size={18} /><div><span>Status</span><strong>{selectedLead.status}</strong></div></div>
                   <div className="info-item"><MapPin size={18} /><div><span>Origem</span><strong>{selectedLead.origin || 'Não informado'}</strong></div></div>
                   <div className="info-item"><UsersRound size={18} /><div><span>Responsável</span><strong>{memberName(selectedLead.assignedTo)}</strong></div></div>
+                  <div className="info-item"><MapPin size={18} /><div><span>Bairro de entrega</span><strong>{selectedLead.neighborhood || 'Não informado'}</strong></div></div>
                 </div>
               </section>
+
+              {cleanItems(selectedLead.items).length > 0 && (() => {
+                const order = orderTotals(selectedLead.items, selectedLead.neighborhood);
+                return (
+                  <section className="detail-card">
+                    <div className="section-heading"><div><h2>Pedido</h2><p>O que o cliente comprou.</p></div></div>
+                    <div className="order-detail">
+                      <div className="order-lines">
+                        {cleanItems(selectedLead.items).map(item => <div key={item.productId}>{item.qty}× {item.name} · {currency(item.price * item.qty)}</div>)}
+                      </div>
+                      <div>Itens {currency(order.subtotal)} · Frete {currency(order.fee)}{neighborhoodInfo(selectedLead.neighborhood) ? ` (${selectedLead.neighborhood})` : ''} · <strong>Total {currency(order.total)}</strong></div>
+                    </div>
+                  </section>
+                );
+              })()}
 
               <section className="detail-card">
                 <div className="section-heading"><div><h2>Observações</h2><p>Contexto importante da conversa.</p></div></div>
@@ -917,6 +948,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (selectedLead) return renderLeadDetail();
     if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
     if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
+    if (activePage === 'Pedidos por bairro') return <OrdersByNeighborhood leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} />;
     if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
     if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} memberName={memberName} teamMembers={teamMembers} />;
     if (activePage === 'Inbox') return <InboxPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onReplyWithAI={openReplyAssistant} onStatusChange={requestStatusChange} demoMode={demoMode} />;
@@ -938,10 +970,11 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
           <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-lead-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="new-lead-title">Novo pedido</h2><p>Adicione um novo contato ao pipeline.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
+            <div className="modal-header"><div><h2 id="new-lead-title">Novo pedido</h2><p>Escolha o bairro e o que o cliente comprou.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
             <form onSubmit={addLead} className="quick-lead-form">
               <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: João Silva" /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
+              <OrderBuilder items={form.items} neighborhood={form.neighborhood} onChange={order => setForm({ ...form, ...order })} />
               <details className="quick-lead-details">
                 <summary>Mais detalhes (opcional)</summary>
                 <div className="quick-lead-details-grid">
@@ -957,7 +990,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                 </div>
               </details>
               {formError && <div className="auth-error full" role="alert">{formError}</div>}
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setModalOpen(false); setFormError(''); }}>Cancelar</button><button className="primary-button"><Plus size={16} /> Adicionar lead</button></div>
+              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setModalOpen(false); setFormError(''); }}>Cancelar</button><button className="primary-button"><Plus size={16} /> Adicionar pedido</button></div>
             </form>
           </section>
         </div>
