@@ -10,9 +10,9 @@ export const DELIVERY_ZONES = [
   {
     zone: 'Zona Sul',
     fee: 15,
-    neighborhoods: ['Flamengo', 'Glória', 'Laranjeiras', 'Catete', 'Cosme Velho', 'Botafogo', 'Humaitá', 'Urca', 'Leme', 'Copacabana', 'Ipanema', 'Leblon', 'Lagoa', 'Jardim Botânico', 'Gávea', 'Vidigal', 'São Conrado', 'Rocinha'],
+    neighborhoods: ['Flamengo', 'Glória', 'Laranjeiras', 'Catete', 'Cosme Velho', 'Botafogo', 'Humaitá', 'Urca', 'Leme', 'Copacabana', 'Ipanema', 'Leblon', 'Lagoa', 'Jardim Botânico', 'Gávea', 'Vidigal', 'Rocinha'],
   },
-  { zone: 'Barra da Tijuca', fee: 25, neighborhoods: ['Barra da Tijuca'] },
+  { zone: 'Barra da Tijuca', fee: 25, neighborhoods: ['Barra da Tijuca', 'São Conrado'] },
   {
     zone: 'Niterói',
     fee: 30,

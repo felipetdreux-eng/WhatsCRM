@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, MessageCircle } from 'lucide-react';
 import { DELIVERY_ZONES, cleanItems, neighborhoodInfo, orderTotals } from './chefData.js';
-import { currency } from './domain.js';
+import { currency, whatsappPhone } from './domain.js';
 import './order.css';
 
 const NO_NEIGHBORHOOD = 'Sem bairro';
@@ -77,6 +77,7 @@ export default function OrdersByNeighborhood({ leads, openLead, onMarkSent }) {
                   {lead.notes && <small className="orders-address">{lead.notes}</small>}
                   <div className="orders-order-foot">
                     <small>{lead.phone}</small>
+                    <a className="orders-send orders-wa" href={`https://wa.me/${whatsappPhone(lead.phone)}`} target="_blank" rel="noreferrer" onClick={event => event.stopPropagation()}><MessageCircle size={14} /> WhatsApp</a>
                     {lead.status === 'Enviado'
                       ? <small className="orders-sent">Enviado</small>
                       : <button type="button" className="orders-send" onClick={event => { event.stopPropagation(); onMarkSent(lead.id); }}><CheckCircle2 size={14} /> Enviado</button>}

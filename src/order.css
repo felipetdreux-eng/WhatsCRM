@@ -66,3 +66,5 @@
 .orders-send:hover { background: color-mix(in srgb, var(--primary, #16a34a) 10%, transparent); }
 .orders-sent { color: var(--primary, #16a34a); font-weight: 600; }
 .order-card-items { color: var(--muted, #667085); display: block; margin: 4px 0; }
+.orders-order-foot{flex-wrap:wrap;gap:6px}
+.orders-wa{text-decoration:none;display:inline-flex;align-items:center;gap:4px}

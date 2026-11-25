@@ -15,7 +15,7 @@ test('frete exato por bairro, conforme a tabela do chef', () => {
 
 test('cada bairro aparece uma vez e a contagem bate com a tabela', () => {
   assert.equal(new Set(NEIGHBORHOODS.map(item => item.label)).size, NEIGHBORHOODS.length);
-  assert.deepEqual(DELIVERY_ZONES.map(zone => zone.neighborhoods.length), [16, 18, 1, 6]);
+  assert.deepEqual(DELIVERY_ZONES.map(zone => zone.neighborhoods.length), [16, 17, 2, 6]);
 });
 
 test('ids de produto são únicos e preços do cardápio conferem', () => {
