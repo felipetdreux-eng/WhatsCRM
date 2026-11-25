@@ -21,7 +21,7 @@ import './autopilot.css';
 import './autopilot-outcome.css';
 import './autopilot-v2.css';
 
-const CLOSED = ['Fechado', 'Perdido'];
+const CLOSED = ['Confirmado', 'Perdido'];
 
 const OUTCOME_OPTIONS = [
   {
@@ -54,7 +54,7 @@ const OUTCOME_OPTIONS = [
     detail: 'A negociação avançou para proposta. O próximo objetivo é conseguir uma resposta clara.',
     nextDays: 2,
     nextAction: 'Cobrar retorno da proposta',
-    status: 'Proposta enviada',
+    status: 'Orçamento enviado',
     tone: 'proposal',
   },
   {
@@ -63,14 +63,14 @@ const OUTCOME_OPTIONS = [
     detail: 'A proposta virou uma negociação ativa. Registre o próximo passo para conduzir ao fechamento.',
     nextDays: 2,
     nextAction: 'Avançar negociação',
-    status: 'Negociação',
+    status: 'Aguardando confirmação',
     tone: 'proposal',
   },
   {
     id: 'won',
     label: 'Fechou',
     detail: 'Venda concluída. O lead sai da fila de follow-up e entra como fechado.',
-    status: 'Fechado',
+    status: 'Confirmado',
     tone: 'won',
   },
   {
@@ -154,12 +154,12 @@ function scoreLead(lead) {
   }
 
   if (!lead.nextContact) {
-    const noNextScore = lead.status === 'Proposta enviada' ? 34
-      : lead.status === 'Interessado' ? 27
-        : lead.status === 'Contatado' ? 20
+    const noNextScore = lead.status === 'Orçamento enviado' ? 34
+      : lead.status === 'Cardápio enviado' ? 27
+        : lead.status === 'Em conversa' ? 20
           : 12;
     score += noNextScore;
-    if (lead.status !== 'Novo lead' || idleDays >= 2) reasons.push('sem próximo contato definido');
+    if (lead.status !== 'Novo pedido' || idleDays >= 2) reasons.push('sem próximo contato definido');
   }
 
   if (idleDays >= 7) {
@@ -170,20 +170,20 @@ function scoreLead(lead) {
     reasons.push(`negociação esfriando há ${idleDays} dias`);
   }
 
-  if (lead.status === 'Proposta enviada') {
+  if (lead.status === 'Orçamento enviado') {
     score += 20;
     reasons.push('proposta já enviada');
-  } else if (lead.status === 'Interessado') {
+  } else if (lead.status === 'Cardápio enviado') {
     score += 10;
     reasons.push('lead demonstrou interesse');
-  } else if (lead.status === 'Contatado') {
+  } else if (lead.status === 'Em conversa') {
     score += 4;
   }
 
   if (value > 0) score += Math.min(18, Math.round(value / 500));
 
   const uniqueReasons = [...new Set(reasons)].slice(0, 3);
-  const actionable = uniqueReasons.length > 0 && !(lead.status === 'Novo lead' && !lead.nextContact && idleDays < 2 && due == null);
+  const actionable = uniqueReasons.length > 0 && !(lead.status === 'Novo pedido' && !lead.nextContact && idleDays < 2 && due == null);
 
   return {
     lead,

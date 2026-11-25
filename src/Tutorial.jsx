@@ -38,7 +38,7 @@ const STEPS = [
     selector: '.pipeline-board .pipeline-column',
     side: 'right',
     title: 'Acompanhe cada negociação no Pipeline',
-    text: 'Cada coluna representa uma etapa da venda. Conforme a conversa avança, mova o lead entre as etapas até Fechado ou Perdido e filtre por responsável quando estiver trabalhando em equipe.',
+    text: 'Cada coluna representa uma etapa da venda. Conforme a conversa avança, mova o lead entre as etapas até Confirmado ou Perdido e filtre por responsável quando estiver trabalhando em equipe.',
   },
   {
     page: 'Mensagens',

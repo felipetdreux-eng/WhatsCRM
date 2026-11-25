@@ -163,11 +163,11 @@ begin
     return format('Oi, %s! Passando uma última vez para saber se ainda faz sentido continuarmos essa conversa. Se não for prioridade agora, sem problema, só me avisa para eu organizar por aqui.', first_name);
   end if;
 
-  if _status = 'Proposta enviada' then
+  if _status = 'Orçamento enviado' then
     return format('Oi, %s! Conseguiu analisar a proposta? Se tiver algum ponto travando a decisão, me fala que eu tento resolver por aqui.', first_name);
-  elsif _status = 'Negociação' then
+  elsif _status = 'Aguardando confirmação' then
     return format('Oi, %s! Queria retomar nossa negociação e fechar os próximos passos. O que falta definirmos para conseguir avançar?', first_name);
-  elsif _status = 'Interessado' then
+  elsif _status = 'Cardápio enviado' then
     return format('Oi, %s! Queria retomar o que conversamos. Qual é o principal ponto que falta resolver para conseguirmos avançar?', first_name);
   else
     return format('Oi, %s! Tudo bem? Passando para retomar nossa conversa. Ainda faz sentido falarmos sobre isso?', first_name);
@@ -199,7 +199,7 @@ begin
   where o.lead_id = l.id
     and o.workspace_id = _workspace_id
     and o.status in ('pending', 'ready')
-    and l.status in ('Fechado', 'Perdido');
+    and l.status in ('Confirmado', 'Perdido');
   get diagnostics changed = row_count;
   affected := affected + changed;
 
@@ -215,10 +215,10 @@ begin
       l.created_at + make_interval(mins => cfg.first_contact_delay_minutes),
       1,
       private.automation_message(l.name, l.status, 'first_contact', 1),
-      'Novo lead entrou no Fuply e ainda precisa de primeiro contato.'
+      'Novo pedido entrou no Fuply e ainda precisa de primeiro contato.'
     from public.leads l
     where l.workspace_id = _workspace_id
-      and l.status = 'Novo lead'
+      and l.status = 'Novo pedido'
       and l.last_response_at is null
       and l.last_followup_at is null
       and not exists (
@@ -261,7 +261,7 @@ begin
         and history.status = 'sent'
     ) sent on true
     where l.workspace_id = _workspace_id
-      and l.status not in ('Fechado', 'Perdido', 'Novo lead')
+      and l.status not in ('Confirmado', 'Perdido', 'Novo pedido')
       and activity.last_activity_at <= now() - make_interval(hours => cfg.followup_delay_hours)
       and coalesce(sent.sent_count, 0) < cfg.max_followup_attempts
       and not exists (
@@ -316,7 +316,7 @@ begin
   from public.workspace_automation_settings
   where workspace_id = new.workspace_id;
 
-  if new.status in ('Fechado', 'Perdido') then
+  if new.status in ('Confirmado', 'Perdido') then
     update public.automation_outbox
     set status = 'cancelled', cancel_reason = 'lead_closed'
     where lead_id = new.id and status in ('pending', 'ready');

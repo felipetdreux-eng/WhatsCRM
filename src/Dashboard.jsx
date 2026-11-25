@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import './dashboard.css';
 
-const OPEN = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação'];
-const FUNNEL = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado'];
+const OPEN = ['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação'];
+const FUNNEL = ['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação', 'Confirmado'];
 const ORIGINS = ['Site', 'Indicação', 'WhatsApp', 'Google Maps', 'Instagram', 'Outro'];
 
 const money = value => new Intl.NumberFormat('pt-BR', {
@@ -51,7 +51,7 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
   const data = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
     const active = list.filter(lead => OPEN.includes(lead.status));
-    const sold = list.filter(lead => lead.status === 'Fechado');
+    const sold = list.filter(lead => lead.status === 'Confirmado');
     const lost = list.filter(lead => lead.status === 'Perdido');
     const pipelineValue = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
     const soldValue = sold.reduce((sum, lead) => sum + Number(lead.saleValue || lead.value || 0), 0);
@@ -71,13 +71,13 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
     const funnel = FUNNEL.map(status => ({
       status,
       count: list.filter(lead => lead.status === status).length,
-      value: list.filter(lead => lead.status === status).reduce((sum, lead) => sum + Number(status === 'Fechado' ? (lead.saleValue || lead.value || 0) : (lead.value || 0)), 0),
+      value: list.filter(lead => lead.status === status).reduce((sum, lead) => sum + Number(status === 'Confirmado' ? (lead.saleValue || lead.value || 0) : (lead.value || 0)), 0),
     }));
     const maxFunnel = Math.max(1, ...funnel.map(item => item.count));
 
     const origins = ORIGINS.map(origin => {
       const items = list.filter(lead => (lead.origin || 'Outro') === origin);
-      const wins = items.filter(lead => lead.status === 'Fechado');
+      const wins = items.filter(lead => lead.status === 'Confirmado');
       return {
         origin,
         count: items.length,
@@ -88,7 +88,7 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
     }).filter(item => item.count).sort((a, b) => b.value - a.value || b.count - a.count);
 
     const openStages = funnel.filter(item => OPEN.includes(item.status));
-    const bottleneck = [...openStages].sort((a, b) => b.count - a.count)[0] || { status: 'Novo lead', count: 0 };
+    const bottleneck = [...openStages].sort((a, b) => b.count - a.count)[0] || { status: 'Novo pedido', count: 0 };
 
     const lossReasonMap = new Map();
     lost.forEach(lead => {
@@ -104,7 +104,7 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
       const key = lead.assignedTo || 'unassigned';
       const current = teamMap.get(key) || { id: key, count: 0, wins: 0, value: 0 };
       current.count += 1;
-      if (lead.status === 'Fechado') {
+      if (lead.status === 'Confirmado') {
         current.wins += 1;
         current.value += Number(lead.saleValue || lead.value || 0);
       }
@@ -137,9 +137,9 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
 
   const cards = [
     { label: 'Pipeline aberto', value: money(data.pipelineValue), detail: `${data.active.length} oportunidades`, icon: CircleDollarSign, tone: 'blue', action: () => goPipeline() },
-    { label: 'Fechado no mês', value: money(data.soldThisValue), detail: `${data.soldThis.length} vendas · ${data.soldDelta >= 0 ? '+' : ''}${data.soldDelta}% vs mês anterior`, icon: TrendingUp, tone: 'green', action: () => goPipeline('Fechado') },
-    { label: 'Leads novos', value: data.newThis.length, detail: `${data.newDelta >= 0 ? '+' : ''}${data.newDelta}% vs mês anterior`, icon: UsersRound, tone: 'neutral', action: () => goLeads({ status: 'Novo lead' }) },
-    { label: 'Conversão', value: `${data.conversion}%`, detail: `${data.sold.length} fechados de ${leads.length}`, icon: Target, tone: 'purple', action: () => goPipeline('Fechado') },
+    { label: 'Confirmado no mês', value: money(data.soldThisValue), detail: `${data.soldThis.length} vendas · ${data.soldDelta >= 0 ? '+' : ''}${data.soldDelta}% vs mês anterior`, icon: TrendingUp, tone: 'green', action: () => goPipeline('Confirmado') },
+    { label: 'Leads novos', value: data.newThis.length, detail: `${data.newDelta >= 0 ? '+' : ''}${data.newDelta}% vs mês anterior`, icon: UsersRound, tone: 'neutral', action: () => goLeads({ status: 'Novo pedido' }) },
+    { label: 'Conversão', value: `${data.conversion}%`, detail: `${data.sold.length} fechados de ${leads.length}`, icon: Target, tone: 'purple', action: () => goPipeline('Confirmado') },
   ];
 
   return (
@@ -167,7 +167,7 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
           <div className="dashboard-panel-head"><div><h2>Funil de vendas</h2><p>Clique em qualquer etapa para abrir exatamente aqueles leads.</p></div></div>
           <div className="pipeline-bars">
             {data.funnel.map(item => (
-              <button type="button" className="pipeline-bar-row" key={item.status} onClick={() => item.status === 'Fechado' ? goPipeline('Fechado') : goLeads({ status: item.status })}>
+              <button type="button" className="pipeline-bar-row" key={item.status} onClick={() => item.status === 'Confirmado' ? goPipeline('Confirmado') : goLeads({ status: item.status })}>
                 <div className="pipeline-bar-label"><span className={`status-mini-dot status-${statusClass(item.status)}`} />{item.status}</div>
                 <div className="pipeline-bar-track"><div className={`pipeline-bar-fill fill-${statusClass(item.status)}`} style={{ width: `${(item.count / data.maxFunnel) * 100}%` }} /></div>
                 <strong>{item.count}</strong>
@@ -195,9 +195,9 @@ export default function Dashboard({ leads, goPipeline, goLeads, memberName }) {
         <div className="dashboard-panel">
           <div className="dashboard-panel-head"><div><h2>Resumo financeiro</h2><p>Sem gráfico decorativo fingindo produtividade.</p></div></div>
           <div className="results-list">
-            <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Total fechado</strong><span>{data.sold.length} vendas</span></div><b>{money(data.soldValue)}</b></button>
+            <button type="button" onClick={() => goPipeline('Confirmado')}><div><strong>Total fechado</strong><span>{data.sold.length} vendas</span></div><b>{money(data.soldValue)}</b></button>
             <button type="button" onClick={() => goPipeline()}><div><strong>Valor em aberto</strong><span>{data.active.length} oportunidades</span></div><b>{money(data.pipelineValue)}</b></button>
-            <button type="button" onClick={() => goPipeline('Fechado')}><div><strong>Ticket médio</strong><span>média das vendas fechadas</span></div><b>{money(data.avgTicket)}</b></button>
+            <button type="button" onClick={() => goPipeline('Confirmado')}><div><strong>Ticket médio</strong><span>média das vendas fechadas</span></div><b>{money(data.avgTicket)}</b></button>
             <button type="button" onClick={() => goLeads({ status: 'Perdido' })}><div><strong>Leads perdidos</strong><span>{data.lossReasons[0] ? `Principal motivo: ${data.lossReasons[0].reason}` : 'revise padrões de perda'}</span></div><b>{data.lost.length}</b></button>
           </div>
         </div>

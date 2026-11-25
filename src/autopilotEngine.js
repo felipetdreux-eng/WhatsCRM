@@ -1,19 +1,19 @@
-const CLOSED = new Set(['Fechado', 'Perdido']);
+const CLOSED = new Set(['Confirmado', 'Perdido']);
 
 const STATUS_WEIGHT = {
-  'Negociação': 40,
-  'Proposta enviada': 34,
-  Interessado: 20,
-  Contatado: 10,
-  'Novo lead': 4,
+  'Aguardando confirmação': 40,
+  'Orçamento enviado': 34,
+  'Cardápio enviado': 20,
+  'Em conversa': 10,
+  'Novo pedido': 4,
 };
 
 const STATUS_ORDER = {
-  'Negociação': 0,
-  'Proposta enviada': 1,
-  Interessado: 2,
-  Contatado: 3,
-  'Novo lead': 4,
+  'Aguardando confirmação': 0,
+  'Orçamento enviado': 1,
+  'Cardápio enviado': 2,
+  'Em conversa': 3,
+  'Novo pedido': 4,
 };
 
 export function localDateKey(date = new Date()) {
@@ -48,10 +48,10 @@ function valueWeight(rawValue) {
 }
 
 function coolingThreshold(status) {
-  if (status === 'Negociação') return 2;
-  if (status === 'Proposta enviada') return 2;
-  if (status === 'Interessado') return 3;
-  if (status === 'Contatado') return 4;
+  if (status === 'Aguardando confirmação') return 2;
+  if (status === 'Orçamento enviado') return 2;
+  if (status === 'Cardápio enviado') return 3;
+  if (status === 'Em conversa') return 4;
   return 2;
 }
 
@@ -69,13 +69,13 @@ function priorityFromScore(score) {
 function urgencyRank({ due, lead, idleDays }) {
   if (due != null && due < 0) return 0;
   if (due === 0) return 1;
-  if (lead.status === 'Negociação' && !lead.nextContact) return 2;
-  if (lead.status === 'Negociação' && idleDays >= 2) return 3;
-  if (lead.status === 'Proposta enviada' && !lead.nextContact) return 4;
-  if (lead.status === 'Proposta enviada' && idleDays >= 2) return 5;
-  if (!lead.nextContact && ['Interessado', 'Contatado'].includes(lead.status)) return 4;
+  if (lead.status === 'Aguardando confirmação' && !lead.nextContact) return 2;
+  if (lead.status === 'Aguardando confirmação' && idleDays >= 2) return 3;
+  if (lead.status === 'Orçamento enviado' && !lead.nextContact) return 4;
+  if (lead.status === 'Orçamento enviado' && idleDays >= 2) return 5;
+  if (!lead.nextContact && ['Cardápio enviado', 'Em conversa'].includes(lead.status)) return 4;
   if (idleDays >= coolingThreshold(lead.status)) return 5;
-  if (lead.status === 'Novo lead' && !lead.nextContact) return 6;
+  if (lead.status === 'Novo pedido' && !lead.nextContact) return 6;
   if (due === 1) return 7;
   if (due === 2) return 8;
   return 9;
@@ -117,21 +117,21 @@ export function scoreAutopilotLead(lead, now = new Date()) {
     score += 30;
     operationalSignal = true;
     pushReason(reasons, 'retorno marcado para amanhã', 30, 'upcoming');
-  } else if (due === 2 && ['Negociação', 'Proposta enviada'].includes(lead.status)) {
+  } else if (due === 2 && ['Aguardando confirmação', 'Orçamento enviado'].includes(lead.status)) {
     score += 18;
     operationalSignal = true;
     pushReason(reasons, 'proposta com retorno nos próximos 2 dias', 18, 'upcoming');
   }
 
   if (!lead.nextContact) {
-    const weight = lead.status === 'Negociação' ? 48
-      : lead.status === 'Proposta enviada' ? 42
-        : lead.status === 'Interessado' ? 32
-        : lead.status === 'Contatado' ? 22
+    const weight = lead.status === 'Aguardando confirmação' ? 48
+      : lead.status === 'Orçamento enviado' ? 42
+        : lead.status === 'Cardápio enviado' ? 32
+        : lead.status === 'Em conversa' ? 22
           : 15;
     score += weight;
     operationalSignal = true;
-    pushReason(reasons, lead.status === 'Novo lead' ? 'novo lead sem primeiro contato definido' : 'sem próximo contato definido', weight, 'unscheduled');
+    pushReason(reasons, lead.status === 'Novo pedido' ? 'novo lead sem primeiro contato definido' : 'sem próximo contato definido', weight, 'unscheduled');
   }
 
   const threshold = coolingThreshold(lead.status);
@@ -150,14 +150,14 @@ export function scoreAutopilotLead(lead, now = new Date()) {
     );
   }
 
-  if (lead.status === 'Negociação') {
+  if (lead.status === 'Aguardando confirmação') {
     operationalSignal = true;
-    pushReason(reasons, 'negociação ativa', STATUS_WEIGHT['Negociação'], 'stage');
-  } else if (lead.status === 'Proposta enviada') {
+    pushReason(reasons, 'negociação ativa', STATUS_WEIGHT['Aguardando confirmação'], 'stage');
+  } else if (lead.status === 'Orçamento enviado') {
     operationalSignal = true;
-    pushReason(reasons, 'proposta já enviada', STATUS_WEIGHT['Proposta enviada'], 'stage');
-  } else if (lead.status === 'Interessado') {
-    pushReason(reasons, 'lead demonstrou interesse', STATUS_WEIGHT.Interessado, 'stage');
+    pushReason(reasons, 'proposta já enviada', STATUS_WEIGHT['Orçamento enviado'], 'stage');
+  } else if (lead.status === 'Cardápio enviado') {
+    pushReason(reasons, 'lead demonstrou interesse', STATUS_WEIGHT['Cardápio enviado'], 'stage');
   }
 
   const moneyWeight = valueWeight(lead.value);
@@ -192,25 +192,25 @@ export function autopilotRecommendation(item) {
     title: 'Resolva o contato de hoje',
     detail: 'Esse retorno já estava combinado. Faça o contato e registre o resultado antes de seguir.',
   };
-  if (item.lead.status === 'Negociação' && !item.lead.nextContact) return {
+  if (item.lead.status === 'Aguardando confirmação' && !item.lead.nextContact) return {
     title: 'Defina o próximo passo da negociação',
     detail: 'A negociação está ativa, mas sem uma próxima ação marcada. Defina o retorno e conduza o lead para uma decisão.',
   };
-  if (item.lead.status === 'Negociação') return {
+  if (item.lead.status === 'Aguardando confirmação') return {
     title: 'Conduza para uma decisão',
     detail: 'Esse lead já está negociando. Resolva objeções, ajuste o necessário e busque um sim ou não claro.',
   };
-  if (item.lead.status === 'Proposta enviada' && !item.lead.nextContact) return {
+  if (item.lead.status === 'Orçamento enviado' && !item.lead.nextContact) return {
     title: 'Não deixe a proposta sem retorno',
     detail: 'A proposta está aberta e sem uma próxima data. Busque uma resposta e deixe o próximo passo marcado.',
   };
-  if (item.lead.status === 'Proposta enviada') return {
+  if (item.lead.status === 'Orçamento enviado') return {
     title: 'Destrave a proposta',
     detail: 'Consiga uma resposta clara: avançar, ajustar a proposta ou encerrar a negociação.',
   };
   if (!item.lead.nextContact) return {
-    title: item.lead.status === 'Novo lead' ? 'Faça o primeiro contato' : 'Defina o próximo passo',
-    detail: item.lead.status === 'Novo lead'
+    title: item.lead.status === 'Novo pedido' ? 'Faça o primeiro contato' : 'Defina o próximo passo',
+    detail: item.lead.status === 'Novo pedido'
       ? 'Esse lead entrou no CRM e ainda não tem uma ação marcada. Faça o primeiro contato e registre o resultado.'
       : 'Essa negociação está aberta sem data de retorno. Fale com o lead e deixe a próxima ação definida.',
   };
@@ -237,25 +237,25 @@ export function autopilotMessageSuggestion(item, tone = 'direct') {
   if (!item?.lead) return '';
   const lead = item.lead;
   const name = firstName(lead.name);
-  const status = lead.status || 'Novo lead';
+  const status = lead.status || 'Novo pedido';
   const overdue = item.due != null && item.due < 0;
   const veryCold = item.idleDays >= 7;
 
   if (tone === 'last') {
-    if (status === 'Proposta enviada' || status === 'Negociação') {
+    if (status === 'Orçamento enviado' || status === 'Aguardando confirmação') {
       return `Oi, ${name}! Vou encerrar meu acompanhamento por aqui para não ficar te cobrando. Antes disso, queria confirmar: ainda faz sentido avançarmos ou prefere deixar para outro momento?`;
     }
     return `Oi, ${name}! Passando uma última vez para saber se ainda faz sentido continuarmos essa conversa. Se não for prioridade agora, sem problema, só me avisa para eu organizar por aqui.`;
   }
 
   if (tone === 'light') {
-    if (status === 'Novo lead') {
+    if (status === 'Novo pedido') {
       return `Oi, ${name}! Tudo bem? Vi seu contato por aqui e queria entender melhor o que você está buscando. Posso te fazer uma pergunta rápida?`;
     }
-    if (status === 'Proposta enviada') {
+    if (status === 'Orçamento enviado') {
       return `Oi, ${name}! Tudo bem? Passando rapidinho para saber se conseguiu dar uma olhada na proposta. Se ficou alguma dúvida, posso te ajudar por aqui.`;
     }
-    if (status === 'Negociação') {
+    if (status === 'Aguardando confirmação') {
       return `Oi, ${name}! Tudo certo? Queria retomar nossa conversa e ver se ficou algum ponto para ajustarmos antes de avançar.`;
     }
     if (veryCold) {
@@ -265,25 +265,25 @@ export function autopilotMessageSuggestion(item, tone = 'direct') {
   }
 
   if (overdue) {
-    if (status === 'Proposta enviada') {
+    if (status === 'Orçamento enviado') {
       return `Oi, ${name}! Nosso retorno ficou pendente. Você conseguiu analisar a proposta? Se tiver algum ponto travando a decisão, me fala que eu tento resolver por aqui.`;
     }
-    if (status === 'Negociação') {
+    if (status === 'Aguardando confirmação') {
       return `Oi, ${name}! Nosso retorno ficou pendente. Queria fechar os próximos passos da negociação. O que falta definirmos para conseguir avançar?`;
     }
     return `Oi, ${name}! Nosso retorno ficou pendente e estou retomando por aqui. Ainda faz sentido avançarmos nessa conversa?`;
   }
 
-  if (status === 'Novo lead') {
+  if (status === 'Novo pedido') {
     return `Oi, ${name}! Tudo bem? Vi seu contato por aqui e queria entender melhor o que você precisa. Posso te fazer uma pergunta rápida para ver se consigo ajudar?`;
   }
-  if (status === 'Interessado') {
+  if (status === 'Cardápio enviado') {
     return `Oi, ${name}! Queria retomar o que conversamos. Pelo que entendi, existe interesse. Qual é o principal ponto que você precisa resolver para conseguirmos avançar?`;
   }
-  if (status === 'Proposta enviada') {
+  if (status === 'Orçamento enviado') {
     return `Oi, ${name}! Conseguiu analisar a proposta? Se tiver algum ponto travando a decisão, me fala que eu tento resolver por aqui.`;
   }
-  if (status === 'Negociação') {
+  if (status === 'Aguardando confirmação') {
     return `Oi, ${name}! Queria fechar os próximos passos da nossa negociação. O que falta definirmos para conseguir avançar?`;
   }
   if (veryCold) {

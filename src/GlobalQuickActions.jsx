@@ -96,7 +96,7 @@ export default function GlobalQuickActions({ leads, onNewLead, onNavigate, onOpe
       <div className="global-quick-actions" aria-label="Ações rápidas">
         <button type="button" className="global-search-launcher" onClick={() => setOpen(true)} title="Buscar no Fuply (⌘K)"><Search size={18} /><span>Buscar</span><kbd>⌘K</kbd></button>
         <button type="button" className="global-ai-launcher" onClick={openAISelector} title="Responder cliente com IA"><Sparkles size={18} /><span>IA</span></button>
-        <button type="button" className="global-add-lead" onClick={onNewLead} title="Novo lead"><Plus size={23} /></button>
+        <button type="button" className="global-add-lead" onClick={onNewLead} title="Novo pedido"><Plus size={23} /></button>
       </div>
 
       {open && (

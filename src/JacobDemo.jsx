@@ -22,12 +22,12 @@ import './messages.css';
 import './jacob-demo.css';
 
 const STATUSES = [
-  { id: 'Novo lead', className: 'new' },
-  { id: 'Contatado', className: 'contacted' },
-  { id: 'Interessado', className: 'interested' },
-  { id: 'Proposta enviada', className: 'proposal' },
-  { id: 'Negociação', className: 'negotiation' },
-  { id: 'Fechado', className: 'sold' },
+  { id: 'Novo pedido', className: 'new' },
+  { id: 'Em conversa', className: 'contacted' },
+  { id: 'Cardápio enviado', className: 'interested' },
+  { id: 'Orçamento enviado', className: 'proposal' },
+  { id: 'Aguardando confirmação', className: 'negotiation' },
+  { id: 'Confirmado', className: 'sold' },
   { id: 'Perdido', className: 'lost' },
 ];
 
@@ -56,21 +56,21 @@ const now = new Date().toISOString();
 const daysAgo = days => new Date(Date.now() - days * 86400000).toISOString();
 
 const INITIAL_LEADS = [
-  { id: 'jacob-1', name: 'Reforma apto. Jardins', company: 'Cliente residencial', phone: '11999990001', status: 'Novo lead', value: 185000, origin: 'WhatsApp', nextContact: dateKeyOffset(0), nextContactTime: '14:30', nextAction: 'Entender escopo e metragem', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(0), updatedAt: now },
-  { id: 'jacob-2', name: 'Retrofit escritório Vila Olímpia', company: 'Empresa de tecnologia', phone: '11999990002', status: 'Contatado', value: 420000, origin: 'Indicação', nextContact: dateKeyOffset(0), nextContactTime: '16:00', nextAction: 'Agendar visita técnica', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(2), updatedAt: daysAgo(1), lastFollowupAt: daysAgo(1) },
-  { id: 'jacob-3', name: 'Reforma cobertura Moema', company: 'Cliente residencial', phone: '11999990003', status: 'Interessado', value: 310000, origin: 'Site', nextContact: dateKeyOffset(1), nextContactTime: '10:00', nextAction: 'Enviar estudo preliminar', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(4), updatedAt: daysAgo(2), lastFollowupAt: daysAgo(2) },
-  { id: 'jacob-4', name: 'Adequação clínica Pinheiros', company: 'Clínica médica', phone: '11999990004', status: 'Proposta enviada', value: 265000, origin: 'Google Maps', nextContact: dateKeyOffset(2), nextContactTime: '09:30', nextAction: 'Confirmar análise da proposta', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(8), updatedAt: daysAgo(2), lastFollowupAt: daysAgo(2) },
-  { id: 'jacob-5', name: 'Obra residencial Alphaville', company: 'Cliente residencial', phone: '11999990005', status: 'Negociação', value: 680000, origin: 'Indicação', nextContact: dateKeyOffset(2), nextContactTime: '15:00', nextAction: 'Revisar prazo e condições', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(11), updatedAt: daysAgo(1), lastFollowupAt: daysAgo(1) },
-  { id: 'jacob-6', name: 'Reforma corporativa Itaim', company: 'Escritório jurídico', phone: '11999990006', status: 'Negociação', value: 540000, origin: 'WhatsApp', nextContact: dateKeyOffset(3), nextContactTime: '11:00', nextAction: 'Apresentar contraproposta', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(14), updatedAt: daysAgo(3), lastFollowupAt: daysAgo(3) },
-  { id: 'jacob-7', name: 'Modernização apartamento Perdizes', company: 'Cliente residencial', phone: '11999990007', status: 'Fechado', value: 228000, saleValue: 228000, saleValueSource: 'confirmed', origin: 'Site', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(20), updatedAt: daysAgo(2), soldAt: daysAgo(2) },
+  { id: 'jacob-1', name: 'Reforma apto. Jardins', company: 'Cliente residencial', phone: '11999990001', status: 'Novo pedido', value: 185000, origin: 'WhatsApp', nextContact: dateKeyOffset(0), nextContactTime: '14:30', nextAction: 'Entender escopo e metragem', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(0), updatedAt: now },
+  { id: 'jacob-2', name: 'Retrofit escritório Vila Olímpia', company: 'Empresa de tecnologia', phone: '11999990002', status: 'Em conversa', value: 420000, origin: 'Indicação', nextContact: dateKeyOffset(0), nextContactTime: '16:00', nextAction: 'Agendar visita técnica', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(2), updatedAt: daysAgo(1), lastFollowupAt: daysAgo(1) },
+  { id: 'jacob-3', name: 'Reforma cobertura Moema', company: 'Cliente residencial', phone: '11999990003', status: 'Cardápio enviado', value: 310000, origin: 'Site', nextContact: dateKeyOffset(1), nextContactTime: '10:00', nextAction: 'Enviar estudo preliminar', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(4), updatedAt: daysAgo(2), lastFollowupAt: daysAgo(2) },
+  { id: 'jacob-4', name: 'Adequação clínica Pinheiros', company: 'Clínica médica', phone: '11999990004', status: 'Orçamento enviado', value: 265000, origin: 'Google Maps', nextContact: dateKeyOffset(2), nextContactTime: '09:30', nextAction: 'Confirmar análise da proposta', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(8), updatedAt: daysAgo(2), lastFollowupAt: daysAgo(2) },
+  { id: 'jacob-5', name: 'Obra residencial Alphaville', company: 'Cliente residencial', phone: '11999990005', status: 'Aguardando confirmação', value: 680000, origin: 'Indicação', nextContact: dateKeyOffset(2), nextContactTime: '15:00', nextAction: 'Revisar prazo e condições', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(11), updatedAt: daysAgo(1), lastFollowupAt: daysAgo(1) },
+  { id: 'jacob-6', name: 'Reforma corporativa Itaim', company: 'Escritório jurídico', phone: '11999990006', status: 'Aguardando confirmação', value: 540000, origin: 'WhatsApp', nextContact: dateKeyOffset(3), nextContactTime: '11:00', nextAction: 'Apresentar contraproposta', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(14), updatedAt: daysAgo(3), lastFollowupAt: daysAgo(3) },
+  { id: 'jacob-7', name: 'Modernização apartamento Perdizes', company: 'Cliente residencial', phone: '11999990007', status: 'Confirmado', value: 228000, saleValue: 228000, saleValueSource: 'confirmed', origin: 'Site', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Lead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(20), updatedAt: daysAgo(2), soldAt: daysAgo(2) },
   { id: 'jacob-8', name: 'Reforma loja Oscar Freire', company: 'Varejo premium', phone: '11999990008', status: 'Perdido', value: 195000, origin: 'Site', nextContact: '', nextContactTime: '', nextAction: '', notes: 'Motivo da perda: prazo incompatível\nLead fictício para demonstração.', assignedTo: null, createdAt: daysAgo(18), updatedAt: daysAgo(6), lostAt: daysAgo(6) },
 ];
 
 function statusTone(status) {
-  if (status === 'Contatado') return 'blue';
-  if (status === 'Interessado' || status === 'Negociação') return 'purple';
-  if (status === 'Proposta enviada' || status === 'Perdido') return 'red';
-  if (status === 'Fechado') return 'green';
+  if (status === 'Em conversa') return 'blue';
+  if (status === 'Cardápio enviado' || status === 'Aguardando confirmação') return 'purple';
+  if (status === 'Orçamento enviado' || status === 'Perdido') return 'red';
+  if (status === 'Confirmado') return 'green';
   return 'neutral';
 }
 
@@ -81,7 +81,7 @@ function DemoMessages({ leads, openWhatsApp }) {
   const templates = [
     ['Primeiro contato', 'Prospecção', 'Olá! Tudo bem? Recebemos seu contato e queria entender melhor o projeto para conseguirmos orientar os próximos passos.'],
     ['Follow-up', 'Retorno', 'Olá! Passando para retomar nossa conversa e saber se conseguiu analisar o que combinamos.'],
-    ['Proposta', 'Negociação', `Olá! A proposta do projeto está em ${selected ? currency(selected.value) : 'valor a definir'}. Posso esclarecer algum ponto para avançarmos?`],
+    ['Proposta', 'Aguardando confirmação', `Olá! A proposta do projeto está em ${selected ? currency(selected.value) : 'valor a definir'}. Posso esclarecer algum ponto para avançarmos?`],
     ['Última tentativa', 'Retorno', 'Olá! Passando uma última vez para saber se ainda faz sentido seguirmos com essa conversa.'],
   ].filter(([title, category]) => `${title} ${category}`.toLowerCase().includes(query.toLowerCase()));
 
@@ -95,7 +95,7 @@ function DemoMessages({ leads, openWhatsApp }) {
         <label className="messages-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar modelo" /></label>
         <div className="messages-lead-finder">
           <span className="messages-control-label">Contato</span>
-          <div className="messages-lead-picker"><select value={selectedId} onChange={e => setSelectedId(e.target.value)}>{leads.filter(l => !['Fechado','Perdido'].includes(l.status)).map(lead => <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>)}</select></div>
+          <div className="messages-lead-picker"><select value={selectedId} onChange={e => setSelectedId(e.target.value)}>{leads.filter(l => !['Confirmado','Perdido'].includes(l.status)).map(lead => <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>)}</select></div>
           <span className="messages-lead-count">Dados fictícios usados apenas para demonstrar o fluxo.</span>
         </div>
       </div>
@@ -119,8 +119,8 @@ export default function JacobDemo() {
 
   const metrics = STATUSES.map(status => {
     const items = filteredLeads.filter(lead => lead.status === status.id);
-    const total = items.reduce((sum, lead) => sum + Number(status.id === 'Fechado' ? lead.saleValue || lead.value || 0 : lead.value || 0), 0);
-    return { label: status.id, value: items.length, helper: status.id === 'Fechado' ? `${currency(total)} fechados` : `${currency(total)} em valor`, tone: statusTone(status.id), icon: status.id === 'Fechado' ? CheckCircle2 : status.id === 'Perdido' ? XCircle : Target };
+    const total = items.reduce((sum, lead) => sum + Number(status.id === 'Confirmado' ? lead.saleValue || lead.value || 0 : lead.value || 0), 0);
+    return { label: status.id, value: items.length, helper: status.id === 'Confirmado' ? `${currency(total)} fechados` : `${currency(total)} em valor`, tone: statusTone(status.id), icon: status.id === 'Confirmado' ? CheckCircle2 : status.id === 'Perdido' ? XCircle : Target };
   });
 
   const openWhatsApp = () => window.alert('Demonstração: no Fuply real, este botão abre o WhatsApp Web direto no contato selecionado.');
@@ -148,7 +148,7 @@ export default function JacobDemo() {
         {metrics.map(metric => { const Icon = metric.icon; return <article className="metric-card" key={metric.label}><div className={`metric-icon ${metric.tone}`}><Icon size={18}/></div><div className="metric-copy"><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.helper}</small></div></article>; })}
       </section>
       <section className="pipeline-scroll" aria-label="Etapas do pipeline"><div className="pipeline-board">
-        {STATUSES.map(status => { const items = filteredLeads.filter(lead => lead.status === status.id); return <section className={`pipeline-column ${status.className}`} key={status.id}><div className="column-header"><div><span className="status-dot"/><strong>{status.id}</strong></div><span className="count-pill">{items.length}</span></div><div className="column-body">{items.map(lead => <article className="lead-card" key={lead.id}><div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company}</span></div></div><div className="lead-value">{currency(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</div>{lead.nextAction && <div className="next-contact">{lead.nextAction}</div>}<span className="lead-tag">{lead.origin}</span></article>)}{!items.length && <div className="empty-column">Nenhum lead nesta etapa.</div>}</div></section>; })}
+        {STATUSES.map(status => { const items = filteredLeads.filter(lead => lead.status === status.id); return <section className={`pipeline-column ${status.className}`} key={status.id}><div className="column-header"><div><span className="status-dot"/><strong>{status.id}</strong></div><span className="count-pill">{items.length}</span></div><div className="column-body">{items.map(lead => <article className="lead-card" key={lead.id}><div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company}</span></div></div><div className="lead-value">{currency(lead.status === 'Confirmado' ? lead.saleValue : lead.value)}</div>{lead.nextAction && <div className="next-contact">{lead.nextAction}</div>}<span className="lead-tag">{lead.origin}</span></article>)}{!items.length && <div className="empty-column">Nenhum lead nesta etapa.</div>}</div></section>; })}
       </div></section>
       <div className="jacob-demo-footnote">Dados fictícios. A interface e o fluxo são os mesmos do produto Fuply.</div>
     </main>

@@ -45,7 +45,7 @@ O que é:
 - Fuply NÃO é agência de marketing digital, não compra anúncios e não promete gerar demanda sozinho.
 
 O que existe no produto hoje:
-- Pipeline comercial com etapas como Novo lead, Contatado, Interessado, Proposta enviada, Negociação, Fechado e Perdido.
+- Pipeline comercial com etapas como Novo pedido, Em conversa, Cardápio enviado, Orçamento enviado, Aguardando confirmação, Confirmado e Perdido.
 - Cadastro e organização de leads com empresa, WhatsApp, valor potencial, origem, observações, responsável, próxima ação e próximo contato.
 - Início/Central do Dia com prioridades e follow-ups que precisam de atenção.
 - Resultados com visão do funil e do andamento comercial.

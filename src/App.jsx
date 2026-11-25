@@ -55,7 +55,7 @@ import './team-leads.css';
 import './usability.css';
 
 const ACTIVE_ACCOUNT = getActiveAccount();
-const CLOSED = ['Fechado', 'Perdido'];
+const CLOSED = ['Confirmado', 'Perdido'];
 const GOAL_LABELS = {
   organize: 'Organizar leads',
   followups: 'Follow-ups',
@@ -63,17 +63,17 @@ const GOAL_LABELS = {
 };
 
 const STATUSES = [
-  { id: 'Novo lead', className: 'new' },
-  { id: 'Contatado', className: 'contacted' },
-  { id: 'Interessado', className: 'interested' },
-  { id: 'Proposta enviada', className: 'proposal' },
-  { id: 'Negociação', className: 'negotiation' },
-  { id: 'Fechado', className: 'sold' },
+  { id: 'Novo pedido', className: 'new' },
+  { id: 'Em conversa', className: 'contacted' },
+  { id: 'Cardápio enviado', className: 'interested' },
+  { id: 'Orçamento enviado', className: 'proposal' },
+  { id: 'Aguardando confirmação', className: 'negotiation' },
+  { id: 'Confirmado', className: 'sold' },
   { id: 'Perdido', className: 'lost' },
 ];
 
 const OPEN_STATUSES = STATUSES.filter(status => !CLOSED.includes(status.id));
-const ORIGINS = ['Google Maps', 'Instagram', 'Indicação', 'Site', 'WhatsApp', 'Outro'];
+const ORIGINS = ['WhatsApp', 'Instagram', 'Indicação', 'Site', 'Outro'];
 const NAV_ITEMS = [
   ['Início', CalendarClock],
   ['Resultados', LayoutDashboard],
@@ -85,7 +85,7 @@ const NAV_ITEMS = [
 ];
 
 const EMPTY_FORM = {
-  name: '', company: '', phone: '', value: '', status: 'Novo lead', origin: 'Google Maps', assignedTo: '',
+  name: '', company: '', phone: '', value: '', status: 'Novo pedido', origin: 'WhatsApp', assignedTo: '',
   nextContact: '', nextContactTime: '', nextAction: '', notes: '',
 };
 
@@ -110,22 +110,22 @@ function formatDate(value, long = false) {
 }
 
 function statusTone(status) {
-  if (status === 'Contatado') return 'blue';
-  if (status === 'Interessado') return 'purple';
-  if (status === 'Proposta enviada') return 'red';
-  if (status === 'Negociação') return 'purple';
-  if (status === 'Fechado') return 'green';
+  if (status === 'Em conversa') return 'blue';
+  if (status === 'Cardápio enviado') return 'purple';
+  if (status === 'Orçamento enviado') return 'red';
+  if (status === 'Aguardando confirmação') return 'purple';
+  if (status === 'Confirmado') return 'green';
   if (status === 'Perdido') return 'red';
   return 'neutral';
 }
 
 function migrateLead(rawLead) {
   const lead = rawLead && typeof rawLead === 'object' ? rawLead : {};
-  const rawStatus = lead.status === "Vendido" ? 'Fechado' : lead.status;
-  const status = STATUSES.some(item => item.id === rawStatus) ? rawStatus : 'Novo lead';
+  const rawStatus = lead.status === "Vendido" ? 'Confirmado' : lead.status;
+  const status = STATUSES.some(item => item.id === rawStatus) ? rawStatus : 'Novo pedido';
   const value = Number.isFinite(Number(lead.value)) ? Number(lead.value) : 0;
   const hadSaleValue = Number.isFinite(Number(lead.saleValue)) && Number(lead.saleValue) > 0;
-  const assumedSaleValue = status === 'Fechado' && !hadSaleValue && value > 0;
+  const assumedSaleValue = status === 'Confirmado' && !hadSaleValue && value > 0;
   const migrated = {
     ...lead,
     id: lead.id || crypto.randomUUID(),
@@ -143,10 +143,10 @@ function migrateLead(rawLead) {
     lastFollowupAt: lead.lastFollowupAt || null,
     createdAt: lead.createdAt || null,
     updatedAt: lead.updatedAt || lead.soldAt || lead.lostAt || lead.createdAt || null,
-    soldAt: status === 'Fechado' ? (lead.soldAt || null) : null,
+    soldAt: status === 'Confirmado' ? (lead.soldAt || null) : null,
     lostAt: status === 'Perdido' ? (lead.lostAt || null) : null,
-    saleValue: status === 'Fechado' ? (hadSaleValue ? Number(lead.saleValue) : (value > 0 ? value : null)) : null,
-    saleValueSource: status === 'Fechado'
+    saleValue: status === 'Confirmado' ? (hadSaleValue ? Number(lead.saleValue) : (value > 0 ? value : null)) : null,
+    saleValueSource: status === 'Confirmado'
       ? (hadSaleValue ? (lead.saleValueSource || 'confirmed') : (assumedSaleValue ? 'legacy-potential' : 'missing'))
       : null,
   };
@@ -168,10 +168,10 @@ function applyStatusTransition(previous, draft, nextStatus, saleValue) {
   const changed = previous.status !== nextStatus;
   const next = { ...previous, ...draft, status: nextStatus, updatedAt: now };
 
-  if (nextStatus === 'Fechado') {
+  if (nextStatus === 'Confirmado') {
     next.saleValue = Number(saleValue ?? draft.saleValue ?? previous.saleValue ?? 0);
     next.saleValueSource = 'confirmed';
-    next.soldAt = previous.status === 'Fechado' && previous.soldAt ? previous.soldAt : now;
+    next.soldAt = previous.status === 'Confirmado' && previous.soldAt ? previous.soldAt : now;
     next.lostAt = null;
     next.nextContact = '';
     next.nextContactTime = '';
@@ -302,12 +302,12 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
 
   const metrics = STATUSES.map(status => {
     const items = filteredLeads.filter(lead => lead.status === status.id);
-    const amount = items.reduce((sum, lead) => sum + Number(status.id === 'Fechado' ? lead.saleValue || 0 : lead.value || 0), 0);
+    const amount = items.reduce((sum, lead) => sum + Number(status.id === 'Confirmado' ? lead.saleValue || 0 : lead.value || 0), 0);
     return {
       label: status.id,
       value: items.length,
-      helper: status.id === 'Fechado' ? `${currency(amount)} fechados` : `${currency(amount)} em valor`,
-      icon: status.id === 'Fechado' ? CheckCircle2 : status.id === 'Perdido' ? XCircle : Target,
+      helper: status.id === 'Confirmado' ? `${currency(amount)} fechados` : `${currency(amount)} em valor`,
+      icon: status.id === 'Confirmado' ? CheckCircle2 : status.id === 'Perdido' ? XCircle : Target,
       tone: statusTone(status.id),
     };
   });
@@ -332,8 +332,8 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     return leads.some(lead => lead.id !== exceptId && canonicalPhone(lead.phone) === canonical);
   };
 
-  const openNewLead = (status = 'Novo lead') => {
-    setForm({ ...EMPTY_FORM, status: OPEN_STATUSES.some(item => item.id === status) ? status : 'Novo lead', assignedTo: account?.id || '' });
+  const openNewLead = (status = 'Novo pedido') => {
+    setForm({ ...EMPTY_FORM, status: OPEN_STATUSES.some(item => item.id === status) ? status : 'Novo pedido', assignedTo: account?.id || '' });
     setFormError('');
     setModalOpen(true);
   };
@@ -418,12 +418,12 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (!previous) return false;
 
     let resolvedStatus = status || previous.status;
-    if ((outcome === 'talked' || outcome === 'later') && previous.status === 'Novo lead') resolvedStatus = 'Contatado';
+    if ((outcome === 'talked' || outcome === 'later') && previous.status === 'Novo pedido') resolvedStatus = 'Em conversa';
 
     const numericSaleValue = Number(saleValue ?? previous.value ?? 0);
-    if (resolvedStatus === 'Fechado' && (!Number.isFinite(numericSaleValue) || numericSaleValue <= 0)) return false;
+    if (resolvedStatus === 'Confirmado' && (!Number.isFinite(numericSaleValue) || numericSaleValue <= 0)) return false;
 
-    let next = applyStatusTransition(previous, {}, resolvedStatus, resolvedStatus === 'Fechado' ? numericSaleValue : undefined);
+    let next = applyStatusTransition(previous, {}, resolvedStatus, resolvedStatus === 'Confirmado' ? numericSaleValue : undefined);
     const now = new Date().toISOString();
     next = { ...next, lastFollowupAt: now, updatedAt: now };
 
@@ -439,7 +439,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     const statusDetail = resolvedStatus !== previous.status ? `Status: ${previous.status} → ${resolvedStatus}.` : '';
     const scheduleDetail = next.nextContact
       ? `Próximo contato: ${formatDate(next.nextContact, true)} · ${next.nextAction}.`
-      : CLOSED.includes(next.status) ? 'Negociação encerrada e removida da fila de follow-up.' : '';
+      : CLOSED.includes(next.status) ? 'Aguardando confirmação encerrada e removida da fila de follow-up.' : '';
     const detail = [statusDetail, scheduleDetail].filter(Boolean).join(' ');
 
     logActivity(
@@ -453,7 +453,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
         to: resolvedStatus,
         nextContact: next.nextContact || null,
         nextAction: next.nextAction || null,
-        saleValue: resolvedStatus === 'Fechado' ? numericSaleValue : null,
+        saleValue: resolvedStatus === 'Confirmado' ? numericSaleValue : null,
       },
     );
     return true;
@@ -473,7 +473,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     setUndoAction({ id: Date.now(), message: `${previous.name}: ${previous.status} → ${status}`, lead: previous });
     setLeads(current => current.map(lead => lead.id === id ? next : lead));
 
-    if (status === 'Fechado') {
+    if (status === 'Confirmado') {
       logActivity(previous, 'sale_closed', 'Venda fechada', `Valor final: ${currency(next.saleValue)}.`, { from: previous.status, saleValue: next.saleValue });
     } else {
       logActivity(previous, 'status_changed', `Status alterado para ${status}`, `Antes: ${previous.status}.`, { from: previous.status, to: status });
@@ -483,7 +483,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   const requestStatusChange = (id, status) => {
     const lead = leads.find(item => item.id === id);
     if (!lead || lead.status === status) return;
-    if (status === 'Fechado') {
+    if (status === 'Confirmado') {
       setSaleError('');
       setPendingSale({ id, name: lead.name, value: lead.saleValue ?? lead.value ?? '' });
       return;
@@ -512,7 +512,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       setSaleError('Informe o valor final da venda, maior que zero.');
       return;
     }
-    commitStatusChange(pendingSale.id, 'Fechado', value);
+    commitStatusChange(pendingSale.id, 'Confirmado', value);
     setPendingSale(null);
     setSaleError('');
   };
@@ -547,7 +547,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       assignedTo: form.assignedTo || account?.id || null,
       name: form.name.trim(),
       company: form.company.trim(),
-      status: CLOSED.includes(form.status) ? 'Novo lead' : form.status,
+      status: CLOSED.includes(form.status) ? 'Novo pedido' : form.status,
       phone: canonicalPhone(form.phone),
       value: Number(form.value || 0),
       createdAt: now,
@@ -602,7 +602,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     if (!validBrazilPhone(editingLead.phone)) return setFormError('Digite um WhatsApp brasileiro válido com DDD.');
     if (isDuplicatePhone(editingLead.phone, editingLead.id)) return setFormError('Já existe outro lead com esse WhatsApp.');
     if (Number(editingLead.value || 0) < 0) return setFormError('O valor potencial não pode ser negativo.');
-    if (editingLead.status === 'Fechado' && Number(editingLead.saleValue) <= 0) return setFormError('Informe o valor final da venda.');
+    if (editingLead.status === 'Confirmado' && Number(editingLead.saleValue) <= 0) return setFormError('Informe o valor final da venda.');
 
     const previous = selectedLead;
     const draft = {
@@ -617,7 +617,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     setLeads(current => current.map(lead => lead.id === editingLead.id ? next : lead));
 
     if (previous.status !== next.status) {
-      if (next.status === 'Fechado') {
+      if (next.status === 'Confirmado') {
         logActivity(previous, 'sale_closed', 'Venda fechada', `Valor final: ${currency(next.saleValue)}.`, { from: previous.status, saleValue: next.saleValue });
       } else {
         logActivity(previous, 'status_changed', `Status alterado para ${next.status}`, `Antes: ${previous.status}.`, { from: previous.status, to: next.status });
@@ -733,8 +733,8 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
             <p>{selectedLead.company || 'Sem empresa informada'}</p>
           </div>
           <div className="detail-value">
-            <span>{selectedLead.status === 'Fechado' ? 'Valor fechado' : 'Valor potencial'}</span>
-            <strong>{currency(selectedLead.status === 'Fechado' ? selectedLead.saleValue : selectedLead.value)}</strong>
+            <span>{selectedLead.status === 'Confirmado' ? 'Valor fechado' : 'Valor potencial'}</span>
+            <strong>{currency(selectedLead.status === 'Confirmado' ? selectedLead.saleValue : selectedLead.value)}</strong>
           </div>
         </section>
 
@@ -757,7 +757,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   <label className="info-item info-edit-item"><Phone size={18} /><div><span>WhatsApp</span><input required inputMode="tel" value={editingLead.phone} onChange={e => setEditingLead({ ...editingLead, phone: e.target.value })} /></div></label>
                   <label className="info-item info-edit-item"><CircleDollarSign size={18} /><div><span>Valor potencial</span><input type="number" min="0" step="0.01" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></div></label>
                   <label className="info-item info-edit-item"><Target size={18} /><div><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></div></label>
-                  {editingLead.status === 'Fechado' && <label className="info-item info-edit-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></div></label>}
+                  {editingLead.status === 'Confirmado' && <label className="info-item info-edit-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></div></label>}
                   <label className="info-item info-edit-item"><MapPin size={18} /><div><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></div></label>
                   <label className="info-item info-edit-item"><UsersRound size={18} /><div><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></div></label>
                 </div>
@@ -806,7 +806,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   <div className="info-item"><Building2 size={18} /><div><span>Empresa</span><strong>{selectedLead.company || 'Não informado'}</strong></div></div>
                   <div className="info-item"><Phone size={18} /><div><span>WhatsApp</span><strong>{selectedLead.phone}</strong></div></div>
                   <div className="info-item"><CircleDollarSign size={18} /><div><span>Valor potencial</span><strong>{currency(selectedLead.value)}</strong></div></div>
-                  {selectedLead.status === 'Fechado' && <div className="info-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><strong>{currency(selectedLead.saleValue)}</strong></div></div>}
+                  {selectedLead.status === 'Confirmado' && <div className="info-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><strong>{currency(selectedLead.saleValue)}</strong></div></div>}
                   <div className="info-item"><Target size={18} /><div><span>Status</span><strong>{selectedLead.status}</strong></div></div>
                   <div className="info-item"><MapPin size={18} /><div><span>Origem</span><strong>{selectedLead.origin || 'Não informado'}</strong></div></div>
                   <div className="info-item"><UsersRound size={18} /><div><span>Responsável</span><strong>{memberName(selectedLead.assignedTo)}</strong></div></div>
@@ -841,7 +841,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                 <div className="detail-actions-stack">
                   <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
                   <button type="button" className="detail-action ai-action" onClick={() => openReplyAssistant(selectedLead)}><Sparkles size={17} /> Responder com IA</button>
-                  {selectedLead.status !== 'Fechado' && <button type="button" className="detail-action sold-action" onClick={() => setLeadStatus('Fechado')}><CheckCircle2 size={17} /> Marcar como fechado</button>}
+                  {selectedLead.status !== 'Confirmado' && <button type="button" className="detail-action sold-action" onClick={() => setLeadStatus('Confirmado')}><CheckCircle2 size={17} /> Marcar como fechado</button>}
                   {selectedLead.status !== 'Perdido' && <button type="button" className="detail-action lost-action" onClick={() => setLeadStatus('Perdido')}><XCircle size={17} /> Marcar como perdido</button>}
                   <button type="button" className="detail-action" onClick={startEditing}><Pencil size={17} /> Editar cliente</button>
                 </div>
@@ -862,7 +862,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
           <label className="filter-control"><Filter size={16} /><span className="sr-only">Filtrar por status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrar por status"><option>Todos</option>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
           <label className="filter-control hide-tablet"><span className="sr-only">Filtrar por origem</span><select value={originFilter} onChange={e => setOriginFilter(e.target.value)} aria-label="Filtrar por origem"><option>Todas</option>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
           {teamMembers.length > 1 && <label className="filter-control team-filter"><UsersRound size={16} /><span className="sr-only">Filtrar por responsável</span><select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} aria-label="Filtrar por responsável"><option value="Todos">Todos da equipe</option>{teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.user_id === account?.id ? 'Meus leads' : member.name}</option>)}</select></label>}
-          <button type="button" className="primary-button" onClick={() => openNewLead()}><Plus size={18} /> Novo lead</button>
+          <button type="button" className="primary-button" onClick={() => openNewLead()}><Plus size={18} /> Novo pedido</button>
         </div>
       </header>
 
@@ -887,7 +887,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   {columnLeads.map(lead => (
                     <article className="lead-card" key={lead.id} draggable onDragStart={() => setDraggedId(lead.id)} onDragEnd={() => setDraggedId(null)} onClick={() => openLead(lead)}>
                       <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div><button type="button" className="icon-button" aria-label={`Abrir ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button></div>
-                      <b className="lead-value">{currency(status.id === 'Fechado' ? lead.saleValue : lead.value)}</b>
+                      <b className="lead-value">{currency(status.id === 'Confirmado' ? lead.saleValue : lead.value)}</b>
                       {teamMembers.length > 1 && <div className="lead-assignee"><UserRound size={13} /><span>{memberName(lead.assignedTo)}</span></div>}
                       <label className="mobile-status-control" onClick={e => e.stopPropagation()}>
                         <span>Status</span>
@@ -895,7 +895,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                           {STATUSES.map(option => <option key={option.id}>{option.id}</option>)}
                         </select>
                       </label>
-                      {lead.nextContact ? <div className="next-contact"><CalendarClock size={14} /> Próximo contato: {formatDate(lead.nextContact)}</div> : <div className={`lead-tag ${status.id === 'Fechado' ? 'success' : status.id === 'Perdido' ? 'danger' : ''}`}>{status.id === 'Fechado' ? 'Venda fechada' : status.id === 'Perdido' ? (lead.notes || 'Negociação encerrada') : 'Sem próximo contato'}</div>}
+                      {lead.nextContact ? <div className="next-contact"><CalendarClock size={14} /> Próximo contato: {formatDate(lead.nextContact)}</div> : <div className={`lead-tag ${status.id === 'Confirmado' ? 'success' : status.id === 'Perdido' ? 'danger' : ''}`}>{status.id === 'Confirmado' ? 'Venda fechada' : status.id === 'Perdido' ? (lead.notes || 'Aguardando confirmação encerrada') : 'Sem próximo contato'}</div>}
                       <div className="lead-actions">
                         <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /> Abrir WhatsApp</button>
                         <button type="button" className="icon-button" aria-label={`Ver detalhes de ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button>
@@ -938,7 +938,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       {modalOpen && (
         <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
           <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-lead-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="new-lead-title">Novo lead</h2><p>Adicione um novo contato ao pipeline.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
+            <div className="modal-header"><div><h2 id="new-lead-title">Novo pedido</h2><p>Adicione um novo contato ao pipeline.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
             <form onSubmit={addLead} className="quick-lead-form">
               <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: João Silva" /></label>
               <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>

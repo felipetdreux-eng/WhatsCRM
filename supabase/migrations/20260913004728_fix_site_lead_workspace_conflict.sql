@@ -84,7 +84,7 @@ begin
     clean_service,
     clean_phone,
     potential_value,
-    'Novo lead',
+    'Novo pedido',
     cfg.origin_label,
     note_text,
     'Responder lead do site',

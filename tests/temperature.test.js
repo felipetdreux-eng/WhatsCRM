@@ -9,7 +9,7 @@ function lead(overrides = {}) {
     id: crypto.randomUUID(),
     name: 'Lead teste',
     value: 500,
-    status: 'Contatado',
+    status: 'Em conversa',
     nextContact: '2030-01-20',
     createdAt: '2030-01-10T12:00:00.000Z',
     updatedAt: '2030-01-15T09:00:00.000Z',
@@ -26,7 +26,7 @@ test('follow-up atrasado é classificado como esfriando', () => {
 
 test('proposta sem próximo contato esfria mais rápido', () => {
   const temperature = getLeadTemperature(lead({
-    status: 'Proposta enviada',
+    status: 'Orçamento enviado',
     nextContact: '',
     updatedAt: '2030-01-12T12:00:00.000Z',
   }), NOW);
@@ -42,14 +42,14 @@ test('interação recente mantém negociação quente', () => {
 
 test('watchlist prioriza esfriando antes de atenção e proposta antes de etapas iniciais', () => {
   const items = buildCoolingWatchlist([
-    lead({ id: 'atencao', status: 'Contatado', updatedAt: '2030-01-11T12:00:00.000Z' }),
-    lead({ id: 'proposta', status: 'Proposta enviada', nextContact: '', updatedAt: '2030-01-12T12:00:00.000Z' }),
-    lead({ id: 'frio', status: 'Interessado', updatedAt: '2030-01-08T12:00:00.000Z' }),
+    lead({ id: 'atencao', status: 'Em conversa', updatedAt: '2030-01-11T12:00:00.000Z' }),
+    lead({ id: 'proposta', status: 'Orçamento enviado', nextContact: '', updatedAt: '2030-01-12T12:00:00.000Z' }),
+    lead({ id: 'frio', status: 'Cardápio enviado', updatedAt: '2030-01-08T12:00:00.000Z' }),
   ], { now: NOW });
   assert.deepEqual(items.map(item => item.lead.id), ['proposta', 'frio', 'atencao']);
 });
 
 test('vendidos e perdidos não recebem temperatura operacional', () => {
-  assert.equal(getLeadTemperature(lead({ status: 'Fechado' }), NOW), null);
+  assert.equal(getLeadTemperature(lead({ status: 'Confirmado' }), NOW), null);
   assert.equal(getLeadTemperature(lead({ status: 'Perdido' }), NOW), null);
 });

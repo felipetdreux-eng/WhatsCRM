@@ -21,7 +21,7 @@ const ACCEPT = '.csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf';
 const SHEET_FORMATS = new Set(['xlsx', 'xls', 'xlsm', 'ods']);
 const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs';
 const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs';
-const FUPLY_STATUSES = new Set(['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido']);
+const FUPLY_STATUSES = new Set(['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação', 'Confirmado', 'Perdido']);
 
 function cleanMatrix(matrix) {
   return (Array.isArray(matrix) ? matrix : [])

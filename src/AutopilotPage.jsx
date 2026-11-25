@@ -185,7 +185,7 @@ export default function AutopilotPage({ leads, openLead, openWhatsApp, onAutopil
 
         <div className="automation-rule-grid">
           <article className={`automation-rule-card ${settings.first_contact_enabled ? 'active' : ''}`}>
-            <div className="automation-rule-title"><div className="automation-rule-icon"><Bot size={18} /></div><div><strong>Novo lead</strong><span>Não deixa contato recém-chegado parado.</span></div></div>
+            <div className="automation-rule-title"><div className="automation-rule-icon"><Bot size={18} /></div><div><strong>Novo pedido</strong><span>Não deixa contato recém-chegado parado.</span></div></div>
             <label className="automation-inline-toggle"><input type="checkbox" checked={Boolean(settings.first_contact_enabled)} disabled={!canConfigure} onChange={event => changeSetting('first_contact_enabled', event.target.checked)} /><span>Automático</span></label>
             <div className="automation-rule-flow"><span>Lead entra</span><ArrowRight size={14} /><span>espera</span><select value={settings.first_contact_delay_minutes} disabled={!canConfigure || !settings.first_contact_enabled} onChange={event => changeSetting('first_contact_delay_minutes', Number(event.target.value))}><option value={0}>agora</option><option value={5}>5 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 h</option></select><ArrowRight size={14} /><strong>primeiro contato</strong></div>
           </article>

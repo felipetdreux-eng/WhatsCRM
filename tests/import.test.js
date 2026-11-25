@@ -27,10 +27,10 @@ test('detecta colunas comuns automaticamente', () => {
 test('normaliza valores, datas e status de planilhas reais', () => {
   assert.equal(parseMoney('R$ 1.250,90'), 1250.9);
   assert.equal(normalizeDate('09/09/2026'), '2026-09-09');
-  assert.equal(normalizeStatus('Orçamento enviado'), 'Proposta enviada');
-  assert.equal(normalizeStatus('Pago'), 'Fechado');
-  assert.equal(normalizeStatus('Em negociação'), 'Negociação');
-  assert.equal(normalizeStatus('NAO RESPONDIDO'), 'Contatado');
+  assert.equal(normalizeStatus('Orçamento enviado'), 'Orçamento enviado');
+  assert.equal(normalizeStatus('Pago'), 'Confirmado');
+  assert.equal(normalizeStatus('Em negociação'), 'Aguardando confirmação');
+  assert.equal(normalizeStatus('NAO RESPONDIDO'), 'Em conversa');
   assert.equal(normalizeStatus('DESCARTADO'), 'Perdido');
 });
 
@@ -38,17 +38,17 @@ test('une WhatsApps repetidos e reconhece cliente existente', () => {
   const headers = ['Nome', 'WhatsApp', 'Pedido', 'Valor', 'Status'];
   const mapping = detectMapping(headers);
   const rows = [
-    ['Ana', '21999999999', 'Landing page', '500,00', 'Interessado'],
-    ['Ana', '21999999999', 'Também pediu logo', '650,00', 'Proposta enviada'],
+    ['Ana', '21999999999', 'Landing page', '500,00', 'Cardápio enviado'],
+    ['Ana', '21999999999', 'Também pediu logo', '650,00', 'Orçamento enviado'],
     ['Bruno', '21999999998', 'Site', '900,00', 'Novo'],
   ];
-  const existingLeads = [{ id: 'existing-id', name: 'Ana antiga', phone: '21999999999', status: 'Contatado', value: 300, origin: 'Outro', notes: '' }];
+  const existingLeads = [{ id: 'existing-id', name: 'Ana antiga', phone: '21999999999', status: 'Em conversa', value: 300, origin: 'Outro', notes: '' }];
   const result = analyzeImport({ headers, rows, mapping, existingLeads });
   assert.equal(result.stats.update, 1);
   assert.equal(result.stats.create, 1);
   assert.equal(result.stats.duplicateRows, 1);
   const ana = result.records.find(record => record.existingId === 'existing-id');
-  assert.equal(ana.lead.status, 'Proposta enviada');
+  assert.equal(ana.lead.status, 'Orçamento enviado');
   assert.equal(ana.lead.value, 650);
   assert.match(ana.lead.notes, /Landing page/);
   assert.match(ana.lead.notes, /Também pediu logo/);
@@ -76,9 +76,9 @@ test('reconstrói PDF sem cabeçalho com nome, telefone e status misturados', ()
     'Nail Designer – Leticia Vieira',
   ]);
   assert.deepEqual(result.records.map(record => record.lead.status), [
-    'Contatado',
+    'Em conversa',
     'Perdido',
-    'Novo lead',
-    'Novo lead',
+    'Novo pedido',
+    'Novo pedido',
   ]);
 });

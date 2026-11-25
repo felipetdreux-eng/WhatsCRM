@@ -30,7 +30,7 @@ begin
   where o.lead_id = l.id
     and o.workspace_id = _workspace_id
     and o.status in ('pending', 'ready')
-    and l.status in ('Fechado', 'Perdido');
+    and l.status in ('Confirmado', 'Perdido');
   get diagnostics changed = row_count;
   affected := affected + changed;
 
@@ -46,11 +46,11 @@ begin
       l.created_at + make_interval(mins => cfg.first_contact_delay_minutes),
       1,
       private.automation_message(l.name, l.status, 'first_contact', 1),
-      'Novo lead entrou no Fuply e ainda precisa de primeiro contato.'
+      'Novo pedido entrou no Fuply e ainda precisa de primeiro contato.'
     from public.leads l
     where l.workspace_id = _workspace_id
       and l.created_at >= cfg.created_at
-      and l.status = 'Novo lead'
+      and l.status = 'Novo pedido'
       and l.last_response_at is null
       and l.last_followup_at is null
       and not exists (
@@ -93,7 +93,7 @@ begin
         and history.status = 'sent'
     ) sent on true
     where l.workspace_id = _workspace_id
-      and l.status not in ('Fechado', 'Perdido', 'Novo lead')
+      and l.status not in ('Confirmado', 'Perdido', 'Novo pedido')
       and activity.last_activity_at <= now() - make_interval(hours => cfg.followup_delay_hours)
       and coalesce(sent.sent_count, 0) < cfg.max_followup_attempts
       and not exists (

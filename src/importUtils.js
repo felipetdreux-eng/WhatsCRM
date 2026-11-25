@@ -13,7 +13,7 @@ export const IMPORT_FIELDS = [
   { key: 'notes', label: 'Observações / pedido', aliases: ['observacao', 'observação', 'observacoes', 'observações', 'obs', 'pedido', 'descricao', 'descrição', 'produto', 'servico', 'serviço'] },
 ];
 
-const CLOSED = ['Fechado', 'Perdido'];
+const CLOSED = ['Confirmado', 'Perdido'];
 const PHONE_PATTERN = /(?:\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g;
 
 export const normalizeText = value => String(value ?? '')
@@ -166,16 +166,20 @@ export function normalizeTime(value) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+const CANONICAL_STATUSES = ['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação', 'Confirmado', 'Perdido'];
+
 export function normalizeStatus(value) {
   const text = normalizeText(value);
   if (!text) return '';
-  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Fechado';
+  const canonical = CANONICAL_STATUSES.find(status => normalizeText(status) === text);
+  if (canonical) return canonical;
+  if (/(vendido|pago|fechado|concluido|finalizado|ganho)/.test(text)) return 'Confirmado';
   if (/(descartado|perdido|cancelado|recusado|desistiu|sem retorno|nao interessado|sem interesse)/.test(text)) return 'Perdido';
-  if (/(proposta|orcamento|cotacao|enviado)/.test(text)) return 'Proposta enviada';
-  if (/(negociacao|negociando|trabalhando|em andamento|contraproposta|ajuste)/.test(text)) return 'Negociação';
-  if (/(interessado|quente)/.test(text)) return 'Interessado';
-  if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Contatado';
-  if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo lead';
+  if (/(proposta|orcamento|cotacao|enviado)/.test(text)) return 'Orçamento enviado';
+  if (/(negociacao|negociando|trabalhando|em andamento|contraproposta|ajuste)/.test(text)) return 'Aguardando confirmação';
+  if (/(interessado|quente)/.test(text)) return 'Cardápio enviado';
+  if (/(nao respondido|sem resposta|contatado|respondido|contato feito|em contato)/.test(text)) return 'Em conversa';
+  if (/(novo|pendente|aguardando|lead)/.test(text)) return 'Novo pedido';
   return '';
 }
 
@@ -288,7 +292,7 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       notes: String(cellAt(row, effectiveMapping.notes)).trim(),
     };
 
-    if (status === 'Fechado' && !(Number(value) > 0)) {
+    if (status === 'Confirmado' && !(Number(value) > 0)) {
       errors.push({ line, message: 'Status fechado exige um valor maior que zero.' });
       return;
     }
@@ -314,7 +318,7 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
   for (const entry of grouped.values()) {
     const existing = existingByPhone.get(entry.phone);
     const importedStatus = entry.status;
-    const status = importedStatus || existing?.status || 'Novo lead';
+    const status = importedStatus || existing?.status || 'Novo pedido';
     const nextContact = CLOSED.includes(status) ? '' : (entry.nextContact || existing?.nextContact || '');
     const nextContactTime = CLOSED.includes(status) ? '' : (entry.nextContactTime || existing?.nextContactTime || '');
     const nextAction = CLOSED.includes(status) ? '' : (entry.nextAction || existing?.nextAction || '');
@@ -335,10 +339,10 @@ export function analyzeImport({ headers = [], rows = [], mapping = {}, existingL
       updatedAt: now,
       createdAt: existing?.createdAt || now,
       lastFollowupAt: existing?.lastFollowupAt || null,
-      soldAt: status === 'Fechado' ? (existing?.soldAt || now) : null,
+      soldAt: status === 'Confirmado' ? (existing?.soldAt || now) : null,
       lostAt: status === 'Perdido' ? (existing?.lostAt || now) : null,
-      saleValue: status === 'Fechado' ? Number(entry.value ?? existing?.saleValue ?? value) : null,
-      saleValueSource: status === 'Fechado' ? 'confirmed' : null,
+      saleValue: status === 'Confirmado' ? Number(entry.value ?? existing?.saleValue ?? value) : null,
+      saleValueSource: status === 'Confirmado' ? 'confirmed' : null,
     };
     records.push({
       mode: existing ? 'update' : 'create',

@@ -27,7 +27,7 @@ const DEFAULT_TEMPLATES = [
   {
     id: 'proposal',
     title: 'Proposta',
-    category: 'Negociação',
+    category: 'Aguardando confirmação',
     text: 'Oi, {nome}! Preparei a proposta que conversamos. O valor ficou em {valor}. Se estiver tudo certo, posso te explicar os próximos passos por aqui.',
   },
   {
@@ -47,7 +47,7 @@ const currency = value => new Intl.NumberFormat('pt-BR', {
 
 const leadValue = lead => {
   if (!lead) return 0;
-  const raw = lead.status === 'Fechado' ? (lead.saleValue ?? lead.value) : lead.value;
+  const raw = lead.status === 'Confirmado' ? (lead.saleValue ?? lead.value) : lead.value;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? value : 0;
 };
@@ -141,7 +141,7 @@ export default function Messages({ leads = [], openWhatsApp, userId, demoMode = 
   )), [templates, query]);
 
   const activeLeadOptions = useMemo(
-    () => leadOptions.filter(lead => !['Fechado', 'Perdido'].includes(lead.status)),
+    () => leadOptions.filter(lead => !['Confirmado', 'Perdido'].includes(lead.status)),
     [leadOptions],
   );
 

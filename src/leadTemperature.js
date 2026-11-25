@@ -1,13 +1,13 @@
 if (typeof document !== 'undefined') import('./cooling.css');
 
-const CLOSED = new Set(['Fechado', 'Perdido']);
+const CLOSED = new Set(['Confirmado', 'Perdido']);
 
 const WINDOWS = {
-  'Negociação': { attention: 2, cooling: 4 },
-  'Proposta enviada': { attention: 2, cooling: 4 },
-  Interessado: { attention: 3, cooling: 6 },
-  Contatado: { attention: 4, cooling: 7 },
-  'Novo lead': { attention: 2, cooling: 4 },
+  'Aguardando confirmação': { attention: 2, cooling: 4 },
+  'Orçamento enviado': { attention: 2, cooling: 4 },
+  'Cardápio enviado': { attention: 3, cooling: 6 },
+  'Em conversa': { attention: 4, cooling: 7 },
+  'Novo pedido': { attention: 2, cooling: 4 },
 };
 
 export function temperatureDateKey(date = new Date()) {
@@ -46,7 +46,7 @@ export function getLeadTemperature(lead, now = new Date()) {
 
   const days = temperatureIdleDays(lead, now);
   const due = temperatureDayDiff(lead.nextContact, now);
-  const window = WINDOWS[lead.status] || WINDOWS.Contatado;
+  const window = WINDOWS[lead.status] || WINDOWS['Em conversa'];
 
   if (due != null && due < 0) {
     const late = Math.abs(due);
@@ -58,7 +58,7 @@ export function getLeadTemperature(lead, now = new Date()) {
     );
   }
 
-  if (lead.status === 'Proposta enviada' && !lead.nextContact && days >= 2) {
+  if (lead.status === 'Orçamento enviado' && !lead.nextContact && days >= 2) {
     return result(
       'cooling',
       days,
@@ -68,7 +68,7 @@ export function getLeadTemperature(lead, now = new Date()) {
   }
 
   if (days >= window.cooling) {
-    const stage = lead.status === 'Proposta enviada' ? 'A proposta' : 'A negociação';
+    const stage = lead.status === 'Orçamento enviado' ? 'A proposta' : 'A negociação';
     return result(
       'cooling',
       days,
@@ -86,7 +86,7 @@ export function getLeadTemperature(lead, now = new Date()) {
     );
   }
 
-  if (!lead.nextContact && lead.status !== 'Novo lead' && days >= 1) {
+  if (!lead.nextContact && lead.status !== 'Novo pedido' && days >= 1) {
     return result(
       'attention',
       days,
@@ -104,7 +104,7 @@ export function getLeadTemperature(lead, now = new Date()) {
 }
 
 export function buildCoolingWatchlist(leads, { now = new Date(), limit = 6 } = {}) {
-  const stageOrder = { 'Negociação': 0, 'Proposta enviada': 1, Interessado: 2, Contatado: 3, 'Novo lead': 4 };
+  const stageOrder = { 'Aguardando confirmação': 0, 'Orçamento enviado': 1, 'Cardápio enviado': 2, 'Em conversa': 3, 'Novo pedido': 4 };
   return (Array.isArray(leads) ? leads : [])
     .map(lead => ({ lead, temperature: getLeadTemperature(lead, now) }))
     .filter(item => item.temperature?.atRisk)

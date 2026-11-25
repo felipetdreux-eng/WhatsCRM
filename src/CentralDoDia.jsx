@@ -45,11 +45,11 @@ function recommendationFor(lead) {
 export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead, goPipeline, goFollowUps, goAutopilot, onReplyWithAI }) {
   const data = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
-    const active = list.filter(lead => !['Fechado', 'Perdido'].includes(lead.status));
+    const active = list.filter(lead => !['Confirmado', 'Perdido'].includes(lead.status));
     const today = dateKey();
     const overdue = active.filter(lead => lead.nextContact && lead.nextContact < today);
     const todayFollowups = active.filter(lead => lead.nextContact === today);
-    const siteNew = active.filter(lead => lead.origin === 'Site' && lead.status === 'Novo lead');
+    const siteNew = active.filter(lead => lead.origin === 'Site' && lead.status === 'Novo pedido');
     const cooling = buildCoolingWatchlist(active, { limit: Math.max(1, active.length) });
     const smart = buildSmartLeadList(active, { limit: Math.max(1, active.length), minScore: 60 });
     const duplicateIndex = buildDuplicateIndex(list);
@@ -70,13 +70,13 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
     cooling.forEach(item => add(item.lead, 'cooling', { temperature: item.temperature }));
 
     const potential = active.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
-    const withNextStep = active.filter(lead => lead.nextContact || ['Novo lead'].includes(lead.status)).length;
+    const withNextStep = active.filter(lead => lead.nextContact || ['Novo pedido'].includes(lead.status)).length;
     const organized = active.length ? Math.round((withNextStep / active.length) * 100) : 100;
 
     const onboarding = {
       hasLead: list.length > 0,
       hasFollowup: list.some(lead => Boolean(lead.nextContact)),
-      hasMoved: list.some(lead => lead.status && lead.status !== 'Novo lead'),
+      hasMoved: list.some(lead => lead.status && lead.status !== 'Novo pedido'),
     };
     onboarding.complete = onboarding.hasLead && onboarding.hasFollowup && onboarding.hasMoved;
 
@@ -102,10 +102,10 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
 
 
   const typeLabel = item => {
-    if (item.type === 'site') return 'Novo lead do site';
+    if (item.type === 'site') return 'Novo pedido do site';
     if (item.type === 'overdue') return `${Math.abs(dayDiff(item.lead.nextContact) || 1)}d atrasado`;
     if (item.type === 'today') return 'Follow-up hoje';
-    if (item.type === 'cooling') return 'Negociação esfriando';
+    if (item.type === 'cooling') return 'Aguardando confirmação esfriando';
     return item.intelligence?.label || 'Prioridade alta';
   };
 
@@ -120,7 +120,7 @@ export default function CentralDoDia({ leads, openLead, openWhatsApp, onNewLead,
         <div className="dashboard-header-actions daily-secondary-actions">
           <button type="button" className="secondary-button" onClick={goAutopilot}><Sparkles size={17} /> Autopilot</button>
           <button type="button" className="secondary-button" onClick={goPipeline}><ListFilter size={17} /> Pipeline</button>
-          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
+          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo pedido</button>
         </div>
       </header>
 

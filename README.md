@@ -10,7 +10,7 @@ A interface principal do pipeline já segue a identidade visual definida para o 
 
 ## Recursos já presentes
 
-- Pipeline com as etapas Novo lead, Contatado, Interessado, Proposta enviada, Vendido e Perdido
+- Pipeline com as etapas Novo pedido, Em conversa, Cardápio enviado, Orçamento enviado, Vendido e Perdido
 - Cards de métricas do funil
 - Cadastro rápido de leads
 - Nome, empresa, WhatsApp, valor potencial, status, origem, próximo contato e observações

@@ -23,8 +23,8 @@ import { buildSmartLeadList, getLeadIntelligence } from './leadIntelligence';
 import { buildDuplicateIndex, duplicateGroupCount } from './duplicateLeads';
 import './leads.css';
 
-const CLOSED = ['Fechado', 'Perdido'];
-const STATUSES = ['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'];
+const CLOSED = ['Confirmado', 'Perdido'];
+const STATUSES = ['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação', 'Confirmado', 'Perdido'];
 const SCOPES = ['Todos', 'Inteligentes', 'Duplicados', 'Hoje', 'Atrasados', 'Próx. 7 dias', 'Sem próximo contato', 'Esfriando'];
 const LEADS_FILTERS_STORAGE_KEY = 'fuply-leads-filters';
 const normalizeAssigneeFilter = value => value === 'unassigned' ? 'Sem responsável' : (typeof value === 'string' && value ? value : 'Todos');
@@ -204,7 +204,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
   const changeStatus = (lead, next) => {
     if (lead.status === next) return;
     updateLeadStatus?.(lead.id, next);
-    flash(next === 'Fechado' ? `Confirme o valor final da venda de ${lead.name}.` : `${lead.name} atualizado para ${next}.`);
+    flash(next === 'Confirmado' ? `Confirme o valor final da venda de ${lead.name}.` : `${lead.name} atualizado para ${next}.`);
   };
 
   const complete = lead => {
@@ -331,7 +331,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
         <div className="leads-header-actions">
           <div className="view-mode-toggle" aria-label="Modo de visualização"><button type="button" className={viewMode === 'simple' ? 'active' : ''} onClick={() => changeViewMode('simple')}>Simples</button><button type="button" className={viewMode === 'complete' ? 'active' : ''} onClick={() => changeViewMode('complete')}>Completo</button></div>
           <button type="button" className="secondary-button leads-import-button" onClick={() => setImportOpen(true)}><FileSpreadsheet size={17} /> Importar planilha</button>
-          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo lead</button>
+          <button type="button" className="primary-button" onClick={onNewLead}><Plus size={18} /> Novo pedido</button>
         </div>
       </header>
 
@@ -365,7 +365,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
                 <td onClick={event => event.stopPropagation()}><select className="leads-status-select" value={lead.status} onChange={event => changeStatus(lead, event.target.value)} aria-label={`Status de ${lead.name}`}>{STATUSES.map(item => <option key={item}>{item}</option>)}</select></td>
                 <td><span className="lead-origin">{lead.origin || 'Outro'}</span></td>
                 <td><span className="leads-next"><UsersRound size={14} />{assigneeName(lead)}</span></td>
-                <td onClick={event => event.stopPropagation()}>{lead.status === 'Fechado' ? <strong className="leads-value">{money(lead.saleValue)}</strong> : <input className="inline-value-input" type="number" min="0" step="0.01" defaultValue={Number(lead.value || 0)} onBlur={event => updateInlineValue(lead, event.target.value)} aria-label={`Valor potencial de ${lead.name}`} />}</td>
+                <td onClick={event => event.stopPropagation()}>{lead.status === 'Confirmado' ? <strong className="leads-value">{money(lead.saleValue)}</strong> : <input className="inline-value-input" type="number" min="0" step="0.01" defaultValue={Number(lead.value || 0)} onBlur={event => updateInlineValue(lead, event.target.value)} aria-label={`Valor potencial de ${lead.name}`} />}</td>
                 <td><SmartBadge lead={lead} /></td>
                 <td><span className={`leads-next ${lead.nextContact ? '' : 'muted'} ${diff(lead.nextContact) < 0 ? 'overdue' : ''}`}><CalendarClock size={14} />{pretty(lead.nextContact)}{lead.nextContactTime ? ` · ${lead.nextContactTime}` : ''}</span></td>
                 <td onClick={event => event.stopPropagation()}><input className="inline-next-action-input" defaultValue={lead.nextAction || ''} placeholder="Definir ação" onBlur={event => updateInlineAction(lead, event.target.value)} aria-label={`Próxima ação de ${lead.name}`} /></td>
@@ -391,7 +391,7 @@ export default function LeadsPage({ leads, setLeads, openLead, openWhatsApp, onN
           <article className="lead-directory-card" key={lead.id}>
             <div className="lead-directory-card-top"><div className="lead-contact-cell"><div className="leads-avatar">{lead.name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div></div><div className="lead-mobile-badges"><span className={`leads-status status-${statusClass(lead.status)}`}>{lead.status}</span><TemperatureBadge lead={lead} /><SmartBadge lead={lead} /><DuplicateBadge lead={lead} duplicateIndex={duplicateIndex} /></div></div>
             <div className="lead-directory-card-meta"><span><UsersRound size={14} />{assigneeName(lead)}</span><span><CalendarClock size={14} />{pretty(lead.nextContact)}</span><span><Target size={14} />{lead.nextAction || 'Sem próxima ação'}</span></div>
-            <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Fechado' ? lead.saleValue : lead.value)}</strong><div>
+            <div className="lead-directory-card-bottom"><strong>{money(lead.status === 'Confirmado' ? lead.saleValue : lead.value)}</strong><div>
               <button type="button" className="mobile-whatsapp" onClick={() => openWhatsApp(lead)} aria-label={`Abrir WhatsApp de ${lead.name}`}><MessageCircle size={15} /></button>
               {!CLOSED.includes(lead.status) && <select className="lead-mark-for mobile-mark-for" value="" onChange={event => handleMarkFor(event, lead)} aria-label={`Marcar ${lead.name} para uma data`}>
                 <option value="" disabled>{lead.nextContact ? `Marcado: ${pretty(lead.nextContact)}` : 'Marcar para'}</option>

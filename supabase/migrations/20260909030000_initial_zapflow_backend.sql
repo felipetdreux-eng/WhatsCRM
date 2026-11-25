@@ -21,7 +21,7 @@ create table if not exists public.leads (
   value numeric(12,2) not null default 0 check (value >= 0),
   sale_value numeric(12,2) check (sale_value is null or sale_value > 0),
   sale_value_source text check (sale_value_source in ('confirmed','legacy-potential','missing')),
-  status text not null default 'Novo lead' check (status in ('Novo lead','Contatado','Interessado','Proposta enviada','Vendido','Perdido')),
+  status text not null default 'Novo pedido' check (status in ('Novo pedido','Em conversa','Cardápio enviado','Orçamento enviado','Vendido','Perdido')),
   origin text not null default 'Outro' check (origin in ('Google Maps','Instagram','Indicação','Site','WhatsApp','Outro')),
   notes text not null default '',
   next_contact date,

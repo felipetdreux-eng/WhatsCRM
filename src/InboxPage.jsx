@@ -29,7 +29,7 @@ import {
 } from './whatsappInboxBackend';
 import './inbox.css';
 
-const CLOSED = new Set(['Fechado', 'Perdido']);
+const CLOSED = new Set(['Confirmado', 'Perdido']);
 const FILTERS = [
   ['Todas', 'Todas'],
   ['Radar', 'Radar'],
@@ -48,16 +48,16 @@ function firstName(name) {
 
 function messageSuggestion(lead) {
   const name = firstName(lead?.name);
-  if (lead?.status === 'Novo lead') {
+  if (lead?.status === 'Novo pedido') {
     return 'Oi, ' + name + '! Vi que você entrou em contato. Quero entender melhor o que você precisa e te mostrar o caminho mais rápido. Posso te fazer duas perguntas?';
   }
-  if (lead?.status === 'Interessado') {
+  if (lead?.status === 'Cardápio enviado') {
     return 'Oi, ' + name + '! Para eu te indicar a melhor opção, posso confirmar qual é a sua prioridade agora? Aí eu já te passo o próximo passo mais objetivo.';
   }
-  if (lead?.status === 'Proposta enviada') {
+  if (lead?.status === 'Orçamento enviado') {
     return 'Oi, ' + name + '! Conseguiu olhar a proposta? Se ficou alguma dúvida ou se precisar ajustar algum ponto, posso resolver por aqui.';
   }
-  if (lead?.status === 'Negociação') {
+  if (lead?.status === 'Aguardando confirmação') {
     return 'Oi, ' + name + '! Vamos fechar os próximos passos? Se me confirmar o que falta para avançarmos, eu organizo isso com você agora.';
   }
   return 'Oi, ' + name + '! Passando para retomar nossa conversa. Ainda faz sentido avançarmos com isso?';
@@ -65,14 +65,14 @@ function messageSuggestion(lead) {
 
 function demoConversation(lead) {
   const name = firstName(lead?.name);
-  if (lead?.status === 'Proposta enviada') {
+  if (lead?.status === 'Orçamento enviado') {
     return [
       { id: 'in-1', side: 'inbound', time: '09:14', text: 'Oi! Recebi a proposta, mas ainda estou comparando algumas opções.' },
       { id: 'out-1', side: 'outbound', time: '09:18', text: 'Perfeito. Posso te ajudar a comparar os pontos principais e ajustar o que fizer sentido.' },
       { id: 'in-2', side: 'inbound', time: '09:22', text: 'Vou revisar hoje e te retorno.' },
     ];
   }
-  if (lead?.status === 'Negociação') {
+  if (lead?.status === 'Aguardando confirmação') {
     return [
       { id: 'in-1', side: 'inbound', time: '10:02', text: 'Gostei da solução. Preciso alinhar só o próximo passo internamente.' },
       { id: 'out-1', side: 'outbound', time: '10:06', text: 'Ótimo. Deixo tudo organizado para você decidir com segurança.' },
@@ -163,8 +163,8 @@ export default function InboxPage({
       const matchesQuery = !term || haystack.includes(term);
       const matchesFilter = filter === 'Todas'
         || (filter === 'Radar' && item.temperature?.atRisk)
-        || (filter === 'Novos' && lead.status === 'Novo lead')
-        || (filter === 'Negociações' && ['Interessado', 'Proposta enviada', 'Negociação'].includes(lead.status));
+        || (filter === 'Novos' && lead.status === 'Novo pedido')
+        || (filter === 'Negociações' && ['Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação'].includes(lead.status));
       return matchesQuery && matchesFilter;
     });
   }, [filter, query, rankedLeads]);
@@ -359,7 +359,7 @@ export default function InboxPage({
                 </div>
               </header>
               <div className="inbox-thread-toolbar">
-                <label><span>Etapa</span><select value={selectedLead.status} onChange={event => onStatusChange?.(selectedLead.id, event.target.value)}>{['Novo lead', 'Contatado', 'Interessado', 'Proposta enviada', 'Negociação', 'Fechado', 'Perdido'].map(status => <option key={status}>{status}</option>)}</select></label>
+                <label><span>Etapa</span><select value={selectedLead.status} onChange={event => onStatusChange?.(selectedLead.id, event.target.value)}>{['Novo pedido', 'Em conversa', 'Cardápio enviado', 'Orçamento enviado', 'Aguardando confirmação', 'Confirmado', 'Perdido'].map(status => <option key={status}>{status}</option>)}</select></label>
                 <div className="inbox-assignee-pill"><UserRound size={14} /> Responsável atual</div>
                 <span className={'inbox-ownership-pill ' + mode}>{mode === 'ia' ? <><Bot size={13} /> Agente Fuply</> : <><Hand size={13} /> Humano assumiu</>}</span>
               </div>

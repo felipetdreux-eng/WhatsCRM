@@ -56,7 +56,7 @@ begin
     status, origin, notes, next_action, created_at, updated_at
   ) values (
     cfg.owner_id, cfg.workspace_id, cfg.owner_id, null, clean_name, '', clean_phone, 0,
-    'Novo lead', cfg.origin_label, note_text, 'Responder lead do site', now(), now()
+    'Novo pedido', cfg.origin_label, note_text, 'Responder lead do site', now(), now()
   )
   on conflict (user_id, phone) do update
   set

@@ -104,7 +104,7 @@ POSICIONAMENTO
 
 2. PIPELINE
 - Organiza cada lead por etapa comercial.
-- Etapas principais: Novo lead, Contatado, Interessado, Proposta enviada, Negociação, Fechado e Perdido.
+- Etapas principais: Novo pedido, Em conversa, Cardápio enviado, Orçamento enviado, Aguardando confirmação, Confirmado e Perdido.
 - Permite visualizar rapidamente onde cada oportunidade está no funil.
 - É útil para acompanhar vendas que levam dias ou semanas e exigem vários retornos.
 

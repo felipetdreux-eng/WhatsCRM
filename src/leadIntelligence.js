@@ -1,13 +1,13 @@
 import { temperatureDayDiff, temperatureIdleDays } from './leadTemperature';
 
-const CLOSED = new Set(['Fechado', 'Perdido']);
+const CLOSED = new Set(['Confirmado', 'Perdido']);
 
 const STATUS_SCORE = {
-  'Novo lead': 16,
-  Contatado: 22,
-  Interessado: 32,
-  'Proposta enviada': 38,
-  Negociação: 44,
+  'Novo pedido': 16,
+  'Em conversa': 22,
+  'Cardápio enviado': 32,
+  'Orçamento enviado': 38,
+  'Aguardando confirmação': 44,
 };
 
 const ORIGIN_SCORE = {
@@ -42,7 +42,7 @@ function timingScore(lead, now) {
   if (due != null && due < 0) return 16;
   if (due === 0) return 12;
   if (due === 1) return 7;
-  if (!lead.nextContact && lead.status !== 'Novo lead') return 5;
+  if (!lead.nextContact && lead.status !== 'Novo pedido') return 5;
   return 0;
 }
 
@@ -56,11 +56,11 @@ function priorityFromScore(score) {
 function recommendedAction(lead, now) {
   const due = temperatureDayDiff(lead.nextContact, now);
   if (due != null && due < 0) return 'Fazer follow-up agora';
-  if (lead.status === 'Novo lead' && lead.origin === 'Site') return 'Responder lead do site';
-  if (lead.status === 'Novo lead') return 'Fazer primeiro contato';
-  if (lead.status === 'Interessado') return 'Avançar para proposta';
-  if (lead.status === 'Proposta enviada') return 'Cobrar retorno da proposta';
-  if (lead.status === 'Negociação') return 'Retomar negociação';
+  if (lead.status === 'Novo pedido' && lead.origin === 'Site') return 'Responder lead do site';
+  if (lead.status === 'Novo pedido') return 'Fazer primeiro contato';
+  if (lead.status === 'Cardápio enviado') return 'Avançar para proposta';
+  if (lead.status === 'Orçamento enviado') return 'Cobrar retorno da proposta';
+  if (lead.status === 'Aguardando confirmação') return 'Retomar negociação';
   if (!lead.nextContact) return 'Agendar próximo contato';
   return lead.nextAction || 'Retomar contato';
 }
@@ -73,9 +73,9 @@ export function getLeadIntelligence(lead, now = new Date()) {
 
   const stage = STATUS_SCORE[lead.status] || 8;
   score += stage;
-  if (lead.status === 'Negociação') reasons.push('Negociação avançada');
-  else if (lead.status === 'Proposta enviada') reasons.push('Proposta em aberto');
-  else if (lead.status === 'Interessado') reasons.push('Lead demonstrou interesse');
+  if (lead.status === 'Aguardando confirmação') reasons.push('Aguardando confirmação avançada');
+  else if (lead.status === 'Orçamento enviado') reasons.push('Proposta em aberto');
+  else if (lead.status === 'Cardápio enviado') reasons.push('Lead demonstrou interesse');
 
   const amount = Number(lead.value || 0);
   const amountPoints = valueScore(amount);
@@ -97,7 +97,7 @@ export function getLeadIntelligence(lead, now = new Date()) {
   score += timingScore(lead, now);
   if (due != null && due < 0) reasons.push(`Follow-up atrasado ${Math.abs(due)}d`);
   else if (due === 0) reasons.push('Follow-up para hoje');
-  else if (!lead.nextContact && lead.status !== 'Novo lead') reasons.push('Sem próximo contato');
+  else if (!lead.nextContact && lead.status !== 'Novo pedido') reasons.push('Sem próximo contato');
 
   if (lead.phone) score += 4;
   if (lead.company) score += 3;
