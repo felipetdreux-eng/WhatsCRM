@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ClipboardList, LogOut, MapPin, MessageCircle, Plus, Search, Settings, Trash2, Undo2, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Package, LogOut, MapPin, MessageCircle, Plus, Search, Settings, Trash2, Undo2, UsersRound, X } from 'lucide-react';
 import OrderBuilder from './OrderBuilder';
 import OrdersByNeighborhood from './OrdersByNeighborhood';
 import SettingsPage from './SettingsPage';
 import { cleanItems, itemsSummary, orderTotals } from './chefData';
+import ProductTotals from './ProductTotals.jsx';
 import { canonicalPhone, currency, validBrazilPhone, whatsappPhone } from './domain';
 import { getActiveAccount, logoutAccount } from './accountStorage';
 import { supabase } from './supabaseClient';
@@ -25,6 +26,7 @@ const STATUSES = [
 const NAV_ITEMS = [
   ['Pipeline', ClipboardList],
   ['Por bairro', MapPin],
+  ['Produtos', Package],
   ['Leads', UsersRound],
   ['Configurações', Settings],
 ];
@@ -245,7 +247,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
                   {list.map(lead => (
                     <article className="lead-card" key={lead.id} onClick={() => setEditingId(lead.id)}>
                       <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.neighborhood || 'Sem bairro'}</span></div></div>
-                      <small className="order-card-items">{itemsSummary(lead.items) || 'Sem itens'}</small>
+                      <ul className="item-lines">{cleanItems(lead.items).map(item => <li key={item.productId}>{item.qty}× {item.name}</li>)}</ul>
                       <b className="lead-value">{currency(lead.value)}</b>
                       <div className="lead-actions">
                         {lead.status === STATUS_PEDIDO
@@ -275,17 +277,17 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       </header>
       <div className="orders-toggle" role="group" aria-label="Filtrar por status">
         {[['todos', 'Todos'], ['pedido', 'A enviar'], ['enviado', 'Enviados']].map(([id, label]) => (
-          <button type="button" key={id} className={leadFilter === id ? 'secondary-button' : 'ghost-button'} onClick={() => setLeadFilter(id)}>{label}</button>
+          <button type="button" key={id} className={`lead-filter ${leadFilter === id ? 'active' : ''}`} onClick={() => setLeadFilter(id)}>{label}</button>
         ))}
       </div>
       <section className="orders-production">
         {leadRows.length === 0 ? <p className="orders-empty">Nenhum lead ainda.</p> : (
           <table>
-            <thead><tr><th align="left">Cliente</th><th align="left">WhatsApp</th><th align="left">Bairro</th><th align="right">Total</th><th align="left">Status</th><th /></tr></thead>
+            <thead><tr><th align="left">Cliente</th><th align="left">WhatsApp</th><th align="left">Itens</th><th align="left">Bairro</th><th align="right">Total</th><th align="left">Status</th><th /></tr></thead>
             <tbody>
               {leadRows.map(lead => (
                 <tr key={lead.id} onClick={() => setEditingId(lead.id)} style={{ cursor: 'pointer' }}>
-                  <td>{lead.name}</td><td>{lead.phone} <a href={`https://wa.me/${whatsappPhone(lead.phone)}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} aria-label="Abrir WhatsApp"><MessageCircle size={14} /></a></td><td>{lead.neighborhood}</td><td align="right">{currency(lead.value)}</td><td>{lead.status}</td>
+                  <td>{lead.name}</td><td>{lead.phone} <a href={`https://wa.me/${whatsappPhone(lead.phone)}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} aria-label="Abrir WhatsApp"><MessageCircle size={14} /></a></td><td><ul className="item-lines">{cleanItems(lead.items).map(item => <li key={item.productId}>{item.qty}× {item.name}</li>)}</ul></td><td>{lead.neighborhood}</td><td align="right" style={{ whiteSpace: 'nowrap' }}>{currency(lead.value)}</td><td><b style={{ color: lead.status === STATUS_ENVIADO ? '#0f9d63' : '#b45309' }}>{lead.status}</b></td>
                   <td align="right">
                     {lead.status === STATUS_PEDIDO
                       ? <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_ENVIADO); }}><CheckCircle2 size={16} /> Marcar como enviado</button>
@@ -303,6 +305,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
 
   const renderPage = () => {
     if (activePage === 'Por bairro') return <OrdersByNeighborhood leads={leads} openLead={lead => setEditingId(lead.id)} onMarkSent={id => setStatus(id, STATUS_ENVIADO)} />;
+    if (activePage === 'Produtos') return <ProductTotals leads={leads} />;
     if (activePage === 'Leads') return renderCustomers();
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
     return renderOrders();

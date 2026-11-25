@@ -68,3 +68,17 @@
 .order-card-items { color: var(--muted, #667085); display: block; margin: 4px 0; }
 .orders-order-foot{flex-wrap:wrap;gap:6px}
 .orders-wa{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.product-totals{list-style:none;margin:0;padding:0}
+.product-totals li{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid #e7ebf0;font-size:16px}
+.product-totals label{display:flex;gap:12px;align-items:center;cursor:pointer}
+.product-totals input{width:20px;height:20px}
+.product-totals li.done span{text-decoration:line-through;opacity:.5}
+.product-totals b{font-size:20px}
+.item-lines{list-style:none;margin:4px 0 0;padding:0}
+.item-lines li{padding:2px 0}
+.orders-production table{width:100%;border-collapse:collapse}
+.orders-production th,.orders-production td{padding:10px 14px;vertical-align:middle}
+.orders-production th{color:#5b6675;font-size:13px}
+.lead-filter{border:1px solid #d5dbe3;background:#fff;border-radius:999px;padding:8px 16px;font-size:14px;cursor:pointer;margin-right:8px}
+.lead-filter.active{background:#0f9d63;border-color:#0f9d63;color:#fff;font-weight:600}
+div.orders-toggle[role=group]{margin:0 0 14px}
