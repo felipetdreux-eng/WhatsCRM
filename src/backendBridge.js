@@ -70,7 +70,7 @@ async function resolveActiveWorkspaceId(userId) {
 }
 
 function toDbLead(lead, userId, idMap, workspaceId) {
-  const sold = lead.status === 'Confirmado';
+  const sold = lead.status === 'Enviado';
   const saleValue = sold ? Number(lead.saleValue ?? lead.value ?? 0) : null;
   return {
     id: stableLeadId(lead.id, userId, idMap),
@@ -82,9 +82,9 @@ function toDbLead(lead, userId, idMap, workspaceId) {
     company: String(lead.company || ''),
     phone: String(lead.phone || '').replace(/\D/g, ''),
     value: Number(lead.value || 0),
-    sale_value: sold && saleValue > 0 ? saleValue : null,
+    sale_value: sold ? saleValue : null,
     sale_value_source: sold ? (lead.saleValueSource || 'confirmed') : null,
-    status: lead.status || 'Novo pedido',
+    status: lead.status || 'Pedido',
     origin: lead.origin || 'Outro',
     notes: lead.notes || '',
     neighborhood: lead.neighborhood || '',
@@ -128,28 +128,6 @@ function fromDbLead(row) {
     lostAt: row.lost_at || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
-  };
-}
-
-function fromDbMessage(row) {
-  return {
-    id: row.template_key || row.id,
-    title: row.title || 'Mensagem',
-    category: row.category || '',
-    text: row.text || '',
-  };
-}
-
-function fromDbActivity(row) {
-  return {
-    id: row.id,
-    leadId: row.lead_id,
-    actorId: row.user_id || null,
-    kind: row.kind,
-    title: row.title,
-    detail: row.detail || '',
-    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
-    createdAt: row.created_at,
   };
 }
 
@@ -237,102 +215,6 @@ export function mirrorAccount(user, profile) {
   return account;
 }
 
-export async function loadWorkspaceContext(userId) {
-  if (!userId) return { activeWorkspace: null, workspaces: [], members: [], myRole: null };
-  const profile = await getProfile(userId);
-
-  const { data: ownMemberships, error: membershipsError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id,user_id,role,joined_at')
-    .eq('user_id', userId)
-    .order('joined_at', { ascending: true });
-  if (membershipsError) throw membershipsError;
-
-  const workspaceIds = (ownMemberships || []).map(item => item.workspace_id);
-  if (!workspaceIds.length) return { activeWorkspace: null, workspaces: [], members: [], myRole: null };
-
-  const { data: workspaceRows, error: workspaceError } = await supabase
-    .from('workspaces')
-    .select('id,name,owner_id,created_at,updated_at')
-    .in('id', workspaceIds)
-    .order('created_at', { ascending: true });
-  if (workspaceError) throw workspaceError;
-
-  const activeId = workspaceIds.includes(profile?.active_workspace_id) ? profile.active_workspace_id : workspaceIds[0];
-  workspaceCache.set(userId, activeId);
-  const activeWorkspace = (workspaceRows || []).find(item => item.id === activeId) || null;
-
-  const { data: memberRows, error: memberError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id,user_id,role,joined_at')
-    .eq('workspace_id', activeId)
-    .order('joined_at', { ascending: true });
-  if (memberError) throw memberError;
-
-  const memberIds = (memberRows || []).map(item => item.user_id);
-  let profileRows = [];
-  if (memberIds.length) {
-    const { data, error } = await supabase.from('profiles').select('id,name').in('id', memberIds);
-    if (error) throw error;
-    profileRows = data || [];
-  }
-  const names = new Map(profileRows.map(item => [item.id, item.name || 'Membro']));
-  const members = (memberRows || []).map(item => ({
-    ...item,
-    name: names.get(item.user_id) || (item.user_id === userId ? 'Você' : 'Membro'),
-  }));
-  const myRole = members.find(item => item.user_id === userId)?.role || null;
-
-  return { activeWorkspace, workspaces: workspaceRows || [], members, myRole };
-}
-
-export async function createWorkspaceInvite(workspaceId) {
-  if (!workspaceId) throw new Error('Equipe inválida.');
-  const { data, error } = await supabase.rpc('create_workspace_invite', { _workspace_id: workspaceId });
-  if (error) throw error;
-  return data;
-}
-
-export async function joinWorkspaceByCode(userId, code) {
-  const cleanCode = String(code || '').trim().toUpperCase();
-  if (!userId || cleanCode.length < 6) throw new Error('Código de convite inválido.');
-  const { data, error } = await supabase.rpc('join_workspace_by_code', { _code: cleanCode });
-  if (error) throw error;
-  workspaceCache.set(userId, data || null);
-  return data;
-}
-
-export async function setActiveWorkspace(userId, workspaceId) {
-  if (!userId || !workspaceId) throw new Error('Equipe inválida.');
-  const { error } = await supabase.rpc('set_active_workspace', { _workspace_id: workspaceId });
-  if (error) throw error;
-  workspaceCache.set(userId, workspaceId);
-}
-
-export async function renameWorkspace(workspaceId, name) {
-  const cleanName = String(name || '').trim();
-  if (!workspaceId || cleanName.length < 2) throw new Error('Nome de equipe inválido.');
-  const { data, error } = await supabase
-    .from('workspaces')
-    .update({ name: cleanName })
-    .eq('id', workspaceId)
-    .select('id,name,owner_id,created_at,updated_at')
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function removeWorkspaceMember(workspaceId, memberUserId) {
-  if (!workspaceId || !memberUserId) throw new Error('Membro inválido.');
-  const { data, error } = await supabase.rpc('remove_workspace_member', {
-    _workspace_id: workspaceId,
-    _user_id: memberUserId,
-  });
-  if (error) throw error;
-  if (data !== true) throw new Error('A pessoa não foi removida.');
-  return true;
-}
-
 export async function loadLeads(userId) {
   if (!userId) return [];
   const workspaceId = await resolveActiveWorkspaceId(userId);
@@ -347,65 +229,11 @@ export async function syncLeads(leads, userId) {
   const workspaceId = await resolveActiveWorkspaceId(userId);
   if (!workspaceId) return [];
   const idMap = loadIdMap(userId);
-  const rows = leads.map(lead => toDbLead(lead, userId, idMap, workspaceId)).filter(row => row.status !== 'Confirmado' || Number(row.sale_value) > 0);
+  const rows = leads.map(lead => toDbLead(lead, userId, idMap, workspaceId));
   if (!rows.length) return [];
   const { data, error } = await supabase.from('leads').upsert(rows, { onConflict: 'id' }).select();
   if (error) throw error;
   return (data || []).map(fromDbLead);
-}
-
-export async function loadLeadActivities(userId, leadId, limit = 50) {
-  if (!userId || !isUuid(leadId)) return [];
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
-  const { data, error } = await supabase
-    .from('lead_activities')
-    .select('id,user_id,lead_id,kind,title,detail,metadata,created_at')
-    .eq('lead_id', leadId)
-    .order('created_at', { ascending: false })
-    .limit(safeLimit);
-  if (error) throw error;
-  return (data || []).map(fromDbActivity);
-}
-
-export async function recordLeadActivity({ userId, leadId, kind, title, detail = '', metadata = {} }) {
-  if (!userId || !isUuid(leadId) || !kind || !title) return null;
-  const row = {
-    user_id: userId,
-    lead_id: leadId,
-    kind,
-    title: String(title).trim(),
-    detail: String(detail || '').trim(),
-    metadata: metadata && typeof metadata === 'object' ? metadata : {},
-  };
-  const { data, error } = await supabase
-    .from('lead_activities')
-    .insert(row)
-    .select('id,user_id,lead_id,kind,title,detail,metadata,created_at')
-    .single();
-  if (error) throw error;
-  return fromDbActivity(data);
-}
-
-export async function loadMessages(userId) {
-  if (!userId) return [];
-  const { data, error } = await supabase.from('message_templates').select('*').eq('user_id', userId).order('created_at');
-  if (error) throw error;
-  return (data || []).map(fromDbMessage);
-}
-
-export async function syncMessages(templates, userId) {
-  if (!Array.isArray(templates) || !userId) return [];
-  const rows = templates.map(template => ({
-    user_id: userId,
-    template_key: String(template.id || template.title),
-    title: template.title || 'Mensagem',
-    category: template.category || '',
-    text: template.text || '',
-  })).filter(row => row.text.trim());
-  if (!rows.length) return [];
-  const { data, error } = await supabase.from('message_templates').upsert(rows, { onConflict: 'user_id,template_key' }).select();
-  if (error) throw error;
-  return (data || []).map(fromDbMessage);
 }
 
 export async function hydrateBackend(user, profile) {
@@ -429,11 +257,6 @@ export async function hydrateBackend(user, profile) {
     }
   }
 
-  const dbMessages = await loadMessages(user.id);
-  if (!dbMessages.length) {
-    const oldMessages = legacyData('zapflow-messages', legacyId);
-    if (Array.isArray(oldMessages) && oldMessages.length) await syncMessages(oldMessages, user.id);
-  }
 }
 
 function leadFingerprint(lead) {

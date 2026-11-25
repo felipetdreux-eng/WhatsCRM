@@ -49,3 +49,20 @@
 .orders-production td { padding: 5px 0; border-bottom: 1px solid var(--border, #eef0f4); }
 .orders-production td:last-child { text-align: right; font-weight: 600; }
 .orders-empty { color: var(--muted, #667085); }
+
+/* Pedidos por bairro: uma coluna (torre) por bairro */
+.orders-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.orders-towers { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
+.orders-tower { flex: 0 0 300px; display: grid; gap: 10px; align-content: start; border: 1px solid var(--border, #d9dee7); border-radius: 14px; background: var(--surface, #fff); padding: 12px; }
+.orders-tower-head { display: grid; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--border, #eef0f4); }
+.orders-tower-head h3 { margin: 0; font-size: 17px; }
+.orders-tower-head small { color: var(--muted, #667085); }
+.orders-tower-sum { display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px; }
+.orders-tower-body { display: grid; gap: 8px; }
+.orders-lines { margin: 2px 0; padding-left: 18px; font-size: 13px; }
+.orders-address { white-space: pre-line; }
+.orders-order-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.orders-send { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border, #d9dee7); border-radius: 8px; background: transparent; padding: 4px 8px; font: inherit; font-size: 12px; cursor: pointer; }
+.orders-send:hover { background: color-mix(in srgb, var(--primary, #16a34a) 10%, transparent); }
+.orders-sent { color: var(--primary, #16a34a); font-weight: 600; }
+.order-card-items { color: var(--muted, #667085); display: block; margin: 4px 0; }

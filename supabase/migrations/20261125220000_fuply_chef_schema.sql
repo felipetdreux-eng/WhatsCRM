@@ -1,0 +1,2 @@
+-- Schema do Fuply Chef (aplicado no projeto khdqisojedaalystpdah via MCP).
+-- Tabelas: workspaces, workspace_members, profiles, leads (pedidos), RLS por membro, trigger de cadastro.

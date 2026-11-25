@@ -1,24 +1,32 @@
-import React, { useMemo } from 'react';
-import { MessageCircle } from 'lucide-react';
-import { cleanItems, itemsSummary, neighborhoodInfo, orderTotals } from './chefData.js';
+import React, { useMemo, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import { DELIVERY_ZONES, cleanItems, neighborhoodInfo, orderTotals } from './chefData.js';
 import { currency } from './domain.js';
 import './order.css';
 
-const NO_NEIGHBORHOOD = 'Sem bairro definido';
+const NO_NEIGHBORHOOD = 'Sem bairro';
+const zoneIndex = zone => {
+  const index = DELIVERY_ZONES.findIndex(item => item.zone === zone);
+  return index < 0 ? 99 : index;
+};
 
-export default function OrdersByNeighborhood({ leads, openLead, openWhatsApp }) {
-  const { groups, production, totals } = useMemo(() => {
-    const active = leads.filter(lead => lead.status !== 'Perdido' && (cleanItems(lead.items).length || lead.neighborhood));
+// Uma coluna ("torre") por bairro, com todos os pedidos que vão pra lá.
+export default function OrdersByNeighborhood({ leads, openLead, onMarkSent }) {
+  const [showSent, setShowSent] = useState(false);
+
+  const { towers, production, totals } = useMemo(() => {
+    const visible = leads.filter(lead => showSent || lead.status !== 'Enviado');
     const byNeighborhood = new Map();
     const byProduct = new Map();
     let all = 0;
-    active.forEach(lead => {
+
+    visible.forEach(lead => {
       const key = lead.neighborhood || NO_NEIGHBORHOOD;
       const order = orderTotals(lead.items, lead.neighborhood);
       if (!byNeighborhood.has(key)) byNeighborhood.set(key, { name: key, info: neighborhoodInfo(key), orders: [], total: 0 });
-      const group = byNeighborhood.get(key);
-      group.orders.push({ lead, ...order });
-      group.total += order.total;
+      const tower = byNeighborhood.get(key);
+      tower.orders.push({ lead, total: order.total });
+      tower.total += order.total;
       all += order.total;
       cleanItems(lead.items).forEach(item => {
         const row = byProduct.get(item.productId) || { name: item.name, qty: 0 };
@@ -26,19 +34,21 @@ export default function OrdersByNeighborhood({ leads, openLead, openWhatsApp }) 
         byProduct.set(item.productId, row);
       });
     });
-    const sorted = [...byNeighborhood.values()].sort((a, b) => b.orders.length - a.orders.length || a.name.localeCompare(b.name, 'pt-BR'));
+
+    const sorted = [...byNeighborhood.values()].sort((a, b) =>
+      zoneIndex(a.info?.zone) - zoneIndex(b.info?.zone) || a.name.localeCompare(b.name, 'pt-BR'));
     return {
-      groups: sorted,
+      towers: sorted,
       production: [...byProduct.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
-      totals: { orders: active.length, neighborhoods: sorted.length, value: all },
+      totals: { orders: visible.length, neighborhoods: sorted.length, value: all },
     };
-  }, [leads]);
+  }, [leads, showSent]);
 
   return (
-    <main className="main-content dashboard-page orders-page">
-      <header>
-        <h1>Pedidos por bairro</h1>
-        <p>Pedidos ativos (sem os perdidos), agrupados pelo bairro de entrega.</p>
+    <main className="main-content orders-page">
+      <header className="page-header">
+        <div><h1>Pedidos por bairro</h1><p>Cada coluna é um bairro, com todos os pedidos que vão pra lá.</p></div>
+        <label className="orders-toggle"><input type="checkbox" checked={showSent} onChange={event => setShowSent(event.target.checked)} /> Mostrar já enviados</label>
       </header>
 
       <div className="orders-kpis">
@@ -47,29 +57,31 @@ export default function OrdersByNeighborhood({ leads, openLead, openWhatsApp }) 
         <div><small>Total (itens + frete)</small><b>{currency(totals.value)}</b></div>
       </div>
 
-      {!groups.length && <p className="orders-empty">Nenhum pedido com bairro ou itens ainda. Crie um pedido e escolha o bairro e os produtos.</p>}
+      {!towers.length && <p className="orders-empty">Nenhum pedido {showSent ? '' : 'para enviar '}ainda.</p>}
 
-      <div className="orders-grid">
-        {groups.map(group => (
-          <section key={group.name} className="orders-card">
-            <div className="orders-card-head">
-              <h3>{group.name}</h3>
-              <small>{group.info ? `${group.info.zone} · frete ${currency(group.info.fee)}` : 'frete não definido'}</small>
+      <div className="orders-towers">
+        {towers.map(tower => (
+          <section key={tower.name} className="orders-tower">
+            <div className="orders-tower-head">
+              <h3>{tower.name}</h3>
+              <small>{tower.info ? `${tower.info.zone} · frete ${currency(tower.info.fee)}` : 'frete não definido'}</small>
+              <div className="orders-tower-sum"><span>{tower.orders.length} {tower.orders.length === 1 ? 'pedido' : 'pedidos'}</span><b>{currency(tower.total)}</b></div>
             </div>
-            <div className="orders-card-totals">
-              <span>{group.orders.length} {group.orders.length === 1 ? 'pedido' : 'pedidos'}</span>
-              <b>{currency(group.total)}</b>
-            </div>
-            <div className="orders-list">
-              {group.orders.map(({ lead, total }) => (
-                <div key={lead.id} className="orders-order" role="button" tabIndex={0} onClick={() => openLead(lead)} onKeyDown={event => { if (event.key === 'Enter') openLead(lead); }}>
+            <div className="orders-tower-body">
+              {tower.orders.map(({ lead, total }) => (
+                <article key={lead.id} className="orders-order" role="button" tabIndex={0} onClick={() => openLead(lead)} onKeyDown={event => { if (event.key === 'Enter') openLead(lead); }}>
                   <div><strong>{lead.name}</strong><b>{currency(total)}</b></div>
-                  <small>{itemsSummary(lead.items) || 'Sem itens'}</small>
-                  <div>
-                    <small>{lead.status}</small>
-                    <button type="button" className="icon-button" aria-label={`WhatsApp de ${lead.name}`} onClick={event => { event.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /></button>
+                  <ul className="orders-lines">
+                    {cleanItems(lead.items).map(item => <li key={item.productId}>{item.qty}× {item.name}</li>)}
+                  </ul>
+                  {lead.notes && <small className="orders-address">{lead.notes}</small>}
+                  <div className="orders-order-foot">
+                    <small>{lead.phone}</small>
+                    {lead.status === 'Enviado'
+                      ? <small className="orders-sent">Enviado</small>
+                      : <button type="button" className="orders-send" onClick={event => { event.stopPropagation(); onMarkSent(lead.id); }}><CheckCircle2 size={14} /> Enviado</button>}
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           </section>

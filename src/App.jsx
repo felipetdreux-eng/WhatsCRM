@@ -1,941 +1,271 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowLeft,
-  Building2,
-  CalendarClock,
-  CheckCircle2,
-  CircleDollarSign,
-  Filter,
-  LayoutDashboard,
-  ListFilter,
-  LogOut,
-  MapPin,
-  MessageCircle,
-  MessagesSquare,
-  MoreHorizontal,
-  Pencil,
-  Phone,
-  Plus,
-  Save,
-  Search,
-  Sparkles,
-  Settings,
-  Target,
-  UserRound,
-  UsersRound,
-  X,
-  XCircle,
-} from 'lucide-react';
-import Dashboard from './Dashboard';
-import CentralDoDia from './CentralDoDia';
-import AutopilotPage from './AutopilotPage';
-import FollowUps from './FollowUps';
-import LeadHistory from './LeadHistory';
-import Messages from './Messages';
-import SettingsPage from './SettingsPage';
-import GlobalQuickActions from './GlobalQuickActions';
-import LeadReplyAssistant from './LeadReplyAssistant';
-import InboxPage from './InboxPage';
+import { CheckCircle2, ClipboardList, LogOut, MapPin, MessageCircle, Plus, Search, Settings, Trash2, Undo2, UsersRound, X } from 'lucide-react';
 import OrderBuilder from './OrderBuilder';
 import OrdersByNeighborhood from './OrdersByNeighborhood';
-import { cleanItems, neighborhoodInfo, orderTotals } from './chefData';
+import SettingsPage from './SettingsPage';
+import { cleanItems, itemsSummary, orderTotals } from './chefData';
+import { canonicalPhone, currency, validBrazilPhone } from './domain';
 import { getActiveAccount, logoutAccount } from './accountStorage';
-import { loadWorkspaceContext, recordLeadActivity, syncLeads } from './backendBridge';
-import {
-  buildDemoLeads,
-  canonicalPhone,
-  currency,
-  dateKeyOffset,
-  localDateKey,
-  validBrazilPhone,
-  whatsappPhone,
-} from './domain';
+import { supabase } from './supabaseClient';
 import './styles.css';
 import './detail.css';
 import './account.css';
-import './followup.css';
-import './team-leads.css';
 import './usability.css';
+import './order.css';
 
 const ACTIVE_ACCOUNT = getActiveAccount();
-const CLOSED = ['Confirmado', 'Perdido'];
-const GOAL_LABELS = {
-  organize: 'Organizar leads',
-  followups: 'Follow-ups',
-  sales: 'Aumentar vendas',
-};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export const STATUS_PEDIDO = 'Pedido';
+export const STATUS_ENVIADO = 'Enviado';
 const STATUSES = [
-  { id: 'Novo pedido', className: 'new' },
-  { id: 'Em conversa', className: 'contacted' },
-  { id: 'Cardápio enviado', className: 'interested' },
-  { id: 'Orçamento enviado', className: 'proposal' },
-  { id: 'Aguardando confirmação', className: 'negotiation' },
-  { id: 'Confirmado', className: 'sold' },
-  { id: 'Perdido', className: 'lost' },
+  { id: STATUS_PEDIDO, className: 'new', title: 'Pedidos' },
+  { id: STATUS_ENVIADO, className: 'sold', title: 'Enviados' },
 ];
-
-const OPEN_STATUSES = STATUSES.filter(status => !CLOSED.includes(status.id));
-const ORIGINS = ['WhatsApp', 'Instagram', 'Indicação', 'Site', 'Outro'];
 const NAV_ITEMS = [
-  ['Início', CalendarClock],
-  ['Resultados', LayoutDashboard],
-  ['Pipeline', ListFilter],
-  ['Pedidos por bairro', MapPin],
-  ['Leads', UsersRound],
-  ['Inbox', MessageCircle],
-  ['Mensagens', MessagesSquare],
+  ['Pedidos', ClipboardList],
+  ['Por bairro', MapPin],
+  ['Clientes', UsersRound],
   ['Configurações', Settings],
 ];
+const EMPTY_FORM = { name: '', phone: '', notes: '', items: [], neighborhood: '', deliveryFee: 0, value: 0 };
 
-const EMPTY_FORM = {
-  name: '', company: '', phone: '', value: '', status: 'Novo pedido', origin: 'WhatsApp', assignedTo: '',
-  nextContact: '', nextContactTime: '', nextAction: '', notes: '',
-  items: [], neighborhood: '', deliveryFee: 0,
-};
-
-function initials(name) {
-  const parts = String(name || 'Usuário').trim().split(/\s+/).filter(Boolean);
-  return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || 'US').toUpperCase();
-}
-
-function formatDate(value, long = false) {
-  if (!value) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const date = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return '';
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  if (!long && date.toDateString() === today.toDateString()) return 'Hoje';
-  if (!long && date.toDateString() === tomorrow.toDateString()) return 'Amanhã';
-  return date.toLocaleDateString('pt-BR', long
-    ? { day: '2-digit', month: 'long', year: 'numeric' }
-    : { day: '2-digit', month: '2-digit' });
-}
-
-function statusTone(status) {
-  if (status === 'Em conversa') return 'blue';
-  if (status === 'Cardápio enviado') return 'purple';
-  if (status === 'Orçamento enviado') return 'red';
-  if (status === 'Aguardando confirmação') return 'purple';
-  if (status === 'Confirmado') return 'green';
-  if (status === 'Perdido') return 'red';
-  return 'neutral';
-}
-
-function migrateLead(rawLead) {
-  const lead = rawLead && typeof rawLead === 'object' ? rawLead : {};
-  const rawStatus = lead.status === "Vendido" ? 'Confirmado' : lead.status;
-  const status = STATUSES.some(item => item.id === rawStatus) ? rawStatus : 'Novo pedido';
-  const value = Number.isFinite(Number(lead.value)) ? Number(lead.value) : 0;
-  const hadSaleValue = Number.isFinite(Number(lead.saleValue)) && Number(lead.saleValue) > 0;
-  const assumedSaleValue = status === 'Confirmado' && !hadSaleValue && value > 0;
-  const migrated = {
+// Aceita pedidos salvos por versões anteriores: qualquer coisa que não seja "Enviado" volta a ser "Pedido".
+function migrateLead(raw) {
+  const lead = raw && typeof raw === 'object' ? raw : {};
+  const sent = lead.status === STATUS_ENVIADO || lead.status === 'Confirmado' || lead.status === 'Fechado';
+  const items = cleanItems(lead.items);
+  const totals = orderTotals(items, lead.neighborhood);
+  const value = items.length ? totals.total : (Number.isFinite(Number(lead.value)) ? Number(lead.value) : 0);
+  return {
     ...lead,
     id: lead.id || crypto.randomUUID(),
-    name: String(lead.name || 'Lead sem nome'),
+    name: String(lead.name || 'Cliente sem nome'),
     company: String(lead.company || ''),
     phone: canonicalPhone(lead.phone),
-    value,
-    status,
+    status: sent ? STATUS_ENVIADO : STATUS_PEDIDO,
     origin: lead.origin || 'Outro',
-    assignedTo: lead.assignedTo || null,
-    nextContact: lead.nextContact || '',
-    nextContactTime: lead.nextContactTime || '',
-    nextAction: lead.nextAction || '',
     notes: lead.notes || '',
-    items: cleanItems(lead.items),
+    items,
     neighborhood: lead.neighborhood || '',
-    deliveryFee: Number.isFinite(Number(lead.deliveryFee)) ? Number(lead.deliveryFee) : 0,
-    lastFollowupAt: lead.lastFollowupAt || null,
+    deliveryFee: items.length ? totals.fee : (Number(lead.deliveryFee) || 0),
+    value,
+    saleValue: sent ? value : null,
+    saleValueSource: sent ? 'confirmed' : null,
+    soldAt: sent ? (lead.soldAt || lead.updatedAt || null) : null,
+    lostAt: null,
     createdAt: lead.createdAt || null,
-    updatedAt: lead.updatedAt || lead.soldAt || lead.lostAt || lead.createdAt || null,
-    soldAt: status === 'Confirmado' ? (lead.soldAt || null) : null,
-    lostAt: status === 'Perdido' ? (lead.lostAt || null) : null,
-    saleValue: status === 'Confirmado' ? (hadSaleValue ? Number(lead.saleValue) : (value > 0 ? value : null)) : null,
-    saleValueSource: status === 'Confirmado'
-      ? (hadSaleValue ? (lead.saleValueSource || 'confirmed') : (assumedSaleValue ? 'legacy-potential' : 'missing'))
-      : null,
+    updatedAt: lead.updatedAt || lead.createdAt || null,
+  };
+}
+
+const migrateLeads = items => (Array.isArray(items) ? items.map(migrateLead) : []);
+const formatDate = iso => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
+const initials = name => String(name || 'U').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
+
+function OrderForm({ initial, submitLabel, onSubmit, onCancel, children }) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState('');
+
+  const submit = event => {
+    event.preventDefault();
+    if (!form.name.trim()) return setError('Informe o nome do cliente.');
+    if (!validBrazilPhone(form.phone)) return setError('Digite um WhatsApp brasileiro válido com DDD.');
+    if (!cleanItems(form.items).length) return setError('Escolha pelo menos um produto.');
+    if (!form.neighborhood) return setError('Escolha o bairro de entrega.');
+    setError('');
+    onSubmit(form);
   };
 
-  if (CLOSED.includes(status)) {
-    migrated.nextContact = '';
-    migrated.nextContactTime = '';
-    migrated.nextAction = '';
-  }
-  return migrated;
+  return (
+    <form onSubmit={submit} className="quick-lead-form">
+      <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: João Silva" /></label>
+      <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
+      <OrderBuilder items={form.items} neighborhood={form.neighborhood} onChange={order => setForm({ ...form, ...order })} />
+      <label className="full"><span>Endereço e observações</span><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Rua, número, complemento, ponto de referência..." /></label>
+      {error && <div className="auth-error full" role="alert">{error}</div>}
+      <div className="modal-actions full">
+        {children}
+        <button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button>
+        <button className="primary-button">{submitLabel}</button>
+      </div>
+    </form>
+  );
 }
 
-function migrateLeads(items) {
-  return (Array.isArray(items) ? items : []).map(migrateLead);
-}
-
-function applyStatusTransition(previous, draft, nextStatus, saleValue) {
-  const now = new Date().toISOString();
-  const changed = previous.status !== nextStatus;
-  const next = { ...previous, ...draft, status: nextStatus, updatedAt: now };
-
-  if (nextStatus === 'Confirmado') {
-    next.saleValue = Number(saleValue ?? draft.saleValue ?? previous.saleValue ?? 0);
-    next.saleValueSource = 'confirmed';
-    next.soldAt = previous.status === 'Confirmado' && previous.soldAt ? previous.soldAt : now;
-    next.lostAt = null;
-    next.nextContact = '';
-    next.nextContactTime = '';
-    next.nextAction = '';
-  } else if (nextStatus === 'Perdido') {
-    next.saleValue = null;
-    next.saleValueSource = null;
-    next.soldAt = null;
-    next.lostAt = previous.status === 'Perdido' && previous.lostAt ? previous.lostAt : now;
-    next.nextContact = '';
-    next.nextContactTime = '';
-    next.nextAction = '';
-  } else if (changed && CLOSED.includes(previous.status)) {
-    next.saleValue = null;
-    next.saleValueSource = null;
-    next.soldAt = null;
-    next.lostAt = null;
-  }
-  return next;
-}
-
-function interactionTemperature(lead) {
-  if (!lead || CLOSED.includes(lead.status)) return null;
-  const source = lead.lastFollowupAt || lead.updatedAt || lead.createdAt;
-  if (!source) return { tone: 'cooling', text: 'Sem interação registrada' };
-  const date = new Date(source);
-  if (Number.isNaN(date.getTime())) return null;
-  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
-  if (days <= 1) return { tone: 'hot', text: days === 0 ? 'Interação hoje' : 'Interação ontem' };
-  if (days <= 4) return { tone: 'cooling', text: `${days} dias sem interação` };
-  return { tone: 'cold', text: `${days} dias sem interação` };
-}
-
-export default function App({ demoMode = false, demoAccount = null, demoLeads = null, demoTeamMembers = [], demoWhatsAppPhone = '' }) {
+export default function App({ demoMode = false, demoAccount = null, demoLeads = null }) {
   const [account, setAccount] = useState(demoMode && demoAccount ? demoAccount : ACTIVE_ACCOUNT);
   const [leads, setLeads] = useState(() => {
     if (demoMode && Array.isArray(demoLeads)) return migrateLeads(demoLeads);
     try {
-      const saved = JSON.parse(localStorage.getItem('zapflow-leads'));
-      return migrateLeads(Array.isArray(saved) ? saved : buildDemoLeads());
+      return migrateLeads(JSON.parse(localStorage.getItem('zapflow-leads')));
     } catch {
-      return migrateLeads(buildDemoLeads());
+      return [];
     }
   });
-  const [teamMembers, setTeamMembers] = useState(demoMode ? demoTeamMembers : []);
+  const [activePage, setActivePage] = useState('Pedidos');
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Todos');
-  const [originFilter, setOriginFilter] = useState('Todas');
-  const [assigneeFilter, setAssigneeFilter] = useState('Todos');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [draggedId, setDraggedId] = useState(null);
-  const [selectedLeadId, setSelectedLeadId] = useState(null);
-  const [editingLead, setEditingLead] = useState(null);
-  const [activePage, setActivePage] = useState('Início');
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState('');
-  const [leadsPreset, setLeadsPreset] = useState(null);
-  const [undoAction, setUndoAction] = useState(null);
-  const [pendingSale, setPendingSale] = useState(null);
-  const [saleError, setSaleError] = useState('');
-  const [pendingLoss, setPendingLoss] = useState(null);
-  const [lossReason, setLossReason] = useState('');
-  const [pendingFollowup, setPendingFollowup] = useState(null);
-  const [followupForm, setFollowupForm] = useState({ date: '', time: '', action: 'Retornar contato' });
-  const [followupError, setFollowupError] = useState('');
-  const [replyAssistantSignal, setReplyAssistantSignal] = useState(0);
-  const [demoNotice, setDemoNotice] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState('');
 
+  // O backendBridge observa esta chave do localStorage e envia as mudanças pro Supabase.
   useEffect(() => {
     if (demoMode) return;
     localStorage.setItem('zapflow-leads', JSON.stringify(leads));
   }, [leads, demoMode]);
 
   useEffect(() => {
-    if (!undoAction) return undefined;
-    const timer = window.setTimeout(() => setUndoAction(null), 7000);
-    return () => window.clearTimeout(timer);
-  }, [undoAction]);
-
-  useEffect(() => {
     if (demoMode) return undefined;
     const handleRemoteLeads = event => {
-      const freshLeads = event?.detail?.leads;
-      if (!Array.isArray(freshLeads)) return;
-      setLeads(migrateLeads(freshLeads));
+      if (Array.isArray(event?.detail?.leads)) setLeads(migrateLeads(event.detail.leads));
     };
     window.addEventListener('zapflow:remote-leads', handleRemoteLeads);
     return () => window.removeEventListener('zapflow:remote-leads', handleRemoteLeads);
   }, [demoMode]);
 
   useEffect(() => {
-    let active = true;
-    if (demoMode) { setTeamMembers(demoTeamMembers); return undefined; }
-    if (!account?.id) return undefined;
-    loadWorkspaceContext(account.id)
-      .then(context => {
-        if (!active) return;
-        setTeamMembers(context?.members || []);
-      })
-      .catch(error => console.error('Team members load failed:', error));
-    return () => { active = false; };
-  }, [account?.id, demoMode]);
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
-  const handleTeamMembersChange = nextMembers => {
-    const safeMembers = Array.isArray(nextMembers) ? nextMembers : [];
-    setTeamMembers(safeMembers);
-    setAssigneeFilter(current => (
-      current === 'Todos' || safeMembers.some(member => member.user_id === current)
-        ? current
-        : 'Todos'
-    ));
-  };
-
-  const selectedLead = leads.find(lead => lead.id === selectedLeadId) || null;
   const accountName = account?.name || 'Usuário';
-  const accountGoal = GOAL_LABELS[account?.onboarding?.goal] || 'Plano gratuito';
-  const memberName = userId => teamMembers.find(member => member.user_id === userId)?.name || (userId === account?.id ? accountName : 'Sem responsável');
+  const editingLead = leads.find(lead => lead.id === editingId) || null;
 
-  const filteredLeads = useMemo(() => leads.filter(lead => {
-    const haystack = `${lead.name} ${lead.company} ${lead.phone} ${lead.origin} ${lead.status} ${lead.notes || ''} ${lead.nextAction || ''}`.toLowerCase();
-    return haystack.includes(query.trim().toLowerCase())
-      && (statusFilter === 'Todos' || lead.status === statusFilter)
-      && (originFilter === 'Todas' || lead.origin === originFilter)
-      && (assigneeFilter === 'Todos' || lead.assignedTo === assigneeFilter);
-  }), [leads, query, statusFilter, originFilter, assigneeFilter]);
+  const filtered = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    if (!search) return leads;
+    return leads.filter(lead => `${lead.name} ${lead.phone} ${lead.neighborhood} ${itemsSummary(lead.items)} ${lead.notes || ''}`.toLowerCase().includes(search));
+  }, [leads, query]);
 
-  const dueFollowups = leads.filter(lead => lead.nextContact && !CLOSED.includes(lead.status) && lead.nextContact <= localDateKey()).length;
-
-  const metrics = STATUSES.map(status => {
-    const items = filteredLeads.filter(lead => lead.status === status.id);
-    const amount = items.reduce((sum, lead) => sum + Number(status.id === 'Confirmado' ? lead.saleValue || 0 : lead.value || 0), 0);
-    return {
-      label: status.id,
-      value: items.length,
-      helper: status.id === 'Confirmado' ? `${currency(amount)} fechados` : `${currency(amount)} em valor`,
-      icon: status.id === 'Confirmado' ? CheckCircle2 : status.id === 'Perdido' ? XCircle : Target,
-      tone: statusTone(status.id),
-    };
-  });
-
-  const emitActivityRefresh = leadId => {
-    window.dispatchEvent(new CustomEvent('zapflow:activity-recorded', { detail: { leadId } }));
-  };
-
-  const logActivity = async (lead, kind, title, detail = '', metadata = {}) => {
-    if (demoMode) { emitActivityRefresh(lead?.id); return; }
-    if (!account?.id || !lead?.id) return;
-    try {
-      const item = await recordLeadActivity({ userId: account.id, leadId: lead.id, kind, title, detail, metadata });
-      if (item) emitActivityRefresh(lead.id);
-    } catch (activityError) {
-      console.error('Lead activity save failed:', activityError);
-    }
-  };
-
-  const isDuplicatePhone = (phone, exceptId = null) => {
-    const canonical = canonicalPhone(phone);
-    return leads.some(lead => lead.id !== exceptId && canonicalPhone(lead.phone) === canonical);
-  };
-
-  const openNewLead = (status = 'Novo pedido') => {
-    setForm({ ...EMPTY_FORM, status: OPEN_STATUSES.some(item => item.id === status) ? status : 'Novo pedido', assignedTo: account?.id || '' });
-    setFormError('');
-    setModalOpen(true);
-  };
-
-  const openWhatsApp = (lead, message = '', options = {}) => {
-    const currentLead = leads.find(item => item.id === lead.id) || lead;
-    if (!currentLead) return false;
-    const phone = whatsappPhone(demoMode && demoWhatsAppPhone ? demoWhatsAppPhone : lead?.phone);
-    if (!phone) return false;
-
-    if (demoMode) {
-      setDemoNotice('Modo demonstração: o WhatsApp real está bloqueado. A ação foi simulada dentro do Fuply.');
-      window.setTimeout(() => setDemoNotice(''), 4500);
-    } else {
-      const params = new URLSearchParams({ phone });
-      if (message) params.set('text', message);
-      window.open(`https://web.whatsapp.com/send?${params.toString()}`, '_blank', 'noopener,noreferrer');
-    }
-
+  const buildLead = (form, base = {}) => {
+    const items = cleanItems(form.items);
+    const totals = orderTotals(items, form.neighborhood);
     const now = new Date().toISOString();
-    setLeads(current => current.map(item => item.id === currentLead.id
-      ? { ...item, lastFollowupAt: now, updatedAt: now }
-      : item));
-    logActivity(
-      currentLead,
-      'whatsapp_opened',
-      'WhatsApp aberto',
-      message ? 'Conversa aberta com uma mensagem preparada pelo sistema.' : 'Conversa aberta pelo sistema. O envio da mensagem não é confirmado pelo WhatsApp.',
-      { hasMessage: Boolean(message), source: options?.source || 'app', preparedMessage: message ? String(message).slice(0, 1800) : '' },
-    );
-
-    if (!options?.skipFollowupPrompt && !CLOSED.includes(currentLead.status)) {
-      setPendingFollowup({ id: currentLead.id, name: currentLead.name });
-      setFollowupForm({
-        date: currentLead.nextContact || dateKeyOffset(1),
-        time: currentLead.nextContactTime || '',
-        action: currentLead.nextAction || 'Retornar contato',
-      });
-      setFollowupError('');
-    }
-    return true;
-  };
-
-  const scheduleOffset = days => {
-    setFollowupForm(current => ({ ...current, date: dateKeyOffset(days) }));
-  };
-
-  const savePostWhatsAppFollowup = event => {
-    event.preventDefault();
-    if (!pendingFollowup) return;
-    if (!followupForm.date || followupForm.date < localDateKey()) {
-      setFollowupError('Escolha hoje ou uma data futura.');
-      return;
-    }
-    const lead = leads.find(item => item.id === pendingFollowup.id);
-    if (!lead) {
-      setPendingFollowup(null);
-      return;
-    }
-    const now = new Date().toISOString();
-    const action = followupForm.action.trim() || 'Retornar contato';
-    setLeads(current => current.map(item => item.id === lead.id ? {
-      ...item,
-      nextContact: followupForm.date,
-      nextContactTime: followupForm.time,
-      nextAction: action,
+    return migrateLead({
+      ...base,
+      id: base.id || crypto.randomUUID(),
+      name: form.name.trim(),
+      phone: canonicalPhone(form.phone),
+      notes: form.notes || '',
+      items,
+      neighborhood: form.neighborhood,
+      deliveryFee: totals.fee,
+      value: totals.total,
+      origin: base.origin || 'WhatsApp',
+      status: base.status || STATUS_PEDIDO,
+      createdAt: base.createdAt || now,
       updatedAt: now,
-    } : item));
-    logActivity(
-      lead,
-      'followup_scheduled',
-      'Próximo contato agendado',
-      `${formatDate(followupForm.date, true)}${followupForm.time ? ` às ${followupForm.time}` : ''} · ${action}`,
-      { date: followupForm.date, time: followupForm.time, action },
-    );
-    setPendingFollowup(null);
-    setFollowupError('');
+    });
   };
 
-  const applyAutopilotOutcome = ({ leadId, outcome, label, status, nextDays = null, nextAction = '', saleValue = null }) => {
-    const previous = leads.find(lead => lead.id === leadId);
-    if (!previous) return false;
+  const addOrder = form => {
+    setLeads(current => [buildLead(form), ...current]);
+    setCreating(false);
+    setToast('Pedido criado.');
+  };
 
-    let resolvedStatus = status || previous.status;
-    if ((outcome === 'talked' || outcome === 'later') && previous.status === 'Novo pedido') resolvedStatus = 'Em conversa';
+  const saveOrder = form => {
+    setLeads(current => current.map(lead => lead.id === editingId ? buildLead(form, lead) : lead));
+    setEditingId(null);
+    setToast('Pedido salvo.');
+  };
 
-    const numericSaleValue = Number(saleValue ?? previous.value ?? 0);
-    if (resolvedStatus === 'Confirmado' && (!Number.isFinite(numericSaleValue) || numericSaleValue <= 0)) return false;
-
-    let next = applyStatusTransition(previous, {}, resolvedStatus, resolvedStatus === 'Confirmado' ? numericSaleValue : undefined);
+  const setStatus = (id, status) => {
     const now = new Date().toISOString();
-    next = { ...next, lastFollowupAt: now, updatedAt: now };
+    setLeads(current => current.map(lead => lead.id !== id ? lead : migrateLead({
+      ...lead,
+      status,
+      soldAt: status === STATUS_ENVIADO ? now : null,
+      updatedAt: now,
+    })));
+    setToast(status === STATUS_ENVIADO ? 'Pedido marcado como enviado.' : 'Pedido voltou para a fila.');
+  };
 
-    if (!CLOSED.includes(next.status)) {
-      const hasSuggestedDate = Number.isFinite(Number(nextDays));
-      next.nextContact = hasSuggestedDate ? dateKeyOffset(Number(nextDays)) : (next.nextContact || '');
-      next.nextContactTime = '';
-      next.nextAction = nextAction || next.nextAction || 'Retornar contato';
+  const deleteOrder = async lead => {
+    if (!window.confirm(`Excluir o pedido de ${lead.name}? Isso não pode ser desfeito.`)) return;
+    if (!demoMode && UUID.test(lead.id)) {
+      const { error } = await supabase.from('leads').delete().eq('id', lead.id);
+      if (error) {
+        console.error('Delete failed:', error);
+        setToast('Não foi possível excluir. Tente de novo.');
+        return;
+      }
     }
-
-    setLeads(current => current.map(lead => lead.id === leadId ? next : lead));
-
-    const statusDetail = resolvedStatus !== previous.status ? `Status: ${previous.status} → ${resolvedStatus}.` : '';
-    const scheduleDetail = next.nextContact
-      ? `Próximo contato: ${formatDate(next.nextContact, true)} · ${next.nextAction}.`
-      : CLOSED.includes(next.status) ? 'Aguardando confirmação encerrada e removida da fila de follow-up.' : '';
-    const detail = [statusDetail, scheduleDetail].filter(Boolean).join(' ');
-
-    logActivity(
-      previous,
-      'autopilot_outcome',
-      `Autopilot: ${label || 'resultado registrado'}`,
-      detail || 'Resultado do contato registrado pelo Autopilot.',
-      {
-        outcome,
-        from: previous.status,
-        to: resolvedStatus,
-        nextContact: next.nextContact || null,
-        nextAction: next.nextAction || null,
-        saleValue: resolvedStatus === 'Confirmado' ? numericSaleValue : null,
-      },
-    );
-    return true;
+    setLeads(current => current.filter(item => item.id !== lead.id));
+    setEditingId(null);
+    setToast('Pedido excluído.');
   };
 
   const handleLogout = () => {
-    if (demoMode) { window.location.reload(); return; }
-    if (!account?.id) return;
+    if (demoMode || !account?.id) { window.location.reload(); return; }
     logoutAccount(account.id);
     window.location.reload();
   };
 
-  const commitStatusChange = (id, status, saleValue, draft = {}) => {
-    const previous = leads.find(lead => lead.id === id);
-    if (!previous || previous.status === status) return;
-    const next = applyStatusTransition(previous, draft, status, saleValue);
-    setUndoAction({ id: Date.now(), message: `${previous.name}: ${previous.status} → ${status}`, lead: previous });
-    setLeads(current => current.map(lead => lead.id === id ? next : lead));
+  const customers = useMemo(() => {
+    const byPhone = new Map();
+    filtered.forEach(lead => {
+      const key = lead.phone || lead.id;
+      const row = byPhone.get(key) || { key, name: lead.name, phone: lead.phone, orders: 0, total: 0, last: '' };
+      row.orders += 1;
+      row.total += Number(lead.value || 0);
+      if ((lead.createdAt || '') >= row.last) { row.last = lead.createdAt || ''; row.name = lead.name; }
+      byPhone.set(key, row);
+    });
+    return [...byPhone.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [filtered]);
 
-    if (status === 'Confirmado') {
-      logActivity(previous, 'sale_closed', 'Venda fechada', `Valor final: ${currency(next.saleValue)}.`, { from: previous.status, saleValue: next.saleValue });
-    } else {
-      logActivity(previous, 'status_changed', `Status alterado para ${status}`, `Antes: ${previous.status}.`, { from: previous.status, to: status });
-    }
-  };
-
-  const requestStatusChange = (id, status) => {
-    const lead = leads.find(item => item.id === id);
-    if (!lead || lead.status === status) return;
-    if (status === 'Confirmado') {
-      setSaleError('');
-      setPendingSale({ id, name: lead.name, value: lead.saleValue ?? lead.value ?? '' });
-      return;
-    }
-    if (status === 'Perdido') {
-      setLossReason('');
-      setPendingLoss({ id, name: lead.name });
-      return;
-    }
-    commitStatusChange(id, status);
-  };
-
-  const onDrop = status => {
-    if (!draggedId) return;
-    const id = draggedId;
-    setDraggedId(null);
-    if (statusFilter !== 'Todos' && statusFilter !== status) setStatusFilter('Todos');
-    requestStatusChange(id, status);
-  };
-
-  const confirmSale = event => {
-    event.preventDefault();
-    if (!pendingSale) return;
-    const value = Number(pendingSale.value);
-    if (!Number.isFinite(value) || value <= 0) {
-      setSaleError('Informe o valor final da venda, maior que zero.');
-      return;
-    }
-    commitStatusChange(pendingSale.id, 'Confirmado', value);
-    setPendingSale(null);
-    setSaleError('');
-  };
-
-  const confirmLoss = event => {
-    event.preventDefault();
-    if (!pendingLoss) return;
-    const reason = lossReason.trim();
-    if (!reason) return;
-    const lead = leads.find(item => item.id === pendingLoss.id);
-    if (!lead) { setPendingLoss(null); return; }
-    const cleanNotes = String(lead.notes || '').replace(/(?:^|\n)Motivo da perda:.*(?:\n|$)/gi, '\n').trim();
-    const notes = [`Motivo da perda: ${reason}`, cleanNotes].filter(Boolean).join('\n\n');
-    commitStatusChange(pendingLoss.id, 'Perdido', undefined, { notes });
-    logActivity(lead, 'lead_lost', 'Lead marcado como perdido', `Motivo: ${reason}.`, { reason });
-    setPendingLoss(null);
-    setLossReason('');
-  };
-
-  const addLead = event => {
-    event.preventDefault();
-    setFormError('');
-    if (!form.name.trim()) return setFormError('Informe o nome do lead.');
-    if (!validBrazilPhone(form.phone)) return setFormError('Digite um WhatsApp brasileiro válido com DDD.');
-    if (isDuplicatePhone(form.phone)) return setFormError('Já existe um lead com esse WhatsApp.');
-    if (Number(form.value || 0) < 0) return setFormError('O valor potencial não pode ser negativo.');
-
-    const now = new Date().toISOString();
-    const order = orderTotals(form.items, form.neighborhood);
-    const next = {
-      id: crypto.randomUUID(),
-      ...form,
-      items: cleanItems(form.items),
-      deliveryFee: order.fee,
-      assignedTo: form.assignedTo || account?.id || null,
-      name: form.name.trim(),
-      company: form.company.trim(),
-      status: CLOSED.includes(form.status) ? 'Novo pedido' : form.status,
-      phone: canonicalPhone(form.phone),
-      value: order.itemCount ? order.total : Number(form.value || 0),
-      createdAt: now,
-      updatedAt: now,
-      lastFollowupAt: null,
-      soldAt: null,
-      lostAt: null,
-      saleValue: null,
-      saleValueSource: null,
-    };
-    setLeads(current => [next, ...current]);
-    setForm(EMPTY_FORM);
-    setFormError('');
-    setModalOpen(false);
-
-    if (account?.id && !demoMode) {
-      syncLeads([next], account.id)
-        .then(() => logActivity(next, 'lead_created', 'Lead criado', `${next.status} · ${next.origin || 'Outro'} · Responsável: ${memberName(next.assignedTo)}.`, { status: next.status, origin: next.origin, assignedTo: next.assignedTo }))
-        .catch(error => console.error('New lead initial sync failed:', error));
-    }
-  };
-
-  const openLead = lead => {
-    setSelectedLeadId(lead.id);
-    setEditingLead(null);
-    setFormError('');
-  };
-
-  const openReplyAssistant = lead => {
-    const target = lead || selectedLead;
-    if (!target) {
-      window.dispatchEvent(new CustomEvent('fuply:open-ai-selector'));
-      return;
-    }
-    setSelectedLeadId(target.id);
-    setEditingLead(null);
-    setFormError('');
-    setReplyAssistantSignal(signal => signal + 1);
-  };
-
-  const startEditing = () => {
-    if (!selectedLead) return;
-    setFormError('');
-    setEditingLead({ ...selectedLead, assignedTo: selectedLead.assignedTo || account?.id || '', value: selectedLead.value ?? '', saleValue: selectedLead.saleValue ?? '' });
-  };
-
-  const saveLead = event => {
-    event.preventDefault();
-    if (!editingLead || !selectedLead) return;
-    setFormError('');
-    if (!editingLead.name?.trim()) return setFormError('Informe o nome do lead.');
-    if (!validBrazilPhone(editingLead.phone)) return setFormError('Digite um WhatsApp brasileiro válido com DDD.');
-    if (isDuplicatePhone(editingLead.phone, editingLead.id)) return setFormError('Já existe outro lead com esse WhatsApp.');
-    if (Number(editingLead.value || 0) < 0) return setFormError('O valor potencial não pode ser negativo.');
-    if (editingLead.status === 'Confirmado' && Number(editingLead.saleValue) <= 0) return setFormError('Informe o valor final da venda.');
-
-    const previous = selectedLead;
-    const order = orderTotals(editingLead.items, editingLead.neighborhood);
-    const draft = {
-      ...editingLead,
-      items: cleanItems(editingLead.items),
-      deliveryFee: order.fee,
-      assignedTo: editingLead.assignedTo || account?.id || null,
-      name: editingLead.name.trim(),
-      company: String(editingLead.company || '').trim(),
-      phone: canonicalPhone(editingLead.phone),
-      value: order.itemCount ? order.total : Number(editingLead.value || 0),
-    };
-    const next = applyStatusTransition(previous, draft, draft.status, draft.saleValue);
-    setLeads(current => current.map(lead => lead.id === editingLead.id ? next : lead));
-
-    if (previous.status !== next.status) {
-      if (next.status === 'Confirmado') {
-        logActivity(previous, 'sale_closed', 'Venda fechada', `Valor final: ${currency(next.saleValue)}.`, { from: previous.status, saleValue: next.saleValue });
-      } else {
-        logActivity(previous, 'status_changed', `Status alterado para ${next.status}`, `Antes: ${previous.status}.`, { from: previous.status, to: next.status });
-      }
-    } else if (previous.assignedTo !== next.assignedTo) {
-      logActivity(previous, 'lead_reassigned', 'Responsável alterado', `${memberName(previous.assignedTo)} → ${memberName(next.assignedTo)}.`, { from: previous.assignedTo || null, to: next.assignedTo || null });
-    } else if (previous.nextContact !== next.nextContact || previous.nextContactTime !== next.nextContactTime || previous.nextAction !== next.nextAction) {
-      logActivity(previous, 'followup_scheduled', next.nextContact ? 'Próximo contato atualizado' : 'Próximo contato removido', next.nextContact ? `${formatDate(next.nextContact, true)}${next.nextContactTime ? ` às ${next.nextContactTime}` : ''} · ${next.nextAction || 'Retornar contato'}` : 'O lead ficou sem próximo contato marcado.');
-    } else {
-      logActivity(previous, 'lead_updated', 'Dados do lead atualizados', 'Informações da negociação foram editadas.');
-    }
-
-    setEditingLead(null);
-    setFormError('');
-  };
-
-  const setLeadStatus = status => {
-    if (!selectedLead) return;
-    requestStatusChange(selectedLead.id, status);
-    setEditingLead(null);
-  };
-
-  const navigate = label => {
-    if (label === 'Pipeline') {
-      setQuery('');
-      setStatusFilter('Todos');
-      setOriginFilter('Todas');
-      setAssigneeFilter('Todos');
-    }
-    setActivePage(label);
-    setSelectedLeadId(null);
-    setEditingLead(null);
-    setFormError('');
-    if (label !== 'Leads') setLeadsPreset(null);
-  };
-
-  const openLeadsView = (preset = {}) => {
-    setLeadsPreset({ ...preset, nonce: Date.now() });
-    setActivePage('Leads');
-    setSelectedLeadId(null);
-    setEditingLead(null);
-    setFormError('');
-  };
-
-  const openPipelineView = (status = 'Todos') => {
-    setQuery('');
-    setStatusFilter(status || 'Todos');
-    setOriginFilter('Todas');
-    setAssigneeFilter('Todos');
-    setActivePage('Pipeline');
-    setSelectedLeadId(null);
-    setEditingLead(null);
-    setFormError('');
-  };
-
-  const restoreUndo = () => {
-    if (!undoAction?.lead) return;
-    const previous = undoAction.lead;
-    setLeads(current => current.map(lead => lead.id === previous.id ? previous : lead));
-    setUndoAction(null);
-  };
-
-  const handleLeadActivity = (lead, kind, title, detail = '', metadata = {}) => {
-    logActivity(lead, kind, title, detail, metadata);
-  };
-
-  const renderSidebar = () => (
-    <aside className="sidebar">
-      <button type="button" className="logo-wrap logo-button" onClick={() => navigate('Início')} aria-label="Ir para Início">
-        <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
-        <span>Fuply</span>
-      </button>
-      <nav className="nav-list" aria-label="Navegação principal">
-        {NAV_ITEMS.map(([label, Icon]) => (
-          <button type="button" key={label} className={`nav-item ${!selectedLead && activePage === label ? 'active' : ''}`} onClick={() => navigate(label)} aria-current={!selectedLead && activePage === label ? 'page' : undefined}>
-            <Icon size={18} /><span>{label}</span>
-            {label === 'Leads' && dueFollowups > 0 && <b className="nav-badge" aria-label={`${dueFollowups} follow-ups pendentes`}>{dueFollowups}</b>}
-          </button>
-        ))}
-      </nav>
-      <div className="profile-card">
-        <div className="avatar" aria-hidden="true">{initials(accountName)}</div>
-        <div><strong>{accountName}</strong><span>Grátis · {accountGoal}</span></div>
-        <button type="button" className="profile-logout icon-button" onClick={handleLogout} title="Sair da conta" aria-label="Sair da conta"><LogOut size={16} /></button>
-      </div>
-    </aside>
-  );
-
-  const renderLeadDetail = () => {
-    if (!selectedLead) return null;
-    const temperature = interactionTemperature(selectedLead);
-
-    return (
-      <main className="main-content detail-content">
-        <div className="detail-topbar">
-          <button type="button" className="back-button" onClick={() => { setSelectedLeadId(null); setEditingLead(null); setFormError(''); }}>
-            <ArrowLeft size={18} /> Voltar
-          </button>
-          <div className="detail-top-actions">
-            <button type="button" className="ai-top-button" onClick={() => openReplyAssistant(selectedLead)}><Sparkles size={17} /> Responder com IA</button>
-            <button type="button" className="secondary-button detail-top-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir WhatsApp</button>
-          </div>
-        </div>
-
-        <section className="detail-hero">
-          <div className="detail-avatar" aria-hidden="true">{selectedLead.name.slice(0, 2).toUpperCase()}</div>
-          <div className="detail-title">
-            <div className="detail-title-line">
-              <h1>{selectedLead.name}</h1>
-              <span className={`detail-status status-${selectedLead.status.toLowerCase().replaceAll(' ', '-')}`}>{selectedLead.status}</span>
-              {temperature && <span className={`lead-temperature ${temperature.tone}`}>{temperature.text}</span>}
-            </div>
-            <p>{selectedLead.company || 'Sem empresa informada'}</p>
-          </div>
-          <div className="detail-value">
-            <span>{selectedLead.status === 'Confirmado' ? 'Valor fechado' : 'Valor potencial'}</span>
-            <strong>{currency(selectedLead.status === 'Confirmado' ? selectedLead.saleValue : selectedLead.value)}</strong>
-          </div>
-        </section>
-
-        <LeadReplyAssistant lead={selectedLead} openWhatsApp={openWhatsApp} openSignal={replyAssistantSignal} />
-
-        {editingLead ? (
-          <form className="detail-grid inline-detail-edit" onSubmit={saveLead}>
-            <div className="detail-main-column">
-              <section className="detail-card info-edit-card">
-                <div className="section-heading inline-section-heading">
-                  <div><h2>Informações</h2><p>Edite os dados diretamente aqui.</p></div>
-                  <div className="inline-edit-actions">
-                    <button type="button" className="secondary-button" onClick={() => { setEditingLead(null); setFormError(''); }}>Cancelar</button>
-                    <button className="primary-button"><Save size={16} /> Salvar</button>
-                  </div>
-                </div>
-                <div className="info-grid editable-info-grid">
-                  <label className="info-item info-edit-item"><UserRound size={18} /><div><span>Nome</span><input required value={editingLead.name} onChange={e => setEditingLead({ ...editingLead, name: e.target.value })} /></div></label>
-                  <label className="info-item info-edit-item"><Building2 size={18} /><div><span>Empresa</span><input value={editingLead.company || ''} onChange={e => setEditingLead({ ...editingLead, company: e.target.value })} placeholder="Não informado" /></div></label>
-                  <label className="info-item info-edit-item"><Phone size={18} /><div><span>WhatsApp</span><input required inputMode="tel" value={editingLead.phone} onChange={e => setEditingLead({ ...editingLead, phone: e.target.value })} /></div></label>
-                  <label className="info-item info-edit-item"><CircleDollarSign size={18} /><div><span>Valor potencial</span><input type="number" min="0" step="0.01" value={editingLead.value} onChange={e => setEditingLead({ ...editingLead, value: e.target.value })} /></div></label>
-                  <label className="info-item info-edit-item"><Target size={18} /><div><span>Status</span><select value={editingLead.status} onChange={e => setEditingLead({ ...editingLead, status: e.target.value })}>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></div></label>
-                  {editingLead.status === 'Confirmado' && <label className="info-item info-edit-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><input type="number" min="0.01" step="0.01" value={editingLead.saleValue} onChange={e => setEditingLead({ ...editingLead, saleValue: e.target.value })} /></div></label>}
-                  <label className="info-item info-edit-item"><MapPin size={18} /><div><span>Origem</span><select value={editingLead.origin || 'Outro'} onChange={e => setEditingLead({ ...editingLead, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></div></label>
-                  <label className="info-item info-edit-item"><UsersRound size={18} /><div><span>Responsável</span><select value={editingLead.assignedTo || account?.id || ''} onChange={e => setEditingLead({ ...editingLead, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></div></label>
-                  <OrderBuilder items={editingLead.items} neighborhood={editingLead.neighborhood} onChange={order => setEditingLead({ ...editingLead, ...order })} />
-                </div>
-                {formError && <div className="auth-error inline-edit-error" role="alert">{formError}</div>}
-              </section>
-
-              <section className="detail-card">
-                <div className="section-heading"><div><h2>Observações</h2><p>Contexto importante da conversa.</p></div></div>
-                <textarea className="inline-notes-editor" value={editingLead.notes || ''} onChange={e => setEditingLead({ ...editingLead, notes: e.target.value })} placeholder="Adicione observações sobre este lead..." />
-              </section>
-
-              <LeadHistory userId={account?.id} leadId={selectedLead.id} demoMode={demoMode} />
-            </div>
-
-            <aside className="detail-side-column">
-              <section className="detail-card next-action-card">
-                <div className="section-heading"><div><h2>Próxima ação</h2><p>Edite o próximo passo sem sair desta tela.</p></div></div>
-                <div className="inline-next-form">
-                  <label><span>Data</span><input type="date" min={localDateKey()} value={editingLead.nextContact || ''} onChange={e => setEditingLead({ ...editingLead, nextContact: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
-                  <label><span>Horário</span><input type="time" value={editingLead.nextContactTime || ''} onChange={e => setEditingLead({ ...editingLead, nextContactTime: e.target.value })} disabled={CLOSED.includes(editingLead.status)} /></label>
-                  <label className="full"><span>Ação</span><input value={editingLead.nextAction || ''} onChange={e => setEditingLead({ ...editingLead, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" disabled={CLOSED.includes(editingLead.status)} /></label>
-                  {CLOSED.includes(editingLead.status) && <small>Leads fechados ou perdidos não precisam de próximo contato.</small>}
-                </div>
-              </section>
-
-              <section className="detail-card">
-                <div className="section-heading"><div><h2>Ações</h2><p>Salve antes de avançar a negociação.</p></div></div>
-                <div className="detail-actions-stack">
-                  <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
-                  <button type="submit" className="detail-action sold-action"><Save size={17} /> Salvar alterações</button>
-                  <button type="button" className="detail-action" onClick={() => { setEditingLead(null); setFormError(''); }}><X size={17} /> Cancelar edição</button>
-                </div>
-              </section>
-            </aside>
-          </form>
-        ) : (
-          <div className="detail-grid">
-            <div className="detail-main-column">
-              <section className="detail-card">
-                <div className="section-heading">
-                  <div><h2>Informações</h2><p>Dados principais deste lead.</p></div>
-                  <button type="button" className="secondary-button" onClick={startEditing}><Pencil size={16} /> Editar</button>
-                </div>
-                <div className="info-grid">
-                  <div className="info-item"><UserRound size={18} /><div><span>Nome</span><strong>{selectedLead.name}</strong></div></div>
-                  <div className="info-item"><Building2 size={18} /><div><span>Empresa</span><strong>{selectedLead.company || 'Não informado'}</strong></div></div>
-                  <div className="info-item"><Phone size={18} /><div><span>WhatsApp</span><strong>{selectedLead.phone}</strong></div></div>
-                  <div className="info-item"><CircleDollarSign size={18} /><div><span>Valor potencial</span><strong>{currency(selectedLead.value)}</strong></div></div>
-                  {selectedLead.status === 'Confirmado' && <div className="info-item"><CheckCircle2 size={18} /><div><span>Valor fechado</span><strong>{currency(selectedLead.saleValue)}</strong></div></div>}
-                  <div className="info-item"><Target size={18} /><div><span>Status</span><strong>{selectedLead.status}</strong></div></div>
-                  <div className="info-item"><MapPin size={18} /><div><span>Origem</span><strong>{selectedLead.origin || 'Não informado'}</strong></div></div>
-                  <div className="info-item"><UsersRound size={18} /><div><span>Responsável</span><strong>{memberName(selectedLead.assignedTo)}</strong></div></div>
-                  <div className="info-item"><MapPin size={18} /><div><span>Bairro de entrega</span><strong>{selectedLead.neighborhood || 'Não informado'}</strong></div></div>
-                </div>
-              </section>
-
-              {cleanItems(selectedLead.items).length > 0 && (() => {
-                const order = orderTotals(selectedLead.items, selectedLead.neighborhood);
-                return (
-                  <section className="detail-card">
-                    <div className="section-heading"><div><h2>Pedido</h2><p>O que o cliente comprou.</p></div></div>
-                    <div className="order-detail">
-                      <div className="order-lines">
-                        {cleanItems(selectedLead.items).map(item => <div key={item.productId}>{item.qty}× {item.name} · {currency(item.price * item.qty)}</div>)}
-                      </div>
-                      <div>Itens {currency(order.subtotal)} · Frete {currency(order.fee)}{neighborhoodInfo(selectedLead.neighborhood) ? ` (${selectedLead.neighborhood})` : ''} · <strong>Total {currency(order.total)}</strong></div>
-                    </div>
-                  </section>
-                );
-              })()}
-
-              <section className="detail-card">
-                <div className="section-heading"><div><h2>Observações</h2><p>Contexto importante da conversa.</p></div></div>
-                <div className="notes-box">{selectedLead.notes || 'Nenhuma observação adicionada ainda.'}</div>
-              </section>
-
-
-              <LeadHistory userId={account?.id} leadId={selectedLead.id} />
-            </div>
-
-            <aside className="detail-side-column">
-              <section className="detail-card next-action-card">
-                <div className="section-heading"><div><h2>Próxima ação</h2><p>O que precisa acontecer depois.</p></div></div>
-                {selectedLead.nextContact ? (
-                  <div className="action-schedule">
-                    <div className="action-date-icon"><CalendarClock size={21} /></div>
-                    <div>
-                      <strong>{formatDate(selectedLead.nextContact, true)}{selectedLead.nextContactTime ? ` às ${selectedLead.nextContactTime}` : ''}</strong>
-                      <span>{selectedLead.nextAction || 'Retornar contato'}</span>
-                    </div>
-                  </div>
-                ) : <div className="no-action">Nenhum próximo contato programado.</div>}
-              </section>
-
-              <section className="detail-card">
-                <div className="section-heading"><div><h2>Ações</h2><p>Atalhos para avançar a negociação.</p></div></div>
-                <div className="detail-actions-stack">
-                  <button type="button" className="detail-whatsapp" onClick={() => openWhatsApp(selectedLead)}><MessageCircle size={17} /> Abrir conversa no WhatsApp</button>
-                  <button type="button" className="detail-action ai-action" onClick={() => openReplyAssistant(selectedLead)}><Sparkles size={17} /> Responder com IA</button>
-                  {selectedLead.status !== 'Confirmado' && <button type="button" className="detail-action sold-action" onClick={() => setLeadStatus('Confirmado')}><CheckCircle2 size={17} /> Marcar como fechado</button>}
-                  {selectedLead.status !== 'Perdido' && <button type="button" className="detail-action lost-action" onClick={() => setLeadStatus('Perdido')}><XCircle size={17} /> Marcar como perdido</button>}
-                  <button type="button" className="detail-action" onClick={startEditing}><Pencil size={17} /> Editar cliente</button>
-                </div>
-              </section>
-            </aside>
-          </div>
-        )}
-      </main>
-    );
-  };
-
-  const renderPipeline = () => (
+  const renderOrders = () => (
     <main className="main-content">
       <header className="page-header">
-        <div><h1>Pipeline</h1><p>Organize seus clientes e não perca follow-ups.</p></div>
+        <div><h1>Pedidos</h1><p>Marque como enviado quando o pedido sair.</p></div>
         <div className="header-actions">
-          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar clientes</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar clientes" /></label>
-          <label className="filter-control"><Filter size={16} /><span className="sr-only">Filtrar por status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrar por status"><option>Todos</option>{STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
-          <label className="filter-control hide-tablet"><span className="sr-only">Filtrar por origem</span><select value={originFilter} onChange={e => setOriginFilter(e.target.value)} aria-label="Filtrar por origem"><option>Todas</option>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
-          {teamMembers.length > 1 && <label className="filter-control team-filter"><UsersRound size={16} /><span className="sr-only">Filtrar por responsável</span><select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} aria-label="Filtrar por responsável"><option value="Todos">Todos da equipe</option>{teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.user_id === account?.id ? 'Meus leads' : member.name}</option>)}</select></label>}
-          <button type="button" className="primary-button" onClick={() => openNewLead()}><Plus size={18} /> Novo pedido</button>
+          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar pedidos</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar pedido" aria-label="Buscar pedidos" /></label>
+          <button type="button" className="primary-button" onClick={() => setCreating(true)}><Plus size={18} /> Novo pedido</button>
         </div>
       </header>
 
-      <section className="metrics-grid" aria-label="Resumo do pipeline">
-        {metrics.map(metric => {
-          const Icon = metric.icon;
-          return <article className="metric-card" key={metric.label}>
-            <div className={`metric-icon ${metric.tone}`}><Icon size={18} /></div>
-            <div className="metric-copy"><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.helper}</small></div>
-          </article>;
+      <section className="metrics-grid" aria-label="Resumo">
+        {STATUSES.map(status => {
+          const list = filtered.filter(lead => lead.status === status.id);
+          const amount = list.reduce((sum, lead) => sum + Number(lead.value || 0), 0);
+          return (
+            <article className="metric-card" key={status.id}>
+              <div className={`metric-icon ${status.id === STATUS_ENVIADO ? 'success' : 'neutral'}`}>{status.id === STATUS_ENVIADO ? <CheckCircle2 size={18} /> : <ClipboardList size={18} />}</div>
+              <div className="metric-copy"><span>{status.title}</span><strong>{list.length}</strong><small>{currency(amount)}</small></div>
+            </article>
+          );
         })}
       </section>
 
-      <section className="pipeline-scroll" aria-label="Etapas do pipeline">
+      <section className="pipeline-scroll" aria-label="Pedidos">
         <div className="pipeline-board">
           {STATUSES.map(status => {
-            const columnLeads = filteredLeads.filter(lead => lead.status === status.id);
+            const list = filtered.filter(lead => lead.status === status.id);
             return (
-              <section className={`pipeline-column ${status.className}`} key={status.id} onDragOver={e => e.preventDefault()} onDrop={() => onDrop(status.id)}>
-                <div className="column-header"><div><span className="status-dot" /><strong>{status.id}</strong></div><span className="count-pill">{columnLeads.length}</span></div>
+              <section className={`pipeline-column ${status.className}`} key={status.id}>
+                <div className="column-header"><div><span className="status-dot" /><strong>{status.title}</strong></div><span className="count-pill">{list.length}</span></div>
                 <div className="column-body">
-                  {columnLeads.map(lead => (
-                    <article className="lead-card" key={lead.id} draggable onDragStart={() => setDraggedId(lead.id)} onDragEnd={() => setDraggedId(null)} onClick={() => openLead(lead)}>
-                      <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.company || 'Sem empresa'}</span></div><button type="button" className="icon-button" aria-label={`Abrir ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button></div>
-                      <b className="lead-value">{currency(status.id === 'Confirmado' ? lead.saleValue : lead.value)}</b>
-                      {teamMembers.length > 1 && <div className="lead-assignee"><UserRound size={13} /><span>{memberName(lead.assignedTo)}</span></div>}
-                      <label className="mobile-status-control" onClick={e => e.stopPropagation()}>
-                        <span>Status</span>
-                        <select value={lead.status} onChange={e => requestStatusChange(lead.id, e.target.value)} aria-label={`Alterar status de ${lead.name}`}>
-                          {STATUSES.map(option => <option key={option.id}>{option.id}</option>)}
-                        </select>
-                      </label>
-                      {lead.nextContact ? <div className="next-contact"><CalendarClock size={14} /> Próximo contato: {formatDate(lead.nextContact)}</div> : <div className={`lead-tag ${status.id === 'Confirmado' ? 'success' : status.id === 'Perdido' ? 'danger' : ''}`}>{status.id === 'Confirmado' ? 'Venda fechada' : status.id === 'Perdido' ? (lead.notes || 'Aguardando confirmação encerrada') : 'Sem próximo contato'}</div>}
+                  {list.map(lead => (
+                    <article className="lead-card" key={lead.id} onClick={() => setEditingId(lead.id)}>
+                      <div className="lead-heading"><div><strong>{lead.name}</strong><span>{lead.neighborhood || 'Sem bairro'}</span></div></div>
+                      <small className="order-card-items">{itemsSummary(lead.items) || 'Sem itens'}</small>
+                      <b className="lead-value">{currency(lead.value)}</b>
                       <div className="lead-actions">
-                        <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); openWhatsApp(lead); }}><MessageCircle size={16} /> Abrir WhatsApp</button>
-                        <button type="button" className="icon-button" aria-label={`Ver detalhes de ${lead.name}`} onClick={e => { e.stopPropagation(); openLead(lead); }}><MoreHorizontal size={18} /></button>
+                        {lead.status === STATUS_PEDIDO
+                          ? <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_ENVIADO); }}><CheckCircle2 size={16} /> Marcar como enviado</button>
+                          : <button type="button" className="secondary-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_PEDIDO); }}><Undo2 size={16} /> Voltar pra fila</button>}
                       </div>
                     </article>
                   ))}
-                  {columnLeads.length === 0 && <div className="empty-column">Nenhum lead nesta etapa</div>}
+                  {list.length === 0 && <div className="empty-column">Nenhum pedido aqui</div>}
                 </div>
-                {!CLOSED.includes(status.id) && <button type="button" className="add-column-lead" onClick={() => openNewLead(status.id)}><Plus size={15} /> Adicionar lead</button>}
+                {status.id === STATUS_PEDIDO && <button type="button" className="add-column-lead" onClick={() => setCreating(true)}><Plus size={15} /> Novo pedido</button>}
               </section>
             );
           })}
@@ -944,101 +274,79 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     </main>
   );
 
-  const renderActivePage = () => {
-    if (selectedLead) return renderLeadDetail();
-    if (activePage === 'Resultados') return <Dashboard leads={leads} goPipeline={openPipelineView} goLeads={openLeadsView} memberName={memberName} />;
-    if (activePage === 'Início') return <CentralDoDia leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onNewLead={() => openNewLead()} goPipeline={() => openPipelineView()} goFollowUps={openLeadsView} goAutopilot={() => setActivePage('Autopilot 2.0')} onReplyWithAI={openReplyAssistant} />;
-    if (activePage === 'Pedidos por bairro') return <OrdersByNeighborhood leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} />;
-    if (activePage === 'Autopilot 2.0') return <AutopilotPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onAutopilotOutcome={applyAutopilotOutcome} />;
-    if (activePage === 'Leads') return <FollowUps leads={leads} setLeads={setLeads} openLead={openLead} openWhatsApp={openWhatsApp} updateLeadStatus={requestStatusChange} onNewLead={() => openNewLead()} onActivity={handleLeadActivity} preset={leadsPreset} demoMode={demoMode} memberName={memberName} teamMembers={teamMembers} />;
-    if (activePage === 'Inbox') return <InboxPage leads={leads} openLead={openLead} openWhatsApp={openWhatsApp} onReplyWithAI={openReplyAssistant} onStatusChange={requestStatusChange} demoMode={demoMode} />;
-    if (activePage === 'Mensagens') return <Messages leads={leads} openWhatsApp={openWhatsApp} userId={account?.id} demoMode={demoMode} />;
-    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} onTeamMembersChange={handleTeamMembersChange} demoMode={demoMode} />;
-    return renderPipeline();
+  const renderCustomers = () => (
+    <main className="main-content">
+      <header className="page-header">
+        <div><h1>Clientes</h1><p>Quem já pediu, quantos pedidos e quanto gastou.</p></div>
+        <div className="header-actions">
+          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar clientes</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar clientes" /></label>
+        </div>
+      </header>
+      <section className="orders-production">
+        {customers.length === 0 ? <p className="orders-empty">Nenhum cliente ainda.</p> : (
+          <table>
+            <thead><tr><th align="left">Cliente</th><th align="left">WhatsApp</th><th align="right">Pedidos</th><th align="right">Total</th></tr></thead>
+            <tbody>
+              {customers.map(row => <tr key={row.key}><td>{row.name}</td><td>{row.phone}</td><td align="right">{row.orders}</td><td align="right">{currency(row.total)}</td></tr>)}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </main>
+  );
+
+  const renderPage = () => {
+    if (activePage === 'Por bairro') return <OrdersByNeighborhood leads={leads} openLead={lead => setEditingId(lead.id)} onMarkSent={id => setStatus(id, STATUS_ENVIADO)} />;
+    if (activePage === 'Clientes') return renderCustomers();
+    if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
+    return renderOrders();
   };
 
   return (
     <div className="app-shell">
-      {renderSidebar()}
+      <aside className="sidebar">
+        <button type="button" className="logo-wrap logo-button" onClick={() => setActivePage('Pedidos')} aria-label="Ir para Pedidos">
+          <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
+          <span>Fuply</span>
+        </button>
+        <nav className="nav-list" aria-label="Navegação principal">
+          {NAV_ITEMS.map(([label, Icon]) => (
+            <button type="button" key={label} className={`nav-item ${activePage === label ? 'active' : ''}`} onClick={() => setActivePage(label)} aria-current={activePage === label ? 'page' : undefined}>
+              <Icon size={18} /><span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="profile-card">
+          <div className="avatar" aria-hidden="true">{initials(accountName)}</div>
+          <div><strong>{accountName}</strong></div>
+          <button type="button" className="profile-logout icon-button" onClick={handleLogout} title="Sair da conta" aria-label="Sair da conta"><LogOut size={16} /></button>
+        </div>
+      </aside>
       <button type="button" className="mobile-logout" onClick={handleLogout} aria-label="Sair da conta" title="Sair"><LogOut size={16} /></button>
-      {renderActivePage()}
 
-      <GlobalQuickActions leads={leads} onNewLead={() => openNewLead()} onNavigate={navigate} onOpenLead={openLead} onOpenLeads={openLeadsView} onReplyWithAI={openReplyAssistant} />
-      {undoAction && <div className="undo-toast" role="status"><span>{undoAction.message}</span><button type="button" onClick={restoreUndo}>Desfazer</button></div>}
-      {demoNotice && <div className="undo-toast" role="status"><span>{demoNotice}</span></div>}
+      {renderPage()}
 
-      {modalOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setModalOpen(false)}>
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-lead-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="new-lead-title">Novo pedido</h2><p>Escolha o bairro e o que o cliente comprou.</p></div><button type="button" className="icon-button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X size={20} /></button></div>
-            <form onSubmit={addLead} className="quick-lead-form">
-              <label><span>Nome *</span><input required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex.: João Silva" /></label>
-              <label><span>WhatsApp *</span><input required inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="21999999999" /></label>
-              <OrderBuilder items={form.items} neighborhood={form.neighborhood} onChange={order => setForm({ ...form, ...order })} />
-              <details className="quick-lead-details">
-                <summary>Mais detalhes (opcional)</summary>
-                <div className="quick-lead-details-grid">
-                  <label><span>Empresa</span><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Ex.: Sua Obra Engenharia" /></label>
-                  <label><span>Valor potencial</span><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="10000" /></label>
-                  <label><span>Status</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{OPEN_STATUSES.map(status => <option key={status.id}>{status.id}</option>)}</select></label>
-                  <label><span>Origem</span><select value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })}>{ORIGINS.map(origin => <option key={origin}>{origin}</option>)}</select></label>
-                  <label><span>Responsável</span><select value={form.assignedTo || account?.id || ''} onChange={e => setForm({ ...form, assignedTo: e.target.value })}>{teamMembers.length ? teamMembers.map(member => <option key={member.user_id} value={member.user_id}>{member.name}{member.user_id === account?.id ? ' (você)' : ''}</option>) : <option value={account?.id || ''}>{accountName}</option>}</select></label>
-                  <label><span>Próximo contato</span><input type="date" min={localDateKey()} value={form.nextContact} onChange={e => setForm({ ...form, nextContact: e.target.value })} /></label>
-                  <label><span>Horário</span><input type="time" value={form.nextContactTime} onChange={e => setForm({ ...form, nextContactTime: e.target.value })} /></label>
-                  <label><span>Próxima ação</span><input value={form.nextAction} onChange={e => setForm({ ...form, nextAction: e.target.value })} placeholder="Ex.: Mandar proposta" /></label>
-                  <label className="full"><span>Observações</span><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Contexto da conversa..." /></label>
-                </div>
-              </details>
-              {formError && <div className="auth-error full" role="alert">{formError}</div>}
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setModalOpen(false); setFormError(''); }}>Cancelar</button><button className="primary-button"><Plus size={16} /> Adicionar pedido</button></div>
-            </form>
+      {toast && <div className="undo-toast" role="status"><span>{toast}</span></div>}
+
+      {creating && (
+        <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header"><div><h2 id="new-order-title">Novo pedido</h2><p>Escolha o bairro e o que o cliente comprou.</p></div><button type="button" className="icon-button" onClick={() => setCreating(false)} aria-label="Fechar"><X size={20} /></button></div>
+            <OrderForm initial={EMPTY_FORM} submitLabel="Adicionar pedido" onSubmit={addOrder} onCancel={() => setCreating(false)} />
           </section>
         </div>
       )}
 
-      {pendingFollowup && (
-        <div className="modal-backdrop" onMouseDown={() => setPendingFollowup(null)}>
-          <section className="modal followup-modal" role="dialog" aria-modal="true" aria-labelledby="followup-modal-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="followup-modal-title">Quando falar com {pendingFollowup.name} de novo?</h2><p>O WhatsApp foi aberto. Marque o próximo passo antes que essa venda suma da memória.</p></div><button type="button" className="icon-button" onClick={() => setPendingFollowup(null)} aria-label="Fechar"><X size={20} /></button></div>
-            <div className="followup-intro"><div className="followup-intro-icon"><MessageCircle size={17} /></div><div><strong>Contato registrado</strong><span>Registramos apenas que o WhatsApp foi aberto. Não afirmamos que a mensagem foi enviada ou lida.</span></div></div>
-            <div className="followup-quick" aria-label="Atalhos de data">
-              <button type="button" className={followupForm.date === dateKeyOffset(1) ? 'active' : ''} onClick={() => scheduleOffset(1)}>Amanhã</button>
-              <button type="button" className={followupForm.date === dateKeyOffset(3) ? 'active' : ''} onClick={() => scheduleOffset(3)}>+3 dias</button>
-              <button type="button" className={followupForm.date === dateKeyOffset(7) ? 'active' : ''} onClick={() => scheduleOffset(7)}>+7 dias</button>
-            </div>
-            <form className="lead-form" onSubmit={savePostWhatsAppFollowup}>
-              <label><span>Data *</span><input required type="date" min={localDateKey()} value={followupForm.date} onChange={e => setFollowupForm({ ...followupForm, date: e.target.value })} /></label>
-              <label><span>Horário</span><input type="time" value={followupForm.time} onChange={e => setFollowupForm({ ...followupForm, time: e.target.value })} /></label>
-              <label className="full"><span>Próxima ação</span><input value={followupForm.action} onChange={e => setFollowupForm({ ...followupForm, action: e.target.value })} placeholder="Ex.: Cobrar retorno da proposta" /></label>
-              <p className="followup-note full">Se não precisar de outro contato, use “Agora não”. O registro de que você abriu o WhatsApp continua no histórico.</p>
-              {followupError && <div className="auth-error full" role="alert">{followupError}</div>}
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => setPendingFollowup(null)}>Agora não</button><button className="primary-button"><CalendarClock size={16} /> Agendar próximo contato</button></div>
-            </form>
-          </section>
-        </div>
-      )}
-
-      {pendingSale && (
-        <div className="modal-backdrop" onMouseDown={() => { setPendingSale(null); setSaleError(''); }}>
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="sale-modal-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="sale-modal-title">Fechar venda</h2><p>{pendingSale.name} · registre o valor que realmente foi fechado.</p></div><button type="button" className="icon-button" onClick={() => { setPendingSale(null); setSaleError(''); }} aria-label="Fechar"><X size={20} /></button></div>
-            <form className="lead-form" onSubmit={confirmSale}>
-              <label className="full"><span>Valor fechado *</span><input autoFocus type="number" min="0.01" step="0.01" value={pendingSale.value} onChange={e => setPendingSale({ ...pendingSale, value: e.target.value })} /></label>
-              {saleError && <div className="auth-error full" role="alert">{saleError}</div>}
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setPendingSale(null); setSaleError(''); }}>Cancelar</button><button className="primary-button"><CheckCircle2 size={16} /> Confirmar venda</button></div>
-            </form>
-          </section>
-        </div>
-      )}
-
-      {pendingLoss && (
-        <div className="modal-backdrop" onMouseDown={() => { setPendingLoss(null); setLossReason(''); }}>
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="loss-modal-title" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="loss-modal-title">Por que essa venda foi perdida?</h2><p>{pendingLoss.name} · isso ajuda o Fuply a mostrar onde seu processo está falhando.</p></div><button type="button" className="icon-button" onClick={() => { setPendingLoss(null); setLossReason(''); }} aria-label="Fechar"><X size={20} /></button></div>
-            <form className="lead-form" onSubmit={confirmLoss}>
-              <label className="full"><span>Motivo *</span><select autoFocus required value={lossReason} onChange={e => setLossReason(e.target.value)}><option value="" disabled>Selecione um motivo</option><option>Preço</option><option>Sem resposta</option><option>Escolheu concorrente</option><option>Sem orçamento agora</option><option>Prazo</option><option>Não tinha interesse real</option><option>Outro</option></select></label>
-              <div className="modal-actions full"><button type="button" className="secondary-button" onClick={() => { setPendingLoss(null); setLossReason(''); }}>Cancelar</button><button className="primary-button lost-action"><XCircle size={16} /> Confirmar perda</button></div>
-            </form>
+      {editingLead && (
+        <div className="modal-backdrop" onMouseDown={() => setEditingId(null)}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-order-title" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header"><div><h2 id="edit-order-title">Pedido de {editingLead.name}</h2><p>{editingLead.status === STATUS_ENVIADO ? 'Já enviado' : 'Aguardando envio'}{editingLead.createdAt ? ` · criado em ${formatDate(editingLead.createdAt)}` : ''}</p></div><button type="button" className="icon-button" onClick={() => setEditingId(null)} aria-label="Fechar"><X size={20} /></button></div>
+            <OrderForm key={editingLead.id} initial={{ ...EMPTY_FORM, name: editingLead.name, phone: editingLead.phone, notes: editingLead.notes, items: editingLead.items, neighborhood: editingLead.neighborhood, deliveryFee: editingLead.deliveryFee, value: editingLead.value }} submitLabel="Salvar" onSubmit={saveOrder} onCancel={() => setEditingId(null)}>
+              <button type="button" className="secondary-button" onClick={() => deleteOrder(editingLead)}><Trash2 size={16} /> Excluir</button>
+              {editingLead.status === STATUS_PEDIDO
+                ? <button type="button" className="secondary-button" onClick={() => { setStatus(editingLead.id, STATUS_ENVIADO); setEditingId(null); }}><CheckCircle2 size={16} /> Marcar como enviado</button>
+                : <button type="button" className="secondary-button" onClick={() => { setStatus(editingLead.id, STATUS_PEDIDO); setEditingId(null); }}><Undo2 size={16} /> Voltar pra fila</button>}
+            </OrderForm>
           </section>
         </div>
       )}

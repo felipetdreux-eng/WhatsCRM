@@ -386,50 +386,35 @@ function AuthScreen({ onAuthenticated }) {
   );
 }
 
-function Onboarding({ user, profile, onComplete }) {
-  const [step, setStep] = useState(1);
-  const [selling, setSelling] = useState(profile?.selling_type || '');
-  const [goal, setGoal] = useState(profile?.goal || '');
-  const [startMode, setStartMode] = useState(profile?.start_mode || 'demo');
-  const [saving, setSaving] = useState(false);
+// Sem perguntas: o Fuply Chef já nasce pronto pra pedidos, então o cadastro só conclui sozinho.
+function Onboarding({ user, onComplete }) {
   const [error, setError] = useState('');
-  const canContinue = step === 1 ? Boolean(selling) : step === 2 ? Boolean(goal) : Boolean(startMode);
 
-  const finish = async () => {
-    if (saving) return;
-    setSaving(true);
-    setError('');
-    try {
-      const { error: updateError } = await supabase.from('profiles').update({
-        selling_type: selling,
-        goal,
-        start_mode: startMode,
-        onboarding_completed: true,
-      }).eq('id', user.id);
+  useEffect(() => {
+    let active = true;
+    supabase.from('profiles').update({
+      selling_type: 'products',
+      goal: 'sales',
+      start_mode: 'empty',
+      onboarding_completed: true,
+    }).eq('id', user.id).then(({ error: updateError }) => {
+      if (!active) return;
       if (updateError) {
-        setError(authErrorMessage(updateError, 'Não foi possível concluir o onboarding agora.'));
+        console.error('Onboarding save failed:', updateError);
+        setError(authErrorMessage(updateError, 'Não foi possível preparar sua conta agora.'));
         return;
       }
       onComplete();
-    } catch (updateError) {
-      console.error('Onboarding save failed:', updateError);
-      setError(authErrorMessage(updateError, 'Não foi possível concluir o onboarding agora.'));
-    } finally {
-      setSaving(false);
-    }
-  };
+    });
+    return () => { active = false; };
+  }, [user.id]);
 
   return (
     <div className="auth-overlay onboarding-overlay">
       <main className="onboarding-shell">
-        <header className="onboarding-topbar"><div className="auth-brand compact"><div className="auth-brand-mark"><MessageCircle size={21} /></div><span>Fuply</span></div><div className="onboarding-progress-copy">Passo {step} de 3</div></header>
-        <div className="onboarding-progress"><span style={{ width: `${(step / 3) * 100}%` }} /></div>
         <section className="onboarding-card">
-          {step === 1 && <><span className="onboarding-kicker">Pra começar</span><h1>Como você vende?</h1><p>Isso ajuda o Fuply a adaptar sua experiência sem jogar 47 configurações inúteis na sua cara.</p><div className="onboarding-options">{SELL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={selling === option.id ? 'selected' : ''} onClick={() => setSelling(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{selling === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
-          {step === 2 && <><span className="onboarding-kicker">Seu foco</span><h1>Qual é seu principal objetivo?</h1><p>Escolha o problema que você mais quer parar de carregar na cabeça.</p><div className="onboarding-options">{GOAL_OPTIONS.map(option => { const Icon = option.icon; return <button type="button" key={option.id} className={goal === option.id ? 'selected' : ''} onClick={() => setGoal(option.id)}><div className="onboarding-option-icon"><Icon size={20} /></div><div><strong>{option.title}</strong><span>{option.text}</span></div>{goal === option.id && <Check className="onboarding-check" size={17} />}</button>; })}</div></>}
-          {step === 3 && <><span className="onboarding-kicker">Último passo</span><h1>Como quer começar?</h1><p>Você pode explorar o Fuply com exemplos ou entrar com o sistema limpo.</p><div className="onboarding-start-grid"><button type="button" className={startMode === 'demo' ? 'selected' : ''} onClick={() => setStartMode('demo')}><div className="onboarding-option-icon"><Sparkles size={21} /></div><strong>Usar dados de exemplo</strong><span>Veja o pipeline, leads e follow-ups já preenchidos.</span>{startMode === 'demo' && <Check className="onboarding-check" size={17} />}</button><button type="button" className={startMode === 'empty' ? 'selected' : ''} onClick={() => setStartMode('empty')}><div className="onboarding-option-icon"><UsersRound size={21} /></div><strong>Começar vazio</strong><span>Entre sem contatos e adicione seu primeiro lead.</span>{startMode === 'empty' && <Check className="onboarding-check" size={17} />}</button></div></>}
+          <h1>Preparando seus pedidos…</h1>
           {error && <div className="auth-error" role="alert">{error}</div>}
-          <footer className="onboarding-actions"><button type="button" className="onboarding-back" disabled={step === 1 || saving} onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft size={17} /> Voltar</button>{step < 3 ? <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={() => setStep(value => Math.min(3, value + 1))}>Continuar <ArrowRight size={17} /></button> : <button type="button" className="onboarding-next" disabled={!canContinue || saving} onClick={finish}>{saving ? 'Salvando...' : 'Entrar no Fuply'} {!saving && <ArrowRight size={17} />}</button>}</footer>
         </section>
       </main>
     </div>
@@ -525,5 +510,5 @@ function AuthFlow() {
 }
 
 const host = document.getElementById('auth-root');
-const isPublicDemo = ['jacob', 'chef'].includes(new URLSearchParams(window.location.search).get('demo'));
+const isPublicDemo = new URLSearchParams(window.location.search).get('demo') === 'chef';
 if (host && !isPublicDemo) createRoot(host).render(<AuthFlow />);
