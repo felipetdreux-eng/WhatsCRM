@@ -4,7 +4,7 @@ import OrderBuilder from './OrderBuilder';
 import OrdersByNeighborhood from './OrdersByNeighborhood';
 import SettingsPage from './SettingsPage';
 import { cleanItems, itemsSummary, orderTotals } from './chefData';
-import { canonicalPhone, currency, validBrazilPhone } from './domain';
+import { canonicalPhone, currency, validBrazilPhone, whatsappPhone } from './domain';
 import { getActiveAccount, logoutAccount } from './accountStorage';
 import { supabase } from './supabaseClient';
 import './styles.css';
@@ -207,7 +207,9 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     window.location.reload();
   };
 
-  const leadRows = useMemo(() => [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR')), [filtered]);
+  const [leadFilter, setLeadFilter] = useState('todos');
+  const toSend = filtered.filter(l => l.status === STATUS_PEDIDO).length;
+  const leadRows = useMemo(() => [...filtered].filter(l => leadFilter === 'todos' || (leadFilter === 'pedido' ? l.status === STATUS_PEDIDO : l.status === STATUS_ENVIADO)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR')), [filtered, leadFilter]);
 
   const renderOrders = () => (
     <main className="main-content">
@@ -266,11 +268,16 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   const renderCustomers = () => (
     <main className="main-content">
       <header className="page-header">
-        <div><h1>Leads</h1><p>Todos os clientes e pedidos. Mude o status aqui.</p></div>
+        <div><h1>Leads</h1><p>{toSend} a enviar · {filtered.length - toSend} enviados</p></div>
         <div className="header-actions">
           <label className="search-box"><Search size={17} /><span className="sr-only">Buscar leads</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar lead" aria-label="Buscar leads" /></label>
         </div>
       </header>
+      <div className="orders-toggle" role="group" aria-label="Filtrar por status">
+        {[['todos', 'Todos'], ['pedido', 'A enviar'], ['enviado', 'Enviados']].map(([id, label]) => (
+          <button type="button" key={id} className={leadFilter === id ? 'secondary-button' : 'ghost-button'} onClick={() => setLeadFilter(id)}>{label}</button>
+        ))}
+      </div>
       <section className="orders-production">
         {leadRows.length === 0 ? <p className="orders-empty">Nenhum lead ainda.</p> : (
           <table>
@@ -278,7 +285,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
             <tbody>
               {leadRows.map(lead => (
                 <tr key={lead.id} onClick={() => setEditingId(lead.id)} style={{ cursor: 'pointer' }}>
-                  <td>{lead.name}</td><td>{lead.phone}</td><td>{lead.neighborhood}</td><td align="right">{currency(lead.value)}</td><td>{lead.status}</td>
+                  <td>{lead.name}</td><td>{lead.phone} <a href={`https://wa.me/${whatsappPhone(lead.phone)}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} aria-label="Abrir WhatsApp"><MessageCircle size={14} /></a></td><td>{lead.neighborhood}</td><td align="right">{currency(lead.value)}</td><td>{lead.status}</td>
                   <td align="right">
                     {lead.status === STATUS_PEDIDO
                       ? <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_ENVIADO); }}><CheckCircle2 size={16} /> Marcar como enviado</button>
