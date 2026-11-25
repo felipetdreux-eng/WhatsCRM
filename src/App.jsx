@@ -23,9 +23,9 @@ const STATUSES = [
   { id: STATUS_ENVIADO, className: 'sold', title: 'Enviados' },
 ];
 const NAV_ITEMS = [
-  ['Leads', ClipboardList],
+  ['Pipeline', ClipboardList],
   ['Por bairro', MapPin],
-  ['Clientes', UsersRound],
+  ['Leads', UsersRound],
   ['Configurações', Settings],
 ];
 const EMPTY_FORM = { name: '', phone: '', notes: '', items: [], neighborhood: '', deliveryFee: 0, value: 0 };
@@ -106,7 +106,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
       return [];
     }
   });
-  const [activePage, setActivePage] = useState('Leads');
+  const [activePage, setActivePage] = useState('Pipeline');
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -207,23 +207,12 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     window.location.reload();
   };
 
-  const customers = useMemo(() => {
-    const byPhone = new Map();
-    filtered.forEach(lead => {
-      const key = lead.phone || lead.id;
-      const row = byPhone.get(key) || { key, name: lead.name, phone: lead.phone, orders: 0, total: 0, last: '' };
-      row.orders += 1;
-      row.total += Number(lead.value || 0);
-      if ((lead.createdAt || '') >= row.last) { row.last = lead.createdAt || ''; row.name = lead.name; }
-      byPhone.set(key, row);
-    });
-    return [...byPhone.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, [filtered]);
+  const leadRows = useMemo(() => [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR')), [filtered]);
 
   const renderOrders = () => (
     <main className="main-content">
       <header className="page-header">
-        <div><h1>Leads</h1><p>Marque como enviado quando o pedido sair.</p></div>
+        <div><h1>Pipeline</h1><p>Marque como enviado quando o pedido sair.</p></div>
         <div className="header-actions">
           <label className="search-box"><Search size={17} /><span className="sr-only">Buscar pedidos</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar pedido" aria-label="Buscar pedidos" /></label>
           <button type="button" className="primary-button" onClick={() => setCreating(true)}><Plus size={18} /> Novo pedido</button>
@@ -277,17 +266,26 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   const renderCustomers = () => (
     <main className="main-content">
       <header className="page-header">
-        <div><h1>Clientes</h1><p>Quem já pediu, quantos pedidos e quanto gastou.</p></div>
+        <div><h1>Leads</h1><p>Todos os clientes e pedidos. Mude o status aqui.</p></div>
         <div className="header-actions">
-          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar clientes</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar clientes" /></label>
+          <label className="search-box"><Search size={17} /><span className="sr-only">Buscar leads</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar lead" aria-label="Buscar leads" /></label>
         </div>
       </header>
       <section className="orders-production">
-        {customers.length === 0 ? <p className="orders-empty">Nenhum cliente ainda.</p> : (
+        {leadRows.length === 0 ? <p className="orders-empty">Nenhum lead ainda.</p> : (
           <table>
-            <thead><tr><th align="left">Cliente</th><th align="left">WhatsApp</th><th align="right">Pedidos</th><th align="right">Total</th></tr></thead>
+            <thead><tr><th align="left">Cliente</th><th align="left">WhatsApp</th><th align="left">Bairro</th><th align="right">Total</th><th align="left">Status</th><th /></tr></thead>
             <tbody>
-              {customers.map(row => <tr key={row.key}><td>{row.name}</td><td>{row.phone}</td><td align="right">{row.orders}</td><td align="right">{currency(row.total)}</td></tr>)}
+              {leadRows.map(lead => (
+                <tr key={lead.id} onClick={() => setEditingId(lead.id)} style={{ cursor: 'pointer' }}>
+                  <td>{lead.name}</td><td>{lead.phone}</td><td>{lead.neighborhood}</td><td align="right">{currency(lead.value)}</td><td>{lead.status}</td>
+                  <td align="right">
+                    {lead.status === STATUS_PEDIDO
+                      ? <button type="button" className="whatsapp-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_ENVIADO); }}><CheckCircle2 size={16} /> Marcar como enviado</button>
+                      : <button type="button" className="secondary-button" onClick={e => { e.stopPropagation(); setStatus(lead.id, STATUS_PEDIDO); }}><Undo2 size={16} /> Voltar pra fila</button>}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
@@ -295,9 +293,10 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
     </main>
   );
 
+
   const renderPage = () => {
     if (activePage === 'Por bairro') return <OrdersByNeighborhood leads={leads} openLead={lead => setEditingId(lead.id)} onMarkSent={id => setStatus(id, STATUS_ENVIADO)} />;
-    if (activePage === 'Clientes') return renderCustomers();
+    if (activePage === 'Leads') return renderCustomers();
     if (activePage === 'Configurações') return <SettingsPage account={account} onAccountChange={setAccount} onLogout={handleLogout} demoMode={demoMode} />;
     return renderOrders();
   };
@@ -305,7 +304,7 @@ export default function App({ demoMode = false, demoAccount = null, demoLeads = 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button type="button" className="logo-wrap logo-button" onClick={() => setActivePage('Leads')} aria-label="Ir para Leads">
+        <button type="button" className="logo-wrap logo-button" onClick={() => setActivePage('Pipeline')} aria-label="Ir para Pipeline">
           <div className="logo-mark"><MessageCircle size={22} strokeWidth={2.4} /></div>
           <span>Fuply</span>
         </button>
