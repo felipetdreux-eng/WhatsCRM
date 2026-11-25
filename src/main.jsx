@@ -5,6 +5,7 @@ import GlobalImportDrop from './GlobalImportDrop';
 import { JACOB_DEMO_ACCOUNT, JACOB_DEMO_LEADS, JACOB_DEMO_TEAM, JACOB_DEMO_WHATSAPP } from './jacobDemoData';
 import { ABLE_DEMO_ACCOUNT, ABLE_DEMO_LEADS, ABLE_DEMO_TEAM, ABLE_DEMO_WHATSAPP } from './ableLiveDemoData';
 import { INNOVA_DEMO_ACCOUNT, INNOVA_DEMO_LEADS, INNOVA_DEMO_TEAM, INNOVA_DEMO_WHATSAPP } from './innovaDemoData';
+import { CHEF_DEMO_ACCOUNT, CHEF_DEMO_LEADS, CHEF_DEMO_TEAM, CHEF_DEMO_WHATSAPP } from './chefDemoData';
 import { getActiveAccount } from './accountStorage';
 import './pipelineDragScroll';
 import './dark.css';
@@ -17,6 +18,7 @@ const params = new URLSearchParams(window.location.search);
 const demo = params.get('demo');
 const demoToken = params.get('token');
 const isJacobDemo = demo === 'jacob';
+const isChefDemo = demo === 'chef';
 const isAbleDemo = demo === 'able' || demo === 'able-live';
 const isInnovaDemo = demo === 'innova' || demo === 'innova-automation';
 
@@ -41,6 +43,15 @@ function DemoStatus({ title, text }) {
         <p style={{ margin: '10px 0 0', color: '#66756d', lineHeight: 1.6 }}>{text}</p>
       </section>
     </main>
+  );
+}
+
+function renderChefDemo() {
+  if (!rootHost) return;
+  createRoot(rootHost).render(
+    <React.StrictMode>
+      <App demoMode demoAccount={CHEF_DEMO_ACCOUNT} demoLeads={CHEF_DEMO_LEADS} demoTeamMembers={CHEF_DEMO_TEAM} demoWhatsAppPhone={CHEF_DEMO_WHATSAPP} />
+    </React.StrictMode>,
   );
 }
 
@@ -93,7 +104,9 @@ async function renderProtectedDemo({ demoKey, account, leads, team, whatsapp }) 
   }
 }
 
-if (rootHost && isInnovaDemo) {
+if (rootHost && isChefDemo) {
+  renderChefDemo();
+} else if (rootHost && isInnovaDemo) {
   renderProtectedDemo({
     demoKey: 'innova',
     account: INNOVA_DEMO_ACCOUNT,

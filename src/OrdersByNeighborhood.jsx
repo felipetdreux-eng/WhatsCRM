@@ -35,7 +35,7 @@ export default function OrdersByNeighborhood({ leads, openLead, openWhatsApp }) 
   }, [leads]);
 
   return (
-    <div className="orders-page">
+    <main className="main-content dashboard-page orders-page">
       <header>
         <h1>Pedidos por bairro</h1>
         <p>Pedidos ativos (sem os perdidos), agrupados pelo bairro de entrega.</p>
@@ -86,6 +86,6 @@ export default function OrdersByNeighborhood({ leads, openLead, openWhatsApp }) 
           </table>
         </section>
       )}
-    </div>
+    </main>
   );
 }
